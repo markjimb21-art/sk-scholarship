@@ -1,0 +1,12 @@
+Options -Indexes
+RewriteEngine On
+
+# Block direct access to sensitive folders
+RewriteRule ^(config|core|database|app)/ - [F,L]
+
+# Deny hidden files
+RewriteRule (^\.|/\.) - [F,L]
+
+# Route everything through public/
+RewriteCond %{REQUEST_URI} !^/sk-scholarship/public/
+RewriteRule ^(.*)$ public/$1 [L]
