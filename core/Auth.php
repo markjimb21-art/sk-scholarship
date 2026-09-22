@@ -5,14 +5,28 @@ final class Auth
 {
     public static function start(): void {
         if (session_status() === PHP_SESSION_NONE) {
+            ini_set('session.use_strict_mode', '1');
+            ini_set('session.use_only_cookies', '1');
+            ini_set('session.gc_maxlifetime', (string)SESSION_LIFETIME);
             session_set_cookie_params([
                 'lifetime' => SESSION_LIFETIME,
                 'path' => '/',
                 'httponly' => true,
                 'samesite' => 'Lax',
-                'secure' => isset($_SERVER['HTTPS']),
+                'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
             ]);
             session_start();
+
+            // Idle timeout: drop an authenticated session that has been inactive longer than SESSION_LIFETIME.
+            if (!empty($_SESSION['user_id'])) {
+                $last = (int)($_SESSION['_last_activity'] ?? 0);
+                if ($last > 0 && (time() - $last) > SESSION_LIFETIME) {
+                    $_SESSION = [];
+                    session_regenerate_id(true);
+                } else {
+                    $_SESSION['_last_activity'] = time();
+                }
+            }
         }
     }
 
@@ -46,9 +60,17 @@ final class Auth
     public static function requireRole(string ...$roles): void {
         self::requireLogin();
         if (!self::hasRole(...$roles)) {
-            http_response_code(403);
-            die('Access denied.');
+            self::deny();
         }
+    }
+
+    /** Respond 403 and record the attempt. Used for every failed authorization check. */
+    public static function deny(): void {
+        http_response_code(403);
+        $r = preg_replace('/[^a-zA-Z0-9_\-\/&=.]/', '', (string)($_GET['r'] ?? ''));
+        AuditLog::write('access_denied', null, null,
+            'Denied ' . ($_SERVER['REQUEST_METHOD'] ?? 'GET') . ' ' . substr($r, 0, 120) . ' as ' . (self::role() ?? 'guest'));
+        die('Access denied.');
     }
 
     public static function login(string $email, string $password): array {

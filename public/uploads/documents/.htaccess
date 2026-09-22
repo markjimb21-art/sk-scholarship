@@ -1,0 +1,5 @@
+# Sensitive applicant documents (Certificate of Residency, Form 138, Enrollment Form, School ID, Profile Picture).
+# These are legacy files uploaded before documents moved to storage/documents/ (outside the web root).
+# They must only be reached through the authenticated document-serving route
+# (admin/documents/view, applicant/documents/view), never fetched directly by URL.
+Require all denied

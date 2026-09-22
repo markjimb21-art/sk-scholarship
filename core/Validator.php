@@ -8,7 +8,7 @@ final class Validator
 
     public function __construct(array $data) { $this->data = $data; }
 
-    public function required(string $field, string $label = null): self {
+    public function required(string $field, ?string $label = null): self {
         $label ??= ucfirst(str_replace('_', ' ', $field));
         if (!isset($this->data[$field]) || trim((string)$this->data[$field]) === '') {
             $this->errors[$field] = "$label is required.";
@@ -23,7 +23,7 @@ final class Validator
         return $this;
     }
 
-    public function min(string $field, int $len, string $label = null): self {
+    public function min(string $field, int $len, ?string $label = null): self {
         $label ??= ucfirst(str_replace('_', ' ', $field));
         if (!empty($this->data[$field]) && mb_strlen((string)$this->data[$field]) < $len) {
             $this->errors[$field] = "$label must be at least $len characters.";
@@ -31,7 +31,7 @@ final class Validator
         return $this;
     }
 
-    public function numeric(string $field, string $label = null): self {
+    public function numeric(string $field, ?string $label = null): self {
         $label ??= ucfirst(str_replace('_', ' ', $field));
         if (!empty($this->data[$field]) && !is_numeric($this->data[$field])) {
             $this->errors[$field] = "$label must be numeric.";
@@ -39,7 +39,7 @@ final class Validator
         return $this;
     }
 
-    public function date(string $field, string $label = null): self {
+    public function date(string $field, ?string $label = null): self {
         $label ??= ucfirst(str_replace('_', ' ', $field));
         if (!empty($this->data[$field])) {
             $d = DateTime::createFromFormat('Y-m-d', $this->data[$field]);
@@ -50,7 +50,7 @@ final class Validator
         return $this;
     }
 
-    public function matches(string $field, string $otherField, string $label = null): self {
+    public function matches(string $field, string $otherField, ?string $label = null): self {
         $label ??= ucfirst(str_replace('_', ' ', $field));
         if (($this->data[$field] ?? null) !== ($this->data[$otherField] ?? null)) {
             $this->errors[$field] = "$label does not match.";
@@ -58,7 +58,7 @@ final class Validator
         return $this;
     }
 
-    public function in(string $field, array $allowed, string $label = null): self {
+    public function in(string $field, array $allowed, ?string $label = null): self {
         $label ??= ucfirst(str_replace('_', ' ', $field));
         if (!empty($this->data[$field]) && !in_array($this->data[$field], $allowed, true)) {
             $this->errors[$field] = "$label has an invalid value.";

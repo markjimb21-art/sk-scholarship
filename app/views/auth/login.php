@@ -41,6 +41,9 @@
                 <input type="password" name="password" class="form-control" required>
               </div>
             </div>
+            <div class="text-end mb-3">
+              <a href="<?= url('forgot-password') ?>" class="small">Forgot password?</a>
+            </div>
             <button class="btn btn-primary w-100 py-2 fw-semibold">
               <i class="bi bi-box-arrow-in-right me-1"></i> Sign In
             </button>

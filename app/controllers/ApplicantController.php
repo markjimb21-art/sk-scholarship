@@ -19,6 +19,7 @@ final class ApplicantController
             case 'application/submit':  $this->submitApplication(); break;
             case 'documents':           $this->documents(); break;
             case 'documents/upload':    $this->uploadDocument(); break;
+            case 'documents/view':      $this->viewDocument(); break;
             case 'interview':           $this->interview(); break;
             case 'scholarship':         $this->scholarship(); break;
             case 'notifications':       $this->notifications(); break;
@@ -52,6 +53,19 @@ final class ApplicantController
         );
         $stmt->execute([$applicantId]);
         return $stmt->fetch() ?: null;
+    }
+
+    /** Applicants may edit/submit only while the application is a Draft or was sent back as Incomplete. */
+    private function isEditable(?array $app): bool
+    {
+        return $app === null || in_array($app['status'], ['Draft', 'Incomplete'], true);
+    }
+
+    /** Honors the admin "application_open" system setting (defaults to open when unset). */
+    private function applicationsOpen(): bool
+    {
+        $v = Database::conn()->query("SELECT setting_value FROM system_settings WHERE setting_key = 'application_open'")->fetchColumn();
+        return $v === false || $v === null || $v === '' || (string)$v !== '0';
     }
 
     private function dashboard(): void
@@ -123,6 +137,16 @@ final class ApplicantController
         $pdo = Database::conn();
         $u = Auth::user();
         $step = $_POST['step'] ?? '';
+
+        $current = $this->activeApplication((int)$applicant['id']);
+        if (!$this->isEditable($current)) {
+            flash('warning', 'Your application has already been submitted and can no longer be edited.');
+            redirect('applicant/application');
+        }
+        if (!$current && !$this->applicationsOpen()) {
+            flash('warning', 'Applications are currently closed.');
+            redirect('applicant/application');
+        }
 
         try {
             $pdo->beginTransaction();
@@ -284,6 +308,15 @@ final class ApplicantController
             redirect('applicant/application');
         }
 
+        if (!$this->isEditable($app)) {
+            flash('warning', 'This application has already been submitted.');
+            redirect('applicant/dashboard');
+        }
+        if (!$this->applicationsOpen()) {
+            flash('warning', 'Applications are currently closed.');
+            redirect('applicant/application');
+        }
+
         // Verify at least 4 out of 5 documents uploaded (or allow submit and let staff verify)
         $docStmt = $pdo->prepare(
             "SELECT COUNT(*) FROM documents WHERE application_id = ? AND status != 'Not Submitted' AND file_path != ''"
@@ -332,28 +365,55 @@ final class ApplicantController
         $applicant = $this->applicantRecord();
         $app = $this->activeApplication((int)$applicant['id']);
         if (!$app) { flash('danger', 'Submit your application first.'); redirect('applicant/documents'); }
+        if (in_array($app['status'], ['Approved', 'Rejected'], true)) {
+            flash('warning', 'This application has been decided; documents can no longer be changed.');
+            redirect('applicant/documents');
+        }
 
         $type = $_POST['document_type'] ?? '';
         if (!in_array($type, DOCUMENT_TYPES, true)) { flash('danger', 'Invalid document type.'); redirect('applicant/documents'); }
-        if (empty($_FILES['file']['name'])) { flash('danger', 'Please choose a file.'); redirect('applicant/documents'); }
+        if (empty($_FILES['file']['name']) || is_array($_FILES['file']['name'])) { flash('danger', 'Please choose a file.'); redirect('applicant/documents'); }
 
         $file = $_FILES['file'];
         if ($file['error'] !== UPLOAD_ERR_OK) { flash('danger', 'Upload error.'); redirect('applicant/documents'); }
-        if ($file['size'] > MAX_FILE_SIZE) { flash('danger', 'File too large (max 5MB).'); redirect('applicant/documents'); }
+        if (!is_uploaded_file($file['tmp_name'])) { flash('danger', 'Upload error.'); redirect('applicant/documents'); }
 
+        // Size: measured on the server, not trusted from the client.
+        $size = filesize($file['tmp_name']);
+        if ($size === false || $size <= 0) { flash('danger', 'The uploaded file is empty.'); redirect('applicant/documents'); }
+        if ($size > MAX_FILE_SIZE) { flash('danger', 'File too large (max 5MB).'); redirect('applicant/documents'); }
+
+        // Type: detected from the file CONTENT; the client-supplied name/extension/type are never trusted.
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mime = finfo_file($finfo, $file['tmp_name']);
         finfo_close($finfo);
         if (!in_array($mime, ALLOWED_MIME, true)) { flash('danger', 'Only PDF, JPG, or PNG allowed.'); redirect('applicant/documents'); }
 
-        $ext = match($mime) { 'application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png', default => 'bin' };
-        $dir = UPLOAD_PATH . '/documents/' . $app['id'];
-        if (!is_dir($dir)) mkdir($dir, 0775, true);
-        $filename = preg_replace('/[^a-z0-9_]/i', '_', $type) . '_' . time() . '.' . $ext;
+        // Structural sanity check so the bytes really are the claimed format.
+        if ($mime === 'application/pdf') {
+            $head = file_get_contents($file['tmp_name'], false, null, 0, 5);
+            $valid = ($head === '%PDF-');
+        } else {
+            $info = getimagesize($file['tmp_name']);
+            $valid = $info !== false && in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true);
+        }
+        if (!$valid) { flash('danger', 'The file is not a valid PDF, JPG, or PNG.'); redirect('applicant/documents'); }
+
+        // Extension comes ONLY from the detected type; filename is random and unguessable.
+        $ext = match($mime) { 'application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png' };
+        $dir = DOCUMENT_PATH . '/' . (int)$app['id'];
+        if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
+            error_log('Cannot create document directory: ' . $dir);
+            flash('danger', 'Cannot save file.');
+            redirect('applicant/documents');
+        }
+        $filename = bin2hex(random_bytes(16)) . '.' . $ext;
         $target = $dir . '/' . $filename;
         if (!move_uploaded_file($file['tmp_name'], $target)) { flash('danger', 'Cannot save file.'); redirect('applicant/documents'); }
+        chmod($target, 0640);
 
-        $rel = 'uploads/documents/' . $app['id'] . '/' . $filename;
+        $rel = 'storage/documents/' . (int)$app['id'] . '/' . $filename;
+        $origName = mb_substr((string)preg_replace('/[\x00-\x1F\x7F]/u', '', basename(str_replace('\\', '/', (string)$file['name']))), 0, 200);
 
         // Upsert document row
         $existing = Database::conn()->prepare("SELECT id, file_path FROM documents WHERE application_id = ? AND document_type = ?");
@@ -361,22 +421,43 @@ final class ApplicantController
         $row = $existing->fetch();
 
         if ($row) {
-            // remove old file
-            $oldPath = PUBLIC_PATH . '/' . $row['file_path'];
-            if ($row['file_path'] && is_file($oldPath)) @unlink($oldPath);
+            // remove the previous file (resolver refuses anything outside the approved document roots)
+            $oldPath = Document::absolutePath($row['file_path']);
+            if ($oldPath !== null && !unlink($oldPath)) {
+                error_log('Could not delete replaced document: ' . $row['file_path']);
+            }
             Database::conn()->prepare("UPDATE documents SET file_path=?, original_filename=?, file_size=?, mime_type=?,
                                        status='Submitted', uploaded_at=NOW(), reviewed_at=NULL, reviewed_by=NULL, remarks=NULL
                                        WHERE id=?")
-                ->execute([$rel, $file['name'], $file['size'], $mime, $row['id']]);
+                ->execute([$rel, $origName, $size, $mime, $row['id']]);
         } else {
             Database::conn()->prepare("INSERT INTO documents (application_id, document_type, file_path, original_filename, file_size, mime_type, status)
                                        VALUES (?,?,?,?,?,?, 'Submitted')")
-                ->execute([$app['id'], $type, $rel, $file['name'], $file['size'], $mime]);
+                ->execute([$app['id'], $type, $rel, $origName, $size, $mime]);
         }
 
-        AuditLog::write('document_uploaded', 'documents', null, "Uploaded $type for application #{$app['application_code']}");
+        AuditLog::write('document_uploaded', 'documents', $row ? (int)$row['id'] : null, "Uploaded $type for application #{$app['application_code']}");
         flash('success', "$type uploaded successfully.");
         redirect('applicant/documents');
+    }
+
+    /** An applicant may only open documents belonging to their OWN application. */
+    private function viewDocument(): void
+    {
+        $applicant = $this->applicantRecord();
+        $doc = Document::find((int)($_GET['id'] ?? 0));
+        $owned = false;
+        if ($doc) {
+            $stmt = Database::conn()->prepare("SELECT 1 FROM applications WHERE id = ? AND applicant_id = ?");
+            $stmt->execute([$doc['application_id'], $applicant['id']]);
+            $owned = (bool)$stmt->fetchColumn();
+        }
+        if (!$doc || !$owned) {
+            // 404 (not 403) so document ids cannot be probed
+            http_response_code(404);
+            die('Document not found.');
+        }
+        Document::send($doc, isset($_GET['download']));
     }
 
     private function interview(): void
@@ -469,7 +550,7 @@ final class ApplicantController
         }
         $pageTitle = 'My Profile';
         require VIEW_PATH . '/layouts/header.php';
-        require VIEW_PATH . '/applicant/profile.php';
+        require VIEW_PATH . '/applicant/Profile.php';   // file on disk is Profile.php (case-sensitive on Linux)
         require VIEW_PATH . '/layouts/footer.php';
     }
 }

@@ -3,6 +3,25 @@ declare(strict_types=1);
 
 final class Scholar
 {
+    private const RENEWAL_STATUS = ['Eligible for Renewal', 'For Review', 'Not Eligible', 'Renewed', 'Renewal Denied'];
+
+    /** Shared by search() and count() so paging totals always match the rows. Placeholder names must be unique (native prepares). */
+    private static function where(array $filters): array
+    {
+        $sql = '';
+        $params = [];
+        if (!empty($filters['q'])) {
+            $sql .= " AND (u.full_name LIKE :q1 OR s.scholar_code LIKE :q2 OR u.email LIKE :q3)";
+            $params['q1'] = $params['q2'] = $params['q3'] = '%' . $filters['q'] . '%';
+        }
+        if (!empty($filters['status']))     { $sql .= " AND s.status = :st";             $params['st'] = $filters['status']; }
+        if (!empty($filters['school']))     { $sql .= " AND e.school_name = :school";    $params['school'] = $filters['school']; }
+        if (!empty($filters['course']))     { $sql .= " AND e.course_name LIKE :course"; $params['course'] = '%' . $filters['course'] . '%'; }
+        if (!empty($filters['year_level'])) { $sql .= " AND e.year_level = :yl";         $params['yl'] = $filters['year_level']; }
+        if (!empty($filters['program_id'])) { $sql .= " AND s.program_id = :pid";        $params['pid'] = (int)$filters['program_id']; }
+        return [$sql, $params];
+    }
+
     /* ================= SCHOLARS ================= */
 
     public static function findByApplicant(int $applicantId): ?array
@@ -74,32 +93,8 @@ final class Scholar
                 JOIN scholarship_programs sp ON sp.id = s.program_id
                 LEFT JOIN education_records e ON e.applicant_id = a.id
                 WHERE 1=1";
-        $params = [];
-
-        if (!empty($filters['q'])) {
-            $sql .= " AND (u.full_name LIKE :q OR s.scholar_code LIKE :q OR u.email LIKE :q)";
-            $params['q'] = '%' . $filters['q'] . '%';
-        }
-        if (!empty($filters['status'])) {
-            $sql .= " AND s.status = :st";
-            $params['st'] = $filters['status'];
-        }
-        if (!empty($filters['school'])) {
-            $sql .= " AND e.school_name = :school";
-            $params['school'] = $filters['school'];
-        }
-        if (!empty($filters['course'])) {
-            $sql .= " AND e.course_name LIKE :course";
-            $params['course'] = '%' . $filters['course'] . '%';
-        }
-        if (!empty($filters['year_level'])) {
-            $sql .= " AND e.year_level = :yl";
-            $params['yl'] = $filters['year_level'];
-        }
-        if (!empty($filters['program_id'])) {
-            $sql .= " AND s.program_id = :pid";
-            $params['pid'] = (int)$filters['program_id'];
-        }
+        [$w, $params] = self::where($filters);
+        $sql .= $w;
 
         $sql .= " ORDER BY s.approval_date DESC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
 
@@ -115,13 +110,9 @@ final class Scholar
                 JOIN users u ON u.id = a.user_id
                 LEFT JOIN education_records e ON e.applicant_id = a.id
                 WHERE 1=1";
-        $params = [];
-        if (!empty($filters['q'])) {
-            $sql .= " AND (u.full_name LIKE :q OR s.scholar_code LIKE :q)";
-            $params['q'] = '%' . $filters['q'] . '%';
-        }
-        if (!empty($filters['status'])) { $sql .= " AND s.status = :st"; $params['st'] = $filters['status']; }
-        if (!empty($filters['school'])) { $sql .= " AND e.school_name = :school"; $params['school'] = $filters['school']; }
+        [$w, $params] = self::where($filters);
+        $sql .= $w;
+
         $stmt = Database::conn()->prepare($sql);
         $stmt->execute($params);
         return (int)$stmt->fetchColumn();

@@ -10,12 +10,82 @@ require_once BASE_PATH . '/app/models/Analytics.php';
 
 final class AdminController
 {
+    private const ROLES_ALL   = ['admin', 'staff', 'official'];
+    private const ROLES_STAFF = ['admin', 'staff'];
+    private const ROLES_ADMIN = ['admin'];
+
+    /**
+     * Authorization policy: action => roles allowed. DEFAULT DENY: an action that is not listed here is a 404.
+     * ALL   = dashboard/analytics/reports (read-only views for officials)
+     * STAFF = day-to-day scholarship administration (admin + staff)
+     * ADMIN = users, system settings, audit logs
+     * Per-action exceptions are enforced inside the handler (e.g. applications/update -> admin_override is admin only).
+     */
+    private const ACCESS = [
+        // ALL
+        'dashboard' => self::ROLES_ALL,
+        'notifications' => self::ROLES_ALL,
+        'analytics' => self::ROLES_ALL,
+        'reports' => self::ROLES_ALL,
+        'reports/generate' => self::ROLES_ALL,
+        // STAFF
+        'applications' => self::ROLES_STAFF,
+        'applications/view' => self::ROLES_STAFF,
+        'applications/update' => self::ROLES_STAFF,
+        'applicants' => self::ROLES_STAFF,
+        'documents' => self::ROLES_STAFF,
+        'documents/view' => self::ROLES_STAFF,
+        'documents/review' => self::ROLES_STAFF,
+        'interview-scheduling' => self::ROLES_STAFF,
+        'interview-schedule-save' => self::ROLES_STAFF,
+        'interview-schedule-update' => self::ROLES_STAFF,
+        'interview-schedule-cancel' => self::ROLES_STAFF,
+        'interview-schedule-detail' => self::ROLES_STAFF,
+        'interview-assign' => self::ROLES_STAFF,
+        'interview-unassign' => self::ROLES_STAFF,
+        'interview-assignment-status' => self::ROLES_STAFF,
+        'interview-calendar' => self::ROLES_STAFF,
+        'interview-calendar-feed' => self::ROLES_STAFF,
+        'interview-evaluation' => self::ROLES_STAFF,
+        'interview-evaluate' => self::ROLES_STAFF,
+        'interview-evaluation-save' => self::ROLES_STAFF,
+        'scholars' => self::ROLES_STAFF,
+        'scholar-view' => self::ROLES_STAFF,
+        'scholar-status' => self::ROLES_STAFF,
+        'academic-records' => self::ROLES_STAFF,
+        'academic-record-save' => self::ROLES_STAFF,
+        'academic-record-delete' => self::ROLES_STAFF,
+        'releases' => self::ROLES_STAFF,
+        'release-save' => self::ROLES_STAFF,
+        'release-delete' => self::ROLES_STAFF,
+        'renewals' => self::ROLES_STAFF,
+        'renewal-view' => self::ROLES_STAFF,
+        'renewal-save' => self::ROLES_STAFF,
+        'renewal-update' => self::ROLES_STAFF,
+        'renewal-delete' => self::ROLES_STAFF,
+        // ADMIN
+        'users' => self::ROLES_ADMIN,
+        'user-save' => self::ROLES_ADMIN,
+        'user-toggle' => self::ROLES_ADMIN,
+        'user-reset' => self::ROLES_ADMIN,
+        'user-delete' => self::ROLES_ADMIN,
+        'settings' => self::ROLES_ADMIN,
+        'settings/save' => self::ROLES_ADMIN,
+        'audit-logs' => self::ROLES_ADMIN,
+    ];
+
     public function handle(string $action): void
     {
         $action = trim($action, '/');
 
-        // Any user in admin area must be admin/staff/official
-        Auth::requireRole('admin', 'staff', 'official');
+        Auth::requireLogin();
+        $allowed = self::ACCESS[$action] ?? null;
+        if ($allowed === null) {                    // unknown action => 404 (default deny)
+            http_response_code(404);
+            require VIEW_PATH . '/errors/404.php';
+            return;
+        }
+        Auth::requireRole(...$allowed);             // wrong role => 403 (GET and POST alike)
 
         switch ($action) {
             case 'dashboard':                  $this->dashboard(); break;
@@ -57,6 +127,14 @@ final class AdminController
             case 'analytics':                  $this->analytics(); break;
             case 'reports':                    $this->reports(); break;
             case 'reports/generate':           $this->generateReport(); break;
+            case 'users':                      $this->users(); break;
+            case 'user-save':                  $this->userSave(); break;
+            case 'user-toggle':                $this->userToggle(); break;
+            case 'user-reset':                 $this->userReset(); break;
+            case 'user-delete':                $this->userDelete(); break;
+            case 'settings':                   $this->settings(); break;
+            case 'settings/save':              $this->settingsSave(); break;
+            case 'audit-logs':                 $this->auditLogs(); break;
             default:
                 http_response_code(404);
                 require VIEW_PATH . '/errors/404.php';
@@ -183,6 +261,10 @@ final class AdminController
         $action = $_POST['action'] ?? '';
         $app    = Application::find($id);
         if (!$app) { flash('danger', 'Application not found.'); redirect('admin/applications'); }
+
+        if ($action === 'admin_override' && !Auth::hasRole('admin')) {
+            Auth::deny();
+        }
 
         $userId = (int)Auth::user()['id'];
         $pdo = Database::conn();
@@ -381,25 +463,9 @@ final class AdminController
      * ------------------------------------------------------------ */
     private function viewDocument(): void
     {
-        $id = (int)($_GET['id'] ?? 0);
-        $doc = Document::find($id);
+        $doc = Document::find((int)($_GET['id'] ?? 0));
         if (!$doc || !$doc['file_path']) { http_response_code(404); die('Document not found.'); }
-
-        $path = PUBLIC_PATH . '/' . $doc['file_path'];
-        if (!is_file($path)) { http_response_code(404); die('File missing on disk.'); }
-
-        $download = isset($_GET['download']);
-        $mime = $doc['mime_type'] ?: 'application/octet-stream';
-
-        header('Content-Type: ' . $mime);
-        header('Content-Length: ' . filesize($path));
-        if ($download) {
-            header('Content-Disposition: attachment; filename="' . basename($doc['original_filename']) . '"');
-        } else {
-            header('Content-Disposition: inline; filename="' . basename($doc['original_filename']) . '"');
-        }
-        readfile($path);
-        exit;
+        Document::send($doc, isset($_GET['download']));
     }
 
     /* ------------------------------------------------------------
@@ -456,7 +522,8 @@ final class AdminController
         }
 
         flash('success', "Document marked as $status.");
-        redirect($_POST['redirect'] ?? 'admin/documents');
+        $back = (string)($_POST['redirect'] ?? '');
+        redirect(preg_match('#^admin/[A-Za-z0-9_\-/]+(?:[&?][A-Za-z0-9_\-]+=[A-Za-z0-9_\-%.+]*)*$#', $back) === 1 ? $back : 'admin/documents');
     }
 
     /* ------------------------------------------------------------
@@ -487,7 +554,9 @@ final class AdminController
         $programId = (int)($_GET['program_id'] ?? ($programs[0]['id'] ?? 0));
 
         $schedules = $programId ? Interview::schedulesByProgram($programId) : [];
-        $program   = $programId ? $pdo->query("SELECT * FROM scholarship_programs WHERE id = $programId")->fetch() : null;
+        $progStmt  = $pdo->prepare("SELECT * FROM scholarship_programs WHERE id = ?");
+        $progStmt->execute([$programId]);
+        $program   = $programId ? ($progStmt->fetch() ?: null) : null;
         $eligible  = $programId ? Interview::eligibleApplicationsForInterview($programId) : [];
 
         $pageTitle = 'Interview Scheduling';
@@ -903,7 +972,7 @@ final class AdminController
                 LEFT JOIN users st ON st.id = r.staff_id
                 WHERE 1=1";
         $params = [];
-        if (!empty($filters['q'])) { $sql .= " AND (u.full_name LIKE :q OR s.scholar_code LIKE :q OR r.release_code LIKE :q)"; $params['q'] = '%'.$filters['q'].'%'; }
+        if (!empty($filters['q'])) { $sql .= " AND (u.full_name LIKE :q1 OR s.scholar_code LIKE :q2 OR r.release_code LIKE :q3)"; $params['q1'] = $params['q2'] = $params['q3'] = '%'.$filters['q'].'%'; }
         if (!empty($filters['year'])) { $sql .= " AND r.academic_year = :y"; $params['y'] = $filters['year']; }
         $sql .= " ORDER BY r.release_date DESC, r.id DESC LIMIT $limit OFFSET $offset";
 
@@ -916,7 +985,7 @@ final class AdminController
                     JOIN applicants a ON a.id = s.applicant_id
                     JOIN users u ON u.id = a.user_id WHERE 1=1";
         $cp = [];
-        if (!empty($filters['q'])) { $countSql .= " AND (u.full_name LIKE :q OR s.scholar_code LIKE :q)"; $cp['q'] = '%'.$filters['q'].'%'; }
+        if (!empty($filters['q'])) { $countSql .= " AND (u.full_name LIKE :q1 OR s.scholar_code LIKE :q2 OR r.release_code LIKE :q3)"; $cp['q1'] = $cp['q2'] = $cp['q3'] = '%'.$filters['q'].'%'; }
         if (!empty($filters['year'])) { $countSql .= " AND r.academic_year = :y"; $cp['y'] = $filters['year']; }
         $cStmt = $pdo->prepare($countSql); $cStmt->execute($cp);
         $total = (int)$cStmt->fetchColumn();
@@ -1125,6 +1194,13 @@ final class AdminController
             self::streamPdf($report);
         }
         exit;
+    }
+
+    private static function programName(PDO $pdo, int $id): string|false
+    {
+        $s = $pdo->prepare("SELECT program_name FROM scholarship_programs WHERE id = ?");
+        $s->execute([$id]);
+        return $s->fetchColumn();
     }
 
     private static function buildReport(string $type, ?int $programId, ?string $from, ?string $to): array
@@ -1363,7 +1439,7 @@ final class AdminController
             'headers' => $rows ? array_keys($rows[0]) : [],
             'rows'    => array_map('array_values', $rows),
             'meta'    => [
-                'Program' => $programId ? ($pdo->query("SELECT program_name FROM scholarship_programs WHERE id=$programId")->fetchColumn() ?: '—') : 'All Programs',
+                'Program' => $programId ? (self::programName($pdo, (int)$programId) ?: '—') : 'All Programs',
                 'From'    => $from ?: 'Any',
                 'To'      => $to   ?: 'Any',
                 'Generated' => date('F d, Y g:i A'),
@@ -1382,7 +1458,9 @@ final class AdminController
         foreach ($report['meta'] as $k => $v) fputcsv($out, [$k, $v]);
         fputcsv($out, []);
         fputcsv($out, $report['headers']);
-        foreach ($report['rows'] as $row) fputcsv($out, $row);
+        // Neutralise spreadsheet formula injection: text starting with = + - @ TAB CR would execute in Excel/Sheets.
+        $safe = static fn($c) => (is_string($c) && $c !== '' && !is_numeric($c) && preg_match('/^[=+\-@\t\r]/', $c)) ? "'" . $c : $c;
+        foreach ($report['rows'] as $row) fputcsv($out, array_map($safe, $row));
         fclose($out);
     }
 
@@ -1474,5 +1552,320 @@ final class AdminController
         // Stream (I = inline, D = download)
         $slug = preg_replace('/[^a-z0-9]+/i', '-', strtolower($report['title']));
         $dompdf->stream($slug . '-' . date('Ymd-His') . '.pdf', ['Attachment' => false]);
+    }
+    /* ================= USERS ================= */
+    private function users(): void
+    {
+        // Only admin can manage users
+        if (!Auth::hasRole('admin')) { http_response_code(403); die('Admin access only.'); }
+
+        $pdo = Database::conn();
+        $filters = [
+            'q'    => trim($_GET['q'] ?? ''),
+            'role' => $_GET['role'] ?? '',
+        ];
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $limit = 25;
+        $offset = ($page - 1) * $limit;
+
+        // Explicit columns: password_hash / reset_token / verify_token must never reach the browser.
+        $sql = "SELECT u.id, u.role_id, u.full_name, u.email, u.contact_number, u.is_active, u.last_login, u.created_at, r.role_name,
+                    (SELECT COUNT(*) FROM applicants ap WHERE ap.user_id = u.id) AS is_applicant
+                FROM users u
+                JOIN roles r ON r.id = u.role_id
+                WHERE 1=1";
+        $params = [];
+        if (!empty($filters['q'])) {
+            $sql .= " AND (u.full_name LIKE :q1 OR u.email LIKE :q2)";
+            $params['q1'] = $params['q2'] = '%' . $filters['q'] . '%';
+        }
+        if (!empty($filters['role'])) {
+            $sql .= " AND r.role_name = :role";
+            $params['role'] = $filters['role'];
+        }
+        $sql .= " ORDER BY u.created_at DESC LIMIT $limit OFFSET $offset";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $users = $stmt->fetchAll();
+
+        // count
+        $countSql = "SELECT COUNT(*) FROM users u JOIN roles r ON r.id = u.role_id WHERE 1=1";
+        $cp = [];
+        if (!empty($filters['q'])) { $countSql .= " AND (u.full_name LIKE :q1 OR u.email LIKE :q2)"; $cp['q1'] = $cp['q2'] = '%'.$filters['q'].'%'; }
+        if (!empty($filters['role'])) { $countSql .= " AND r.role_name = :role"; $cp['role'] = $filters['role']; }
+        $cStmt = $pdo->prepare($countSql); $cStmt->execute($cp);
+        $total = (int)$cStmt->fetchColumn();
+        $pages = max(1, (int)ceil($total / $limit));
+
+        $roles = $pdo->query("SELECT id, role_name, description FROM roles ORDER BY id")->fetchAll();
+
+        $pageTitle = 'Users';
+        require VIEW_PATH . '/layouts/header.php';
+        require VIEW_PATH . '/admin/users.php';
+        require VIEW_PATH . '/layouts/footer.php';
+    }
+
+    private function userSave(): void
+    {
+        if (!Auth::hasRole('admin')) { http_response_code(403); die('Admin access only.'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/users');
+        verify_csrf();
+
+        $pdo = Database::conn();
+        $id       = (int)($_POST['id'] ?? 0);
+        $fullName = trim($_POST['full_name'] ?? '');
+        $email    = strtolower(trim($_POST['email'] ?? ''));
+        $roleId   = (int)($_POST['role_id'] ?? 0);
+        $contact  = trim($_POST['contact_number'] ?? '');
+        $password = $_POST['password'] ?? '';
+
+        if ($fullName === '' || $email === '' || $roleId <= 0) {
+            flash('danger', 'Name, email, and role are required.');
+            redirect('admin/users');
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            flash('danger', 'Invalid email address.');
+            redirect('admin/users');
+        }
+        $rc = $pdo->prepare("SELECT 1 FROM roles WHERE id = ?");
+        $rc->execute([$roleId]);
+        if (!$rc->fetchColumn()) {
+            flash('danger', 'Invalid role.');
+            redirect('admin/users');
+        }
+        if ($id > 0 && $id === (int)Auth::user()['id'] && $roleId !== (int)Auth::user()['role_id']) {
+            flash('danger', 'You cannot change your own role.');
+            redirect('admin/users');
+        }
+
+        if ($id > 0) {
+            // Update
+            $chk = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id <> ?");
+            $chk->execute([$email, $id]);
+            if ($chk->fetch()) { flash('danger', 'Email already used.'); redirect('admin/users'); }
+
+            $sql = "UPDATE users SET full_name=?, email=?, role_id=?, contact_number=? WHERE id=?";
+            $pdo->prepare($sql)->execute([$fullName, $email, $roleId, $contact, $id]);
+
+            if ($password !== '') {
+                if (strlen($password) < PASSWORD_MIN_LENGTH) {
+                    flash('warning', 'Password was not updated (too short).');
+                } else {
+                    $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")
+                        ->execute([password_hash($password, PASSWORD_DEFAULT), $id]);
+                }
+            }
+
+            AuditLog::write('user_updated', 'users', $id, "Updated user $email");
+            flash('success', 'User updated.');
+        } else {
+            // Create
+            $chk = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+            $chk->execute([$email]);
+            if ($chk->fetch()) { flash('danger', 'Email already exists.'); redirect('admin/users'); }
+            if (strlen($password) < PASSWORD_MIN_LENGTH) {
+                flash('danger', 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.');
+                redirect('admin/users');
+            }
+
+            $pdo->prepare(
+                "INSERT INTO users (full_name, email, password_hash, role_id, contact_number, is_active)
+                VALUES (?, ?, ?, ?, ?, 1)"
+            )->execute([$fullName, $email, password_hash($password, PASSWORD_DEFAULT), $roleId, $contact]);
+
+            $newId = (int)$pdo->lastInsertId();
+            AuditLog::write('user_created', 'users', $newId, "Created user $email");
+            flash('success', 'User created.');
+        }
+
+        redirect('admin/users');
+    }
+
+    private function userToggle(): void
+    {
+        if (!Auth::hasRole('admin')) { http_response_code(403); die('Admin access only.'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/users');
+        verify_csrf();
+
+        $id = (int)$_POST['id'];
+        if ($id === (int)Auth::user()['id']) {
+            flash('danger', 'You cannot deactivate your own account.');
+            redirect('admin/users');
+        }
+
+        $pdo = Database::conn();
+        $u = $pdo->prepare("SELECT is_active, email FROM users WHERE id = ?");
+        $u->execute([$id]);
+        $row = $u->fetch();
+        if (!$row) { flash('danger', 'User not found.'); redirect('admin/users'); }
+
+        $newState = $row['is_active'] ? 0 : 1;
+        $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ?")->execute([$newState, $id]);
+
+        AuditLog::write('user_status_changed', 'users', $id,
+            ($newState ? 'Activated' : 'Deactivated') . " user {$row['email']}");
+
+        flash('success', $newState ? 'User activated.' : 'User deactivated.');
+        redirect('admin/users');
+    }
+
+    private function userReset(): void
+    {
+        if (!Auth::hasRole('admin')) { http_response_code(403); die('Admin access only.'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/users');
+        verify_csrf();
+
+        $id = (int)$_POST['id'];
+        $newPassword = $_POST['new_password'] ?? '';
+
+        if (strlen($newPassword) < PASSWORD_MIN_LENGTH) {
+            flash('danger', 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.');
+            redirect('admin/users');
+        }
+
+        Database::conn()->prepare("UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?")
+            ->execute([password_hash($newPassword, PASSWORD_DEFAULT), $id]);
+
+        AuditLog::write('user_password_reset', 'users', $id, 'Admin reset password');
+        flash('success', 'Password reset successfully.');
+        redirect('admin/users');
+    }
+
+    private function userDelete(): void
+    {
+        if (!Auth::hasRole('admin')) { http_response_code(403); die('Admin access only.'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/users');
+        verify_csrf();
+
+        $id = (int)$_POST['id'];
+        if ($id === (int)Auth::user()['id']) {
+            flash('danger', 'You cannot delete your own account.');
+            redirect('admin/users');
+        }
+
+        $pdo = Database::conn();
+        $chk = $pdo->prepare("SELECT email, role_id FROM users WHERE id = ?");
+        $chk->execute([$id]);
+        $row = $chk->fetch();
+        if (!$row) { flash('danger', 'User not found.'); redirect('admin/users'); }
+
+        try {
+            $pdo->beginTransaction();
+            $pdo->prepare("DELETE FROM users WHERE id = ?")->execute([$id]);
+            AuditLog::write('user_deleted', 'users', $id, "Deleted user {$row['email']}");
+            $pdo->commit();
+            flash('success', 'User deleted.');
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            flash('danger', 'Cannot delete user — they may have dependent records. Deactivate instead.');
+        }
+
+        redirect('admin/users');
+    }
+    /* ================= SETTINGS ================= */
+    private function settings(): void
+    {
+        if (!Auth::hasRole('admin')) { http_response_code(403); die('Admin access only.'); }
+
+        $pdo = Database::conn();
+        $settings = $pdo->query("SELECT * FROM system_settings ORDER BY setting_key")->fetchAll();
+
+        $pageTitle = 'System Settings';
+        require VIEW_PATH . '/layouts/header.php';
+        require VIEW_PATH . '/admin/settings.php';
+        require VIEW_PATH . '/layouts/footer.php';
+    }
+
+    private function settingsSave(): void
+    {
+        if (!Auth::hasRole('admin')) { http_response_code(403); die('Admin access only.'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/settings');
+        verify_csrf();
+
+        $pdo = Database::conn();
+        $allowedKeys = ['site_name','barangay_name','max_file_size_mb','allowed_doc_types',
+                        'email_notifications','interview_reminder_hours','application_open'];
+
+        foreach ($_POST as $key => $value) {
+            if (!in_array($key, $allowedKeys, true)) continue;
+
+            if ($key === 'email_notifications' || $key === 'application_open') {
+                $value = $value ? '1' : '0';
+            }
+            if (in_array($key, ['max_file_size_mb','interview_reminder_hours'], true)) {
+                $value = (string)max(0, (int)$value);
+            }
+
+            $pdo->prepare(
+                "INSERT INTO system_settings (setting_key, setting_value)
+                VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
+            )->execute([$key, (string)$value]);
+        }
+
+        AuditLog::write('settings_updated', 'system_settings', null, 'System settings updated');
+        flash('success', 'Settings saved.');
+        redirect('admin/settings');
+    }
+    /* ================= AUDIT LOGS ================= */
+    private function auditLogs(): void
+    {
+        if (!Auth::hasRole('admin')) { Auth::deny(); }
+
+        $pdo = Database::conn();
+        $filters = [
+            'q'           => trim($_GET['q'] ?? ''),
+            'action'      => $_GET['action'] ?? '',
+            'entity_type' => $_GET['entity_type'] ?? '',
+            'user_id'     => $_GET['user_id'] ?? '',
+            'date_from'   => $_GET['date_from'] ?? '',
+            'date_to'     => $_GET['date_to'] ?? '',
+        ];
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $limit = 50;
+        $offset = ($page - 1) * $limit;
+
+        $sql = "SELECT al.*, u.full_name AS actor_name, u.email AS actor_email
+                FROM audit_logs al
+                LEFT JOIN users u ON u.id = al.user_id
+                WHERE 1=1";
+        $params = [];
+        if (!empty($filters['q'])) {
+            $sql .= " AND (al.description LIKE :q1 OR al.action LIKE :q2)";
+            $params['q1'] = $params['q2'] = '%' . $filters['q'] . '%';
+        }
+        if (!empty($filters['action']))      { $sql .= " AND al.action = :a"; $params['a'] = $filters['action']; }
+        if (!empty($filters['entity_type'])) { $sql .= " AND al.entity_type = :et"; $params['et'] = $filters['entity_type']; }
+        if (!empty($filters['user_id']))     { $sql .= " AND al.user_id = :uid"; $params['uid'] = (int)$filters['user_id']; }
+        if (!empty($filters['date_from']))   { $sql .= " AND DATE(al.created_at) >= :df"; $params['df'] = $filters['date_from']; }
+        if (!empty($filters['date_to']))     { $sql .= " AND DATE(al.created_at) <= :dt"; $params['dt'] = $filters['date_to']; }
+        $sql .= " ORDER BY al.created_at DESC LIMIT $limit OFFSET $offset";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $logs = $stmt->fetchAll();
+
+        // counts
+        $countSql = "SELECT COUNT(*) FROM audit_logs al WHERE 1=1";
+        $cp = [];
+        if (!empty($filters['q']))           { $countSql .= " AND (al.description LIKE :q1 OR al.action LIKE :q2)"; $cp['q1'] = $cp['q2'] = '%'.$filters['q'].'%'; }
+        if (!empty($filters['action']))      { $countSql .= " AND al.action = :a"; $cp['a'] = $filters['action']; }
+        if (!empty($filters['entity_type'])) { $countSql .= " AND al.entity_type = :et"; $cp['et'] = $filters['entity_type']; }
+        if (!empty($filters['user_id']))     { $countSql .= " AND al.user_id = :uid"; $cp['uid'] = (int)$filters['user_id']; }
+        if (!empty($filters['date_from']))   { $countSql .= " AND DATE(al.created_at) >= :df"; $cp['df'] = $filters['date_from']; }
+        if (!empty($filters['date_to']))     { $countSql .= " AND DATE(al.created_at) <= :dt"; $cp['dt'] = $filters['date_to']; }
+        $cStmt = $pdo->prepare($countSql); $cStmt->execute($cp);
+        $total = (int)$cStmt->fetchColumn();
+        $pages = max(1, (int)ceil($total / $limit));
+
+        // Distinct filter options
+        $actions      = $pdo->query("SELECT DISTINCT action FROM audit_logs ORDER BY action")->fetchAll();
+        $entityTypes  = $pdo->query("SELECT DISTINCT entity_type FROM audit_logs WHERE entity_type IS NOT NULL ORDER BY entity_type")->fetchAll();
+        $users        = $pdo->query("SELECT id, full_name FROM users ORDER BY full_name")->fetchAll();
+
+        $pageTitle = 'Audit Logs';
+        require VIEW_PATH . '/layouts/header.php';
+        require VIEW_PATH . '/admin/audit_Logs.php';   // file on disk is audit_Logs.php (case-sensitive on Linux)
+        require VIEW_PATH . '/layouts/footer.php';
     }
 }

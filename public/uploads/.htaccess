@@ -1,6 +1,7 @@
-# Disable PHP execution in uploads directory
+# Disable PHP execution entirely
 php_flag engine off
-
-<FilesMatch "\.(php|phtml|php3|php4|php5|phps|phar)$">
+AddType text/plain .php .phtml .phar .php3 .php4 .php5 .php7 .php8
+<FilesMatch "\.(php|phtml|phar|php[0-9])$">
     Require all denied
 </FilesMatch>
+Options -Indexes

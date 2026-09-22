@@ -86,6 +86,88 @@
   </div>
 </div>
 
+<?php
+// Fetch at-risk + pending docs
+$atRiskScholars = \Scholar::atRiskScholars(2.50);
+$pendingDocs    = \Document::pendingCount();
+?>
+
+<?php if ($pendingDocs > 0): ?>
+<div class="alert alert-warning d-flex justify-content-between align-items-center">
+  <div>
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    <strong><?= $pendingDocs ?></strong> document(s) are awaiting verification.
+  </div>
+  <a href="<?= url('admin/documents&status=Submitted') ?>" class="btn btn-sm btn-warning">
+    Review Documents
+  </a>
+</div>
+<?php endif; ?>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-exclamation-triangle text-warning me-1"></i> At-Risk Scholars</h6>
+        <a href="<?= url('admin/academic-records') ?>" class="btn btn-sm btn-outline-secondary">View All</a>
+      </div>
+      <div class="table-responsive" style="max-height: 260px;">
+        <table class="table table-sm mb-0 align-middle small">
+          <thead class="table-light"><tr><th>Scholar</th><th>School</th><th>GPA</th></tr></thead>
+          <tbody>
+            <?php if (!$atRiskScholars): ?>
+              <tr><td colspan="3" class="text-center text-muted py-3">No at-risk scholars.</td></tr>
+            <?php endif; ?>
+            <?php foreach (array_slice($atRiskScholars, 0, 8) as $s): ?>
+              <tr>
+                <td><a href="<?= url('admin/scholar-view&id=' . (int)$s['id']) ?>"><?= e($s['full_name']) ?></a></td>
+                <td><small class="text-muted"><?= e($s['school_name'] ?? '—') ?></small></td>
+                <td><span class="badge bg-warning text-dark"><?= e((string)$s['gpa']) ?></span></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-calendar-week text-primary me-1"></i> This Week's Interviews</h6>
+        <a href="<?= url('admin/interview-calendar') ?>" class="btn btn-sm btn-outline-secondary">Calendar</a>
+      </div>
+      <div class="card-body small">
+        <?php
+          $weekInterviews = $pdo->query(
+            "SELECT s.*, (SELECT COUNT(*) FROM interview_assignments ia WHERE ia.schedule_id=s.id) AS assigned
+             FROM interview_schedules s
+             WHERE s.interview_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+               AND s.status <> 'Cancelled'
+             ORDER BY s.interview_date ASC, s.start_time ASC"
+          )->fetchAll();
+        ?>
+        <?php if (!$weekInterviews): ?>
+          <p class="text-muted text-center py-3 mb-0">No interviews scheduled this week.</p>
+        <?php else: ?>
+          <ul class="list-unstyled mb-0">
+            <?php foreach ($weekInterviews as $s): ?>
+              <li class="mb-2 pb-2 border-bottom">
+                <div class="d-flex justify-content-between">
+                  <div>
+                    <div class="fw-semibold"><?= e(date('D, M d', strtotime($s['interview_date']))) ?></div>
+                    <small class="text-muted"><?= e(date('g:i A', strtotime($s['start_time']))) ?> · <?= e($s['venue']) ?></small>
+                  </div>
+                  <span class="badge bg-primary align-self-center"><?= (int)$s['assigned'] ?>/<?= (int)$s['max_slots'] ?></span>
+                </div>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- CHARTS ROW -->
 <div class="row g-3 mb-4">
   <div class="col-lg-6">

@@ -36,11 +36,22 @@ function csrf_field(): string {
 }
 
 function verify_csrf(): void {
-    $token = $_POST[CSRF_TOKEN_NAME] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-    if (!hash_equals($_SESSION[CSRF_TOKEN_NAME] ?? '', $token)) {
+    $expected = $_SESSION[CSRF_TOKEN_NAME] ?? '';
+    $token    = $_POST[CSRF_TOKEN_NAME] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    // Both sides must be NON-EMPTY strings; an empty session token must never match an empty submitted token.
+    if (!is_string($expected) || $expected === '' || !is_string($token) || $token === '' || !hash_equals($expected, $token)) {
         http_response_code(419);
         die('CSRF token mismatch.');
     }
+}
+
+/**
+ * JSON for embedding in <script> blocks AND in HTML attributes (onclick='f(<?= js_json($x) ?>)').
+ * <, >, &, ' and " are all \u-escaped, so HTML entities such as &quot; can never be re-assembled by the browser.
+ */
+function js_json($value): string {
+    $json = json_encode($value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE);
+    return $json === false ? 'null' : $json;
 }
 
 function calculate_age(string $dob): int {

@@ -19,6 +19,7 @@
           <p class="small text-muted mb-2">
             <i class="bi bi-paperclip"></i> <?= e($doc['original_filename']) ?><br>
             Uploaded: <?= e(date('M d, Y g:i A', strtotime($doc['uploaded_at']))) ?>
+            &middot; <a href="<?= e(url('applicant/documents/view&id=' . (int)$doc['id'])) ?>" target="_blank" rel="noopener">View</a>
           </p>
           <?php if ($doc['remarks']): ?>
             <div class="alert alert-<?= $doc['status']==='Rejected'?'danger':'info' ?> py-2 small mb-2">

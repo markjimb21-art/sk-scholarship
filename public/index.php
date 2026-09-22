@@ -14,20 +14,28 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
 }
 
+// Baseline security headers (also set in public/.htaccess; repeated here so they apply without mod_headers).
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+
+// Never leak stack traces / SQL / paths to the browser outside development.
+set_exception_handler(static function (Throwable $e): void {
+    error_log(sprintf('Unhandled %s: %s in %s:%d', get_class($e), $e->getMessage(), $e->getFile(), $e->getLine()));
+    if (!headers_sent()) {
+        http_response_code(500);
+    }
+    if (APP_DEBUG) {
+        echo '<pre>' . htmlspecialchars((string)$e, ENT_QUOTES, 'UTF-8') . '</pre>';
+        return;
+    }
+    require VIEW_PATH . '/errors/500.php';
+});
+
 Auth::start();
 
-if (isset($_GET['debug_models'])) {
-    header('Content-Type: text/plain');
-    echo "Applicant::findByUserId: "; var_dump(Applicant::findByUserId(1));
-    echo "Application::stats: "; print_r(Application::stats());
-    echo "Document::pendingCount: " . Document::pendingCount() . "\n";
-    echo "Interview::stats: "; print_r(Interview::stats());
-    echo "Scholar::stats: "; print_r(Scholar::stats());
-    exit;
-}
-
 $route = $_GET['r'] ?? 'home';
-$route = preg_replace('/[^a-zA-Z0-9_\-\/]/', '', $route);
+$route = is_string($route) ? preg_replace('/[^a-zA-Z0-9_\-\/]/', '', $route) : 'home';
 
 // Public routes
 $publicRoutes = ['home','login','register','logout','forgot-password','reset-password'];
@@ -55,6 +63,16 @@ switch ($route) {
     case 'logout':
         Auth::logout();
         redirect('login');
+        break;
+
+    case 'forgot-password':
+        require __DIR__ . '/../app/controllers/AuthController.php';
+        (new AuthController())->forgotPassword();
+        break;
+
+    case 'reset-password':
+        require __DIR__ . '/../app/controllers/AuthController.php';
+        (new AuthController())->resetPassword();
         break;
 
     default:
