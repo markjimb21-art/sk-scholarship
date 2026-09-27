@@ -395,12 +395,12 @@ CREATE TABLE `interview_assignments` (
   `schedule_id` int(10) unsigned NOT NULL,
   `application_id` int(10) unsigned NOT NULL,
   `attendance` enum('Scheduled','Attended','No-show') NOT NULL DEFAULT 'Scheduled',
-  `reschedule_count` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT '1 after the single reschedule allowed following a no-show',
+  `reschedule_count` tinyint(3) unsigned NOT NULL DEFAULT 0 COMMENT 'Earlier no-shows of this application when this row was created (1 = this is the one reschedule)',
   `assigned_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `reminder_sent_at` datetime DEFAULT NULL COMMENT 'When the interview reminder was sent (NULL = not yet / reset after reschedule)',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `application_id` (`application_id`),
   KEY `idx_schedule` (`schedule_id`),
+  KEY `idx_application` (`application_id`),
   CONSTRAINT `interview_assignments_ibfk_1` FOREIGN KEY (`schedule_id`) REFERENCES `interview_schedules` (`id`) ON DELETE CASCADE,
   CONSTRAINT `interview_assignments_ibfk_2` FOREIGN KEY (`application_id`) REFERENCES `applications` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -895,7 +895,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,4,'Mark Jim Balintaculo','markjimb21@gmail.com','$2y$10$S/ejb4lZh4Yx4JCEu0Q5BeLi1NgIUj4uPNxFogPgDbpveYeTzqtWO','',1,1,'2026-09-25 19:28:24',0,NULL,'2026-09-14 17:50:28','2026-09-25 11:28:24'),(2,1,'Admin','admin@gmail.com','$2y$10$LMuceB1iratZxXk/2yasXOBzEn6URZMvoPfnf.1NpS.xKGzyJISVq',NULL,1,1,'2026-09-25 23:10:45',0,NULL,'2026-09-16 10:13:03','2026-09-25 15:10:45'),(10,1,'staff','staff@gmail.com','$2y$10$9b7Je8LDKW7BV2MLWjl1u.OC1CT/9ZA9wA.NRceony5O0bMKwCT6i','09123767812',0,0,'2026-09-25 17:57:25',0,NULL,'2026-09-25 09:57:06','2026-09-27 16:53:19'),(11,1,'Official','official@gmail.com','$2y$10$tYBw0N.0Tl0.B5JXGUAi8eOghiN1ihHDcwog12q7upHWvDJiNEdre','12312312312',0,0,'2026-09-25 18:00:28',0,NULL,'2026-09-25 10:00:10','2026-09-27 16:53:19'),(13,4,'Juan Dela Cruz','cscmjb1@gmail.com','$2y$10$Suw.sz2xK8PXcE9CLB6jQepKPQ3Wgys8L5HwHaYMmYCgC3O2qYIM2',NULL,1,1,'2026-09-25 23:16:04',0,NULL,'2026-09-25 11:29:38','2026-09-25 15:16:04');
+INSERT INTO `users` VALUES (1,4,'Mark Jim Balintaculo','markjimb21@gmail.com','$2y$10$S/ejb4lZh4Yx4JCEu0Q5BeLi1NgIUj4uPNxFogPgDbpveYeTzqtWO','',1,1,'2026-09-25 19:28:24',0,NULL,'2026-09-14 17:50:28','2026-09-25 11:28:24'),(2,1,'Admin','admin@gmail.com','$2y$10$LMuceB1iratZxXk/2yasXOBzEn6URZMvoPfnf.1NpS.xKGzyJISVq',NULL,1,1,'2026-09-25 23:10:45',0,NULL,'2026-09-16 10:13:03','2026-09-25 15:10:45'),(10,1,'staff','staff@gmail.com','$2y$10$9b7Je8LDKW7BV2MLWjl1u.OC1CT/9ZA9wA.NRceony5O0bMKwCT6i','09123767812',0,0,'2026-09-25 17:57:25',0,NULL,'2026-09-25 09:57:06','2026-09-27 17:08:47'),(11,1,'Official','official@gmail.com','$2y$10$tYBw0N.0Tl0.B5JXGUAi8eOghiN1ihHDcwog12q7upHWvDJiNEdre','12312312312',0,0,'2026-09-25 18:00:28',0,NULL,'2026-09-25 10:00:10','2026-09-27 17:08:47'),(13,4,'Juan Dela Cruz','cscmjb1@gmail.com','$2y$10$Suw.sz2xK8PXcE9CLB6jQepKPQ3Wgys8L5HwHaYMmYCgC3O2qYIM2',NULL,1,1,'2026-09-25 23:16:04',0,NULL,'2026-09-25 11:29:38','2026-09-25 15:16:04');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

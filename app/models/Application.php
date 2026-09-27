@@ -235,6 +235,118 @@ final class Application
     }
 
     /* ---------------------------------------------------------------------------------------------
+     *  Admin decisions: B2 screening and B5 final decision. Each returns ['ok'=>bool,'error'=>string].
+     * --------------------------------------------------------------------------------------------- */
+
+    /** Runs $fn in a transaction; DomainException => a plain error message. */
+    private static function decide(callable $fn): array
+    {
+        $pdo = Database::conn();
+        try {
+            $pdo->beginTransaction();
+            $fn($pdo);
+            $pdo->commit();
+            return ['ok' => true];
+        } catch (DomainException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /** B2 Qualify for interview: documents count as verified. */
+    public static function qualify(int $id, int $adminId): array
+    {
+        $app = self::find($id);
+        if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
+        $r = self::decide(function () use ($app, $adminId) {
+            $now = date('Y-m-d H:i:s');
+            self::changeStatus($app, 'qualify', $adminId, ['reviewed_at' => $now, 'reviewed_by' => $adminId, 'qualified_at' => $now]);
+            Document::markAllVerified((int)$app['id']);
+        });
+        if ($r['ok']) self::notify($id, 'Qualified for interview',
+            "Your application to {$app['program_name']} passed screening. We will e-mail you the interview date, time and venue.", 'success');
+        return $r;
+    }
+
+    /** B2 Return for correction (remarks required). */
+    public static function returnForCorrection(int $id, int $adminId, string $remarks): array
+    {
+        $remarks = trim($remarks);
+        if ($remarks === '') return ['ok' => false, 'error' => 'Write the items the applicant must correct.'];
+        $app = self::find($id);
+        if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
+        $r = self::decide(function () use ($app, $adminId, $remarks) {
+            $now = date('Y-m-d H:i:s');
+            self::changeStatus($app, 'return', $adminId, [
+                'reviewed_at' => $now, 'reviewed_by' => $adminId,
+                'review_remarks' => $remarks, 'review_remarks_at' => $now, 'review_remarks_by' => $adminId,
+            ], $remarks);
+        });
+        if ($r['ok']) self::notify($id, 'Returned for correction',
+            "Your application needs corrections before it can be screened:\n$remarks\n\nPlease fix these items and submit again.",
+            'warning', 'applicant/application');
+        return $r;
+    }
+
+    /** B2 / B5 Reject (reason required). */
+    public static function reject(int $id, int $adminId, string $reason): array
+    {
+        $reason = trim($reason);
+        if ($reason === '') return ['ok' => false, 'error' => 'A reason is required to reject an application.'];
+        $app = self::find($id);
+        if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
+        $r = self::decide(function () use ($app, $adminId, $reason) {
+            $now = date('Y-m-d H:i:s');
+            $set = ['decided_at' => $now, 'decided_by' => $adminId, 'decision_remarks' => $reason];
+            if ($app['status'] === 'Submitted') $set += ['reviewed_at' => $now, 'reviewed_by' => $adminId];
+            self::changeStatus($app, 'reject', $adminId, $set, $reason);
+        });
+        if ($r['ok']) self::notify($id, 'Application not approved',
+            "We're sorry — your application to {$app['program_name']} was not approved.\nReason: $reason", 'danger');
+        return $r;
+    }
+
+    /** B5 Waitlist. */
+    public static function waitlist(int $id, int $adminId): array
+    {
+        $app = self::find($id);
+        if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
+        $r = self::decide(function () use ($app, $adminId) {
+            $now = date('Y-m-d H:i:s');
+            self::changeStatus($app, 'waitlist', $adminId, ['decided_at' => $now, 'decided_by' => $adminId, 'waitlisted_at' => $now]);
+        });
+        if ($r['ok']) self::notify($id, 'Waitlisted',
+            "You are on the waitlist for {$app['program_name']}. We will e-mail you if a slot opens.", 'warning');
+        return $r;
+    }
+
+    /**
+     * B5 Approve: blocked when the program's slots are used up (the program row is locked so two approvals
+     * can't take the last slot). Creates the scholar and opens Semester 1.
+     */
+    public static function approve(int $id, int $adminId): array
+    {
+        $app = self::find($id);
+        if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
+        $r = self::decide(function (PDO $pdo) use ($app, $adminId) {
+            $lock = $pdo->prepare("SELECT slots_available FROM scholarship_programs WHERE id = ? FOR UPDATE");
+            $lock->execute([(int)$app['program_id']]);
+            $slots = (int)$lock->fetchColumn();
+            $used = Program::slotsUsed((int)$app['program_id']);
+            if ($used >= $slots) {
+                throw new DomainException("All $slots slots are filled ($used approved). Nobody else can be approved unless a slot opens.");
+            }
+            $now = date('Y-m-d H:i:s');
+            self::changeStatus($app, 'approve', $adminId, ['decided_at' => $now, 'decided_by' => $adminId]);
+            Scholar::createFromApplication($app, $adminId);
+        });
+        if ($r['ok']) self::notify($id, 'Approved — welcome, scholar!',
+            "Congratulations! Your application to {$app['program_name']} was approved. Your first semester is open: "
+            . 'go to My Scholarship and upload your School ID and Grades to claim your cash.', 'success', 'applicant/scholarship');
+        return $r;
+    }
+
+    /* ---------------------------------------------------------------------------------------------
      *  Eligibility (B2, also shown in B5): pass/fail rows computed from the submitted data
      * --------------------------------------------------------------------------------------------- */
 

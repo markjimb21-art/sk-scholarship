@@ -44,10 +44,15 @@ ALTER TABLE `scholars`
   ADD COLUMN `end_reason` ENUM('Graduated','Dropped out','Failed grade requirement','Did not renew') NULL AFTER `status`,
   ADD COLUMN `ended_at` DATETIME NULL AFTER `end_reason`;
 
+-- One row per scheduling attempt (a no-show keeps its row; the reschedule gets a new one), so the
+-- application_id key becomes a plain index. The current assignment is the application's latest row.
 ALTER TABLE `interview_assignments`
   ADD COLUMN `attendance` ENUM('Scheduled','Attended','No-show') NOT NULL DEFAULT 'Scheduled' AFTER `application_id`,
   ADD COLUMN `reschedule_count` TINYINT UNSIGNED NOT NULL DEFAULT 0
-    COMMENT '1 after the single reschedule allowed following a no-show' AFTER `attendance`;
+    COMMENT 'Earlier no-shows of this application when this row was created (1 = this is the one reschedule)' AFTER `attendance`,
+  ADD KEY `idx_application` (`application_id`);
+ALTER TABLE `interview_assignments`
+  DROP INDEX `application_id`;
 
 ALTER TABLE `scholarship_releases`
   MODIFY `payment_method` ENUM('Cash','Check','Bank Transfer','GCash','Other','Bank') DEFAULT 'Cash';

@@ -97,7 +97,7 @@ switch ($route) {
         if (Auth::role() === 'applicant' && str_starts_with($route, 'applicant/')) {
             require __DIR__ . '/../app/controllers/ApplicantController.php';
             (new ApplicantController())->handle(substr($route, 10));
-        } elseif (in_array(Auth::role(), ['admin','staff','official'], true) && str_starts_with($route, 'admin/')) {
+        } elseif (Auth::role() === 'admin' && str_starts_with($route, 'admin/')) {
             require __DIR__ . '/../app/controllers/AdminController.php';
             (new AdminController())->handle(substr($route, 6));
         } else {

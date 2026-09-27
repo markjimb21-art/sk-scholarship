@@ -77,3 +77,22 @@ function json_response(array $data, int $code = 200): void {
 function generate_code(string $prefix): string {
     return strtoupper($prefix) . '-' . date('Y') . '-' . strtoupper(bin2hex(random_bytes(4)));
 }
+
+/** Render a page inside the layout. $vars become local variables of the view. */
+function render(string $view, array $vars = [], string $pageTitle = 'Dashboard'): void {
+    extract($vars, EXTR_SKIP);
+    require VIEW_PATH . '/layouts/header.php';
+    require VIEW_PATH . '/' . $view . '.php';
+    require VIEW_PATH . '/layouts/footer.php';
+}
+
+/** Every state-changing action: POST only (anything else goes back to $back) + CSRF check. */
+function require_post(string $back): void {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect($back);
+    verify_csrf();
+}
+
+/** Current admin's user id. */
+function admin_id(): int {
+    return (int)(Auth::user()['id'] ?? 0);
+}

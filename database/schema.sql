@@ -225,17 +225,19 @@ CREATE TABLE interview_schedules (
     INDEX idx_program (program_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- One row per scheduling attempt; the application's latest row is its current assignment.
 CREATE TABLE interview_assignments (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     schedule_id INT UNSIGNED NOT NULL,
-    application_id INT UNSIGNED NOT NULL UNIQUE,
+    application_id INT UNSIGNED NOT NULL,
     attendance ENUM('Scheduled','Attended','No-show') NOT NULL DEFAULT 'Scheduled',
-    reschedule_count TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '1 after the single reschedule allowed following a no-show',
+    reschedule_count TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Earlier no-shows of this application when this row was created (1 = this is the one reschedule)',
     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reminder_sent_at DATETIME NULL COMMENT 'When the interview reminder was sent (NULL = not yet / reset after reschedule)',
     FOREIGN KEY (schedule_id) REFERENCES interview_schedules(id) ON DELETE CASCADE,
     FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
-    INDEX idx_schedule (schedule_id)
+    INDEX idx_schedule (schedule_id),
+    INDEX idx_application (application_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Rubric maximums live in INTERVIEW_RUBRIC (config/constants.php): 40 / 30 / 20 / 10.

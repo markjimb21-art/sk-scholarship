@@ -28,32 +28,28 @@ $item = function (string $route, string $icon, string $label) use ($current) {
       ?>
     <?php else: ?>
     <?php
+      // In process order (docs/PROCESS.md).
+      $section = static function (string $label): void { echo '<li class="nav-item small text-uppercase text-muted px-3 pt-3 pb-1" style="font-size:.7rem">' . e($label) . '</li>'; };
       $item('admin/dashboard', 'bi-speedometer2', 'Dashboard');
-      if (Auth::hasRole('admin','staff')) {
-        $item('admin/applications', 'bi-file-earmark-text', 'Applications');
-        $item('admin/applicants', 'bi-people', 'Applicants');
-        $item('admin/documents', 'bi-folder2-open', 'Documents');
-      }
-      if (Auth::hasRole('admin','staff')) {
-        $item('admin/interview-scheduling', 'bi-calendar-plus', 'Interview Scheduling');
-        $item('admin/interview-calendar', 'bi-calendar3', 'Interview Calendar');
-        $item('admin/interview-evaluation', 'bi-clipboard-check', 'Interview Evaluation');
-      }
-      if (Auth::hasRole('admin','staff')) {
-        $item('admin/scholars', 'bi-mortarboard', 'Scholars');
-        $item('admin/academic-records', 'bi-journal-text', 'Academic Records');
-        $item('admin/releases', 'bi-cash-coin', 'Scholarship Releases');
-        $item('admin/renewals', 'bi-arrow-repeat', 'Renewals');
-      }
-      $item('admin/analytics', 'bi-graph-up-arrow', 'Data Analytics');
+      $section('Application process');
+      $item('admin/programs', 'bi-collection', 'Programs');
+      $item('admin/screening', 'bi-inbox', 'Screening');
+      $item('admin/interviews', 'bi-calendar-plus', 'Interviews');
+      $item('admin/decisions', 'bi-clipboard-check', 'Decisions');
+      $section('Releasing of budget');
+      $item('admin/budget', 'bi-wallet2', 'Budget');
+      $item('admin/claims', 'bi-file-earmark-check', 'Claims');
+      $item('admin/releases', 'bi-cash-coin', 'Releases');
+      $item('admin/renewals', 'bi-arrow-repeat', 'Renewals');
+      $item('admin/scholars', 'bi-mortarboard', 'Scholars');
+      $section('Records & reports');
+      $item('admin/applications', 'bi-file-earmark-text', 'Applications');
       $item('admin/reports', 'bi-printer', 'Reports');
-      $item('admin/budget', 'bi-wallet2', 'Budget'); // staff/official see it read-only (budget.php hides edit controls)
-      if (Auth::hasRole('admin')) {
-        $item('admin/programs', 'bi-collection', 'Scholarship Programs');
-        $item('admin/users', 'bi-person-badge', 'Users');
-        $item('admin/audit-logs', 'bi-shield-check', 'Audit Logs');
-        $item('admin/settings', 'bi-gear', 'System Settings');
-      }
+      $item('admin/analytics', 'bi-graph-up-arrow', 'Analytics');
+      $section('System');
+      $item('admin/users', 'bi-person-badge', 'Users');
+      $item('admin/settings', 'bi-gear', 'Settings');
+      $item('admin/audit-logs', 'bi-shield-check', 'Audit Logs');
     ?>
   <?php endif; ?>
   </ul>
