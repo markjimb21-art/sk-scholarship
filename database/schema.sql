@@ -43,6 +43,23 @@ CREATE TABLE users (
     INDEX idx_role (role_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- One-time e-mail codes for registration and password reset (core/Otp.php). Same definition as sk_scholarship.sql.
+CREATE TABLE email_otp_codes (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    purpose ENUM('registration','password_reset') NOT NULL,
+    otp_hash VARCHAR(255) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 5,
+    resend_available_at DATETIME NOT NULL,
+    verified_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_purpose (user_id, purpose),
+    INDEX idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ---------- GEOGRAPHY ----------
 CREATE TABLE barangays (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -150,6 +167,8 @@ CREATE TABLE education_records (
     year_level_other VARCHAR(50) NULL,
     course_id INT UNSIGNED NULL,
     course_name VARCHAR(200) NOT NULL,
+    major VARCHAR(200) NULL,
+    general_average DECIMAL(4,2) NULL,
     previous_scholarship TINYINT(1) DEFAULT 0,
     previous_scholarship_details VARCHAR(255) NULL,
     current_scholarship TINYINT(1) DEFAULT 0,
@@ -197,12 +216,16 @@ CREATE TABLE applications (
         'Approved','Rejected','Waitlisted'
     ) DEFAULT 'Draft',
     eligibility_score DECIMAL(8,2) NULL,
+    eligibility_notes TEXT NULL,
     submitted_at DATETIME NULL,
     reviewed_at DATETIME NULL,
     reviewed_by INT UNSIGNED NULL,
     decided_at DATETIME NULL,
     decided_by INT UNSIGNED NULL,
     decision_remarks TEXT NULL,
+    review_remarks TEXT NULL,
+    review_remarks_at DATETIME NULL,
+    review_remarks_by INT UNSIGNED NULL,
     admin_override TINYINT(1) DEFAULT 0,
     override_reason TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -211,6 +234,7 @@ CREATE TABLE applications (
     FOREIGN KEY (program_id) REFERENCES scholarship_programs(id),
     FOREIGN KEY (reviewed_by) REFERENCES users(id),
     FOREIGN KEY (decided_by) REFERENCES users(id),
+    FOREIGN KEY (review_remarks_by) REFERENCES users(id),
     UNIQUE KEY uniq_app_per_program (applicant_id, program_id),
     INDEX idx_status (status),
     INDEX idx_program (program_id)
@@ -241,6 +265,7 @@ CREATE TABLE documents (
 CREATE TABLE interview_schedules (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     program_id INT UNSIGNED NOT NULL,
+    title VARCHAR(200) NULL,
     interview_date DATE NOT NULL,
     start_time TIME NOT NULL,
     end_time TIME NOT NULL,
@@ -266,6 +291,7 @@ CREATE TABLE interview_assignments (
     assigned_by INT UNSIGNED NULL,
     assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     confirmed_at DATETIME NULL,
+    reminder_sent_at DATETIME NULL,
     FOREIGN KEY (schedule_id) REFERENCES interview_schedules(id) ON DELETE CASCADE,
     FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
     FOREIGN KEY (assigned_by) REFERENCES users(id),
@@ -363,6 +389,7 @@ CREATE TABLE scholarship_renewals (
     remarks TEXT NULL,
     evaluated_by INT UNSIGNED NULL,
     evaluated_at DATETIME NULL,
+    reminder_sent_at DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (scholar_id) REFERENCES scholars(id) ON DELETE CASCADE,
     FOREIGN KEY (evaluated_by) REFERENCES users(id),

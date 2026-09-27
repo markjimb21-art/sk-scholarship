@@ -4,11 +4,14 @@
       <i class="bi bi-arrow-left"></i> Back to Scheduling
     </a>
     <h4 class="fw-bold mb-1 mt-1">
-      <?= e(date('F d, Y (l)', strtotime($schedule['interview_date']))) ?>
+      <?= !empty($schedule['title']) ? e($schedule['title']) : e(date('F d, Y (l)', strtotime($schedule['interview_date']))) ?>
       <span class="badge bg-<?= $schedule['status']==='Cancelled'?'secondary':($schedule['status']==='Full'?'warning':'primary') ?> ms-2">
         <?= e($schedule['status']) ?>
       </span>
     </h4>
+    <?php if (!empty($schedule['title'])): ?>
+      <div class="text-muted small"><?= e(date('F d, Y (l)', strtotime($schedule['interview_date']))) ?></div>
+    <?php endif; ?>
     <div class="text-muted small">
       <?= e(date('g:i A', strtotime($schedule['start_time']))) ?> – <?= e(date('g:i A', strtotime($schedule['end_time']))) ?>
       · <?= e($schedule['venue']) ?> · Interviewer: <?= e($schedule['interviewer']) ?>
@@ -99,46 +102,93 @@
 
   <!-- AVAILABLE TO ASSIGN -->
   <div class="col-lg-5">
+    <?php
+      $remainingSlots = max(0, (int)$schedule['max_slots'] - (int)$schedule['assigned_count']);
+      $scheduleLocked = $schedule['status'] === 'Cancelled' || $remainingSlots === 0;
+    ?>
     <div class="card border-0 shadow-sm h-100">
       <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h6 class="mb-0">Eligible Applicants (<?= count($eligible) ?>)</h6>
-        <?php if ((int)$schedule['assigned_count'] >= (int)$schedule['max_slots']): ?>
+        <?php if ($remainingSlots === 0): ?>
           <span class="badge bg-danger">Schedule full</span>
+        <?php else: ?>
+          <span class="badge bg-secondary"><?= $remainingSlots ?> slot(s) left</span>
         <?php endif; ?>
       </div>
-      <div class="card-body p-0">
-        <?php if (!$eligible): ?>
-          <p class="text-muted text-center py-3 small mb-0">No eligible applicants available.</p>
-        <?php endif; ?>
-        <div class="list-group list-group-flush" style="max-height: 500px; overflow-y: auto;">
-          <?php foreach ($eligible as $e):
-            $full = (int)$schedule['assigned_count'] >= (int)$schedule['max_slots'];
-          ?>
-            <div class="list-group-item">
-              <div class="d-flex justify-content-between align-items-start">
-                <div>
-                  <div class="fw-semibold small"><?= e($e['full_name']) ?></div>
-                  <div class="small text-muted">
-                    <code><?= e($e['application_code']) ?></code> ·
-                    <?= e($e['course_name'] ?? '—') ?>
+      <?php if (!$eligible): ?>
+        <p class="text-muted text-center py-3 small mb-0">No eligible applicants available.</p>
+      <?php else: ?>
+        <form method="POST" action="<?= url('admin/interview-assign-batch') ?>" id="batchAssignForm">
+          <?= csrf_field() ?>
+          <input type="hidden" name="schedule_id" value="<?= (int)$schedule['id'] ?>">
+          <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-light">
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" id="selectAllEligible" <?= $scheduleLocked ? 'disabled' : '' ?>>
+              <label class="form-check-label small" for="selectAllEligible">Select All (up to <?= $remainingSlots ?> slot<?= $remainingSlots === 1 ? '' : 's' ?>)</label>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary" id="assignSelectedBtn" disabled>
+              <i class="bi bi-plus-lg"></i> Assign Selected (<span id="selectedCount">0</span>)
+            </button>
+          </div>
+          <div class="list-group list-group-flush" style="max-height: 460px; overflow-y: auto;">
+            <?php foreach ($eligible as $e): ?>
+              <label class="list-group-item d-flex justify-content-between align-items-start <?= $scheduleLocked ? 'text-muted' : '' ?>">
+                <div class="form-check">
+                  <input class="form-check-input eligible-checkbox" type="checkbox" name="application_ids[]"
+                         value="<?= (int)$e['id'] ?>" <?= $scheduleLocked ? 'disabled' : '' ?>>
+                  <div class="ms-1">
+                    <div class="fw-semibold small"><?= e($e['full_name']) ?></div>
+                    <div class="small text-muted">
+                      <code><?= e($e['application_code']) ?></code> ·
+                      <?= e($e['course_name'] ?? '—') ?>
+                    </div>
                   </div>
                 </div>
-                <form method="POST" action="<?= url('admin/interview-assign') ?>" class="ms-2">
-                  <?= csrf_field() ?>
-                  <input type="hidden" name="schedule_id" value="<?= (int)$schedule['id'] ?>">
-                  <input type="hidden" name="application_id" value="<?= (int)$e['id'] ?>">
-                  <button class="btn btn-sm btn-primary" <?= $full || $schedule['status']==='Cancelled' ? 'disabled' : '' ?>>
-                    <i class="bi bi-plus"></i>
-                  </button>
-                </form>
-              </div>
-            </div>
-          <?php endforeach; ?>
-        </div>
-      </div>
+              </label>
+            <?php endforeach; ?>
+          </div>
+        </form>
+      <?php endif; ?>
     </div>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('batchAssignForm');
+  if (!form) return;
+  const maxSelectable = <?= (int)$remainingSlots ?>;
+  const checkboxes = Array.from(form.querySelectorAll('.eligible-checkbox'));
+  const selectAll = document.getElementById('selectAllEligible');
+  const assignBtn = document.getElementById('assignSelectedBtn');
+  const countEl = document.getElementById('selectedCount');
+
+  function refresh() {
+    const checked = checkboxes.filter((c) => c.checked);
+    countEl.textContent = checked.length;
+    assignBtn.disabled = checked.length === 0;
+    // Once the slot cap is reached, disable the remaining unchecked boxes.
+    const atCap = checked.length >= maxSelectable;
+    checkboxes.forEach((c) => { if (!c.checked) c.disabled = atCap; });
+  }
+
+  checkboxes.forEach((c) => c.addEventListener('change', refresh));
+
+  if (selectAll) {
+    selectAll.addEventListener('change', () => {
+      checkboxes.forEach((c) => { c.disabled = false; c.checked = false; });
+      if (selectAll.checked) {
+        checkboxes.slice(0, maxSelectable).forEach((c) => { c.checked = true; });
+      }
+      refresh();
+    });
+  }
+
+  form.addEventListener('submit', (e) => {
+    if (!checkboxes.some((c) => c.checked)) e.preventDefault();
+  });
+});
+</script>
 
 <!-- INLINE EDIT MODAL (reuse) -->
 <div class="modal fade" id="editScheduleModal2" tabindex="-1">
@@ -149,6 +199,8 @@
       <input type="hidden" name="program_id" value="<?= (int)$schedule['program_id'] ?>">
       <div class="modal-header"><h5 class="modal-title">Edit Schedule</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
+        <div class="mb-3"><label class="form-label">Title</label>
+          <input name="title" class="form-control" placeholder="e.g., Batch 1 Screening" value="<?= e($schedule['title'] ?? '') ?>"></div>
         <div class="mb-3"><label class="form-label">Date *</label>
           <input type="date" name="interview_date" class="form-control" value="<?= e($schedule['interview_date']) ?>" required></div>
         <div class="row g-2 mb-3">

@@ -10,7 +10,16 @@ $badge = $statusColors[$status] ?? 'secondary';
 ?>
 <div class="mb-4">
   <h3 class="fw-bold mb-1">Welcome back, <?= e(explode(' ', Auth::user()['full_name'])[0]) ?> 👋</h3>
-  <p class="text-muted">Application Code: <strong><?= e($applicant['application_code'] ?? '—') ?></strong></p>
+  <p class="text-muted mb-1">Application Code: <strong><?= e($applicant['application_code'] ?? '—') ?></strong></p>
+  <?php if ($app): ?>
+    <p class="text-muted small mb-0">Program: <strong><?= e($app['program_name']) ?></strong></p>
+  <?php elseif ($openProgram): ?>
+    <div class="alert alert-info py-2 mt-2 mb-0 small">
+      <i class="bi bi-megaphone"></i> Now accepting applications for <strong><?= e($openProgram['program_name']) ?></strong>
+      until <?= e(date('F j, Y', strtotime($openProgram['application_end']))) ?>.
+      <a href="<?= url('applicant/application') ?>" class="alert-link">Start your application</a>.
+    </div>
+  <?php endif; ?>
 </div>
 
 <div class="card border-0 shadow-sm mb-4">
@@ -117,3 +126,27 @@ $badge = $statusColors[$status] ?? 'secondary';
     </a>
   </div>
 </div>
+<?php if (!empty($pastApplications)): ?>
+<h5 class="fw-semibold mt-4 mb-3">Past Applications</h5>
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle small">
+      <thead class="table-light">
+        <tr><th>Program</th><th>Application Code</th><th>Submitted</th><th>Status</th><th>Scholarship</th></tr>
+      </thead>
+      <tbody>
+        <?php foreach ($pastApplications as $pa): ?>
+          <tr>
+            <td><?= e($pa['program_name']) ?><br><span class="text-muted"><?= e($pa['academic_year']) ?></span></td>
+            <td><code><?= e($pa['application_code']) ?></code></td>
+            <td><?= $pa['submitted_at'] ? e(date('M d, Y', strtotime($pa['submitted_at']))) : '—' ?></td>
+            <td><span class="badge bg-<?= e($statusColors[$pa['status']] ?? 'secondary') ?>"><?= e($pa['status']) ?></span></td>
+            <td><?= $pa['scholar_code'] ? e($pa['scholar_code'] . ' (' . $pa['scholar_status'] . ')') : '—' ?></td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer bg-white small text-muted">Past applications are kept for your records and can no longer be edited.</div>
+</div>
+<?php endif; ?>

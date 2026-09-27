@@ -36,7 +36,7 @@
       <table class="table table-hover mb-0 align-middle">
         <thead class="table-light">
           <tr>
-            <th>Date</th><th>Time</th><th>Venue</th><th>Interviewer</th>
+            <th>Title / Date</th><th>Time</th><th>Venue</th><th>Interviewer</th>
             <th>Slots</th><th>Status</th><th></th>
           </tr>
         </thead>
@@ -49,7 +49,14 @@
             $slotBadge = $isFull ? 'danger' : ((int)$s['assigned_count'] > 0 ? 'warning' : 'success');
           ?>
           <tr>
-            <td><strong><?= e(date('D, M d, Y', strtotime($s['interview_date']))) ?></strong></td>
+            <td>
+              <?php if (!empty($s['title'])): ?>
+                <div class="fw-semibold"><?= e($s['title']) ?></div>
+                <div class="small text-muted"><?= e(date('D, M d, Y', strtotime($s['interview_date']))) ?></div>
+              <?php else: ?>
+                <strong><?= e(date('D, M d, Y', strtotime($s['interview_date']))) ?></strong>
+              <?php endif; ?>
+            </td>
             <td><?= e(date('g:i A', strtotime($s['start_time']))) ?> – <?= e(date('g:i A', strtotime($s['end_time']))) ?></td>
             <td><?= e($s['venue']) ?></td>
             <td><?= e($s['interviewer']) ?></td>
@@ -72,9 +79,20 @@
                 <i class="bi bi-pencil"></i>
               </button>
               <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelScheduleModal"
-                      data-id="<?= (int)$s['id'] ?>">
+                      data-id="<?= (int)$s['id'] ?>" title="Cancel (keeps history, notifies applicants)">
                 <i class="bi bi-x-circle"></i>
               </button>
+              <?php if ((int)$s['assigned_count'] === 0): ?>
+                <form method="POST" action="<?= url('admin/interview-schedule-delete') ?>" class="d-inline"
+                      onsubmit="return confirm('Permanently delete this schedule? This cannot be undone.');">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
+                  <input type="hidden" name="program_id" value="<?= $programId ?>">
+                  <button class="btn btn-sm btn-outline-dark" title="Delete (only available while empty)">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              <?php endif; ?>
             </td>
           </tr>
           <?php endforeach; ?>
@@ -102,7 +120,7 @@
             </td></tr>
           <?php endif; ?>
           <?php foreach ($eligible as $a): ?>
-            <tr>
+            <tr id="app-row-<?= (int)$a['id'] ?>">
               <td><code><?= e($a['application_code']) ?></code></td>
               <td><?= e($a['full_name']) ?></td>
               <td><?= e($a['school_name'] ?? '—') ?></td>
@@ -125,6 +143,10 @@
       <input type="hidden" name="program_id" value="<?= $programId ?>">
       <div class="modal-header"><h5 class="modal-title">New Interview Schedule</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Title</label>
+          <input name="title" class="form-control" placeholder="e.g., Batch 1 Screening">
+        </div>
         <div class="mb-3">
           <label class="form-label">Interview Date *</label>
           <input type="date" name="interview_date" class="form-control" min="<?= date('Y-m-d') ?>" required>
@@ -173,6 +195,7 @@
       <input type="hidden" name="program_id" value="<?= $programId ?>">
       <div class="modal-header"><h5 class="modal-title">Edit Schedule</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
+        <div class="mb-3"><label class="form-label">Title</label><input name="title" id="edit-title" class="form-control" placeholder="e.g., Batch 1 Screening"></div>
         <div class="mb-3"><label class="form-label">Date *</label><input type="date" name="interview_date" id="edit-date" class="form-control" required></div>
         <div class="row g-2 mb-3">
           <div class="col-6"><label class="form-label">Start *</label><input type="time" name="start_time" id="edit-start" class="form-control" required></div>
@@ -228,6 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
   editModal.addEventListener('show.bs.modal', e => {
     const s = JSON.parse(e.relatedTarget.dataset.sched);
     editModal.querySelector('#edit-id').value          = s.id;
+    editModal.querySelector('#edit-title').value       = s.title || '';
     editModal.querySelector('#edit-date').value        = s.interview_date;
     editModal.querySelector('#edit-start').value       = s.start_time;
     editModal.querySelector('#edit-end').value         = s.end_time;
@@ -241,5 +265,15 @@ document.addEventListener('DOMContentLoaded', () => {
   cancelModal.addEventListener('show.bs.modal', e => {
     cancelModal.querySelector('#cancel-id').value = e.relatedTarget.dataset.id;
   });
+
+  // Arrived here via "Schedule Interview" on an application — highlight and scroll to that applicant's row.
+  const focusId = new URLSearchParams(window.location.search).get('focus');
+  if (focusId) {
+    const row = document.getElementById('app-row-' + focusId);
+    if (row) {
+      row.classList.add('table-warning');
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
 });
 </script>

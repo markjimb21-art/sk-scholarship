@@ -49,8 +49,9 @@ $item = function (string $route, string $icon, string $label) use ($current) {
       }
       $item('admin/analytics', 'bi-graph-up-arrow', 'Data Analytics');
       $item('admin/reports', 'bi-printer', 'Reports');
+      $item('admin/budget', 'bi-wallet2', 'Budget'); // staff/official see it read-only (budget.php hides edit controls)
       if (Auth::hasRole('admin')) {
-        $item('admin/budget', 'bi-wallet2', 'Budget');
+        $item('admin/programs', 'bi-collection', 'Scholarship Programs');
         $item('admin/users', 'bi-person-badge', 'Users');
         $item('admin/audit-logs', 'bi-shield-check', 'Audit Logs');
         $item('admin/settings', 'bi-gear', 'System Settings');

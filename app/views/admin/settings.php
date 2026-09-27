@@ -98,3 +98,46 @@ foreach ($settings as $s) $map[$s['setting_key']] = $s['setting_value'];
     <button class="btn btn-primary"><i class="bi bi-save"></i> Save Settings</button>
   </div>
 </form>
+
+<div class="row g-3 mt-1">
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-envelope-check me-1"></i> Email Configuration Status</h6></div>
+      <div class="card-body small">
+        <p class="mb-1"><strong>SMTP Host:</strong> <?= e($mailStatus['host'] ?? 'not set') ?></p>
+        <p class="mb-1"><strong>SMTP Port:</strong> <?= (int)$mailStatus['port'] ?></p>
+        <p class="mb-1"><strong>SMTP Encryption:</strong> <?= e($mailStatus['encryption']) ?></p>
+        <p class="mb-1"><strong>SMTP Username:</strong>
+          <?= $mailStatus['user_configured'] ? '<span class="text-success">configured</span>' : '<span class="text-danger">missing</span>' ?>
+        </p>
+        <p class="mb-1"><strong>SMTP Password:</strong>
+          <?= $mailStatus['pass_configured'] ? '<span class="text-success">configured</span>' : '<span class="text-danger">missing</span>' ?>
+        </p>
+        <p class="mb-1"><strong>Sender Email:</strong>
+          <?= $mailStatus['from_is_placeholder']
+              ? '<span class="text-warning">using authenticated SMTP account (MAIL_FROM not set / placeholder)</span>'
+              : '<span class="text-success">configured</span>' ?>
+        </p>
+        <p class="mb-1"><strong>PHPMailer:</strong> <?= $mailStatus['phpmailer_loaded'] ? '<span class="text-success">loaded</span>' : '<span class="text-danger">not loaded</span>' ?></p>
+        <p class="mb-1"><strong>OpenSSL:</strong> <?= $mailStatus['openssl_enabled'] ? '<span class="text-success">enabled</span>' : '<span class="text-danger">disabled</span>' ?></p>
+        <p class="mb-0"><strong>Email Notifications:</strong>
+          <?= $mailStatus['email_notifications_enabled'] ? '<span class="text-success">Enabled</span>' : '<span class="text-muted">Disabled</span>' ?>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-send me-1"></i> Test Email</h6></div>
+      <div class="card-body">
+        <p class="text-muted small">Send a test message to confirm SMTP delivery is working end to end. Admin-only.</p>
+        <form method="POST" action="<?= url('admin/settings/test-email') ?>" class="d-flex gap-2">
+          <?= csrf_field() ?>
+          <input type="email" name="test_email" class="form-control" placeholder="you@example.com" required>
+          <button class="btn btn-outline-primary text-nowrap"><i class="bi bi-send"></i> Test Email</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

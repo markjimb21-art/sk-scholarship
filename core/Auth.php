@@ -103,6 +103,13 @@ final class Auth
 
         if (!$user['is_active']) return ['ok' => false, 'error' => 'Account deactivated.'];
 
+        // Applicants must verify their e-mail (OTP) before they can log in. Staff/admin/official
+        // accounts are created by an administrator and are exempt (email_verified is backfilled to 1
+        // for pre-existing accounts by the OTP migration).
+        if ($user['role_name'] === 'applicant' && !$user['email_verified']) {
+            return ['ok' => false, 'error' => 'unverified', 'user_id' => (int)$user['id']];
+        }
+
         // success
         session_regenerate_id(true);
         $_SESSION['user_id'] = $user['id'];

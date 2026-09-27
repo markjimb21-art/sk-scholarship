@@ -30,7 +30,7 @@ final class Scholar
             "SELECT s.*, sp.program_name, sp.academic_year
              FROM scholars s
              JOIN scholarship_programs sp ON sp.id = s.program_id
-             WHERE s.applicant_id = ? LIMIT 1"
+             WHERE s.applicant_id = ? ORDER BY s.id DESC LIMIT 1"
         );
         $stmt->execute([$applicantId]);
         return $stmt->fetch() ?: null;
@@ -59,8 +59,11 @@ final class Scholar
         $app = Application::find($applicationId);
         if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
 
-        if (self::findByApplicant((int)$app['applicant_id'])) {
-            return ['ok' => false, 'error' => 'Scholar record already exists.'];
+        // One scholar record per applicant PER PROGRAM: a returning scholar can be approved again in a later program.
+        $dup = Database::conn()->prepare("SELECT 1 FROM scholars WHERE applicant_id = ? AND program_id = ? LIMIT 1");
+        $dup->execute([(int)$app['applicant_id'], (int)$app['program_id']]);
+        if ($dup->fetchColumn()) {
+            return ['ok' => false, 'error' => 'Scholar record already exists for this program.'];
         }
 
         $code = generate_code('SCH');
@@ -140,7 +143,7 @@ final class Scholar
                     "Scholarship Status: $status",
                     $remarks ?: "Your scholar status has been updated to: $status",
                     in_array($status, ['Active','Graduated'], true) ? 'success' : 'warning',
-                    url('applicant/scholarship'));
+                    url('applicant/scholarship'), true);
             }
         }
     }
@@ -300,6 +303,25 @@ final class Scholar
         }
 
         $pdo = Database::conn();
+
+        // Every release must be counted against a budget row for the scholar's program + academic_year,
+        // and must not push released past that row's total_budget.
+        $programStmt = $pdo->prepare(
+            "SELECT s.program_id, sp.program_name FROM scholars s JOIN scholarship_programs sp ON sp.id = s.program_id WHERE s.id = ?"
+        );
+        $programStmt->execute([(int)$data['scholar_id']]);
+        $program = $programStmt->fetch();
+        if (!$program) {
+            return ['ok' => false, 'error' => 'Scholar not found.'];
+        }
+        $programId = (int)$program['program_id'];
+        if (!Budget::exists($programId, (string)$data['academic_year'])) {
+            return ['ok' => false, 'error' => "Create a budget for {$program['program_name']} {$data['academic_year']} first."];
+        }
+        if (Budget::wouldExceedBudget($programId, $data['academic_year'], (float)$data['amount'])) {
+            return ['ok' => false, 'error' => 'This release would exceed the remaining budget for this program and academic year.'];
+        }
+
         $code = generate_code('REL');
 
         $pdo->prepare(
@@ -316,6 +338,8 @@ final class Scholar
         ]);
         $releaseId = (int)$pdo->lastInsertId();
 
+        Budget::syncReleased($programId, $data['academic_year']);
+
         AuditLog::write('scholarship_released', 'scholarship_releases', $releaseId,
             "Released ₱" . number_format((float)$data['amount'], 2) . " to scholar #{$data['scholar_id']}");
 
@@ -328,7 +352,7 @@ final class Scholar
         if ($uid) {
             Notification::send($uid, 'Scholarship Released 💵',
                 "₱" . number_format((float)$data['amount'], 2) . " was released to you for {$data['academic_year']} {$data['semester']}.",
-                'success', url('applicant/scholarship'));
+                'success', url('applicant/scholarship'), true);
         }
 
         return ['ok' => true, 'id' => $releaseId, 'release_code' => $code];
@@ -338,7 +362,14 @@ final class Scholar
     {
         $old = self::release($id);
         if (!$old) return;
-        Database::conn()->prepare("DELETE FROM scholarship_releases WHERE id = ?")->execute([$id]);
+        $pdo = Database::conn();
+        $pdo->prepare("DELETE FROM scholarship_releases WHERE id = ?")->execute([$id]);
+
+        $programStmt = $pdo->prepare("SELECT program_id FROM scholars WHERE id = ?");
+        $programStmt->execute([(int)$old['scholar_id']]);
+        $programId = (int)$programStmt->fetchColumn();
+        if ($programId) Budget::syncReleased($programId, $old['academic_year']);
+
         AuditLog::write('scholarship_release_deleted', 'scholarship_releases', $id,
             "Deleted release {$old['release_code']}", $old);
     }
@@ -440,7 +471,7 @@ final class Scholar
                 Notification::send($uid, "Renewal: {$data['status']}",
                     $data['remarks'] ?: "Your scholarship renewal status is now: {$data['status']}",
                     in_array($data['status'], ['Renewed','Eligible for Renewal'], true) ? 'success' : 'warning',
-                    url('applicant/scholarship'));
+                    url('applicant/scholarship'), true);
             }
         }
 

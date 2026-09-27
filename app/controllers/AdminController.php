@@ -7,6 +7,8 @@ require_once BASE_PATH . '/app/models/Document.php';
 require_once BASE_PATH . '/app/models/Interview.php';
 require_once BASE_PATH . '/app/models/Scholar.php';
 require_once BASE_PATH . '/app/models/Analytics.php';
+require_once BASE_PATH . '/app/models/Budget.php';
+require_once BASE_PATH . '/app/models/Program.php';
 
 final class AdminController
 {
@@ -26,6 +28,7 @@ final class AdminController
         'dashboard' => self::ROLES_ALL,
         'notifications' => self::ROLES_ALL,
         'analytics' => self::ROLES_ALL,
+        'budget' => self::ROLES_ALL,             // view: admin full, staff/official read-only (view enforces this)
         'reports' => self::ROLES_ALL,
         'reports/generate' => self::ROLES_ALL,
         // STAFF
@@ -36,12 +39,15 @@ final class AdminController
         'documents' => self::ROLES_STAFF,
         'documents/view' => self::ROLES_STAFF,
         'documents/review' => self::ROLES_STAFF,
+        'documents/verify-all' => self::ROLES_STAFF,
         'interview-scheduling' => self::ROLES_STAFF,
         'interview-schedule-save' => self::ROLES_STAFF,
         'interview-schedule-update' => self::ROLES_STAFF,
         'interview-schedule-cancel' => self::ROLES_STAFF,
+        'interview-schedule-delete' => self::ROLES_STAFF,
         'interview-schedule-detail' => self::ROLES_STAFF,
         'interview-assign' => self::ROLES_STAFF,
+        'interview-assign-batch' => self::ROLES_STAFF,
         'interview-unassign' => self::ROLES_STAFF,
         'interview-assignment-status' => self::ROLES_STAFF,
         'interview-calendar' => self::ROLES_STAFF,
@@ -63,7 +69,14 @@ final class AdminController
         'renewal-save' => self::ROLES_STAFF,
         'renewal-update' => self::ROLES_STAFF,
         'renewal-delete' => self::ROLES_STAFF,
+        // ADMIN (budget writes)
+        'budget-save' => self::ROLES_ADMIN,
+        'budget-update' => self::ROLES_ADMIN,
+        'budget-delete' => self::ROLES_ADMIN,
         // ADMIN
+        'programs' => self::ROLES_ADMIN,
+        'program-save' => self::ROLES_ADMIN,
+        'program-toggle' => self::ROLES_ADMIN,
         'users' => self::ROLES_ADMIN,
         'user-save' => self::ROLES_ADMIN,
         'user-toggle' => self::ROLES_ADMIN,
@@ -71,6 +84,7 @@ final class AdminController
         'user-delete' => self::ROLES_ADMIN,
         'settings' => self::ROLES_ADMIN,
         'settings/save' => self::ROLES_ADMIN,
+        'settings/test-email' => self::ROLES_ADMIN,
         'audit-logs' => self::ROLES_ADMIN,
     ];
 
@@ -96,13 +110,16 @@ final class AdminController
             case 'documents':                  $this->documents(); break;
             case 'documents/view':             $this->viewDocument(); break;
             case 'documents/review':           $this->reviewDocument(); break;
+            case 'documents/verify-all':       $this->verifyAllDocuments(); break;
             case 'notifications':              $this->notifications(); break;
             case 'interview-scheduling':       $this->interviewScheduling(); break;
             case 'interview-schedule-save':    $this->saveInterviewSchedule(); break;
             case 'interview-schedule-update':  $this->updateInterviewSchedule(); break;
             case 'interview-schedule-cancel':  $this->cancelInterviewSchedule(); break;
+            case 'interview-schedule-delete':  $this->deleteInterviewSchedule(); break;
             case 'interview-schedule-detail':  $this->interviewScheduleDetail(); break;
             case 'interview-assign':           $this->assignInterview(); break;
+            case 'interview-assign-batch':     $this->assignInterviewBatch(); break;
             case 'interview-unassign':         $this->unassignInterview(); break;
             case 'interview-assignment-status':$this->updateAssignmentStatus(); break;
             case 'interview-calendar':         $this->interviewCalendar(); break;
@@ -124,6 +141,13 @@ final class AdminController
             case 'renewal-save':               $this->renewalSave(); break;
             case 'renewal-update':             $this->renewalUpdate(); break;
             case 'renewal-delete':             $this->renewalDelete(); break;
+            case 'budget':                     $this->budgetIndex(); break;
+            case 'budget-save':
+            case 'budget-update':              $this->budgetSave(); break;
+            case 'budget-delete':              $this->budgetDelete(); break;
+            case 'programs':                   $this->programs(); break;
+            case 'program-save':               $this->programSave(); break;
+            case 'program-toggle':             $this->programToggle(); break;
             case 'analytics':                  $this->analytics(); break;
             case 'reports':                    $this->reports(); break;
             case 'reports/generate':           $this->generateReport(); break;
@@ -134,6 +158,7 @@ final class AdminController
             case 'user-delete':                $this->userDelete(); break;
             case 'settings':                   $this->settings(); break;
             case 'settings/save':              $this->settingsSave(); break;
+            case 'settings/test-email':        $this->settingsTestEmail(); break;
             case 'audit-logs':                 $this->auditLogs(); break;
             default:
                 http_response_code(404);
@@ -230,6 +255,23 @@ final class AdminController
         $app = Application::withDetails($id);
         if (!$app) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
 
+        if (!empty($app['review_remarks_by'])) {
+            $stmt = Database::conn()->prepare("SELECT full_name FROM users WHERE id = ?");
+            $stmt->execute([$app['review_remarks_by']]);
+            $app['review_remarks_by_name'] = $stmt->fetchColumn() ?: null;
+        }
+
+        // Eligibility panel: the result stored at submission; for applications submitted before this
+        // check existed (score is NULL), compute it now from the current data so staff still see it.
+        $program = Program::find((int)$app['program_id']);
+        $slotsUsed = Program::slotsUsed((int)$app['program_id']);
+        $eligibility = null;
+        if ($app['eligibility_score'] !== null) {
+            $eligibility = ['score' => (float)$app['eligibility_score'], 'notes' => $app['eligibility_notes'] ?? null, 'live' => false];
+        } elseif ($app['status'] !== 'Draft' && $program) {
+            $eligibility = Application::evaluateEligibility($program, $app['personal'], $app['education'], $app['family']) + ['live' => true];
+        }
+
         // Audit trail for this application
         $audit = Database::conn()->prepare(
             "SELECT al.*, u.full_name AS actor
@@ -266,6 +308,22 @@ final class AdminController
             Auth::deny();
         }
 
+        // Workflow guard: Application::TRANSITIONS is the single source of truth (the view's buttons use it too).
+        // The only bypass is an admin acting on an application with admin_override enabled; that is audit-logged below.
+        $overrideUsed = false;
+        if ($action === 'admin_override') {
+            if (in_array($app['status'], Application::FINAL_STATUSES, true)) {
+                flash('danger', "An override cannot be enabled on an application that is already {$app['status']}.");
+                redirect('admin/applications/view&id=' . $id);
+            }
+        } elseif (isset(Application::TRANSITIONS[$action]) && !Application::transitionAllowed($action, $app['status'])) {
+            if (!Application::canBypassTransitions($app)) {
+                flash('danger', "That action is not allowed while the application is \"{$app['status']}\".");
+                redirect('admin/applications/view&id=' . $id);
+            }
+            $overrideUsed = true;
+        }
+
         $userId = (int)Auth::user()['id'];
         $pdo = Database::conn();
 
@@ -275,16 +333,28 @@ final class AdminController
             switch ($action) {
                 case 'start_review':
                     Application::updateStatus($id, 'Under Initial Review', $userId);
+                    // In-app notification only — no email for this event (Initial Review is a routine internal step).
                     Notification::send((int)$app['applicant_id'] ? $this->userIdFromApplicant((int)$app['applicant_id']) : 0,
                         'Application Under Review',
                         'Your application is now being reviewed by the SK office.',
-                        'info', url('applicant/dashboard'));
+                        'info', url('applicant/dashboard'), false);
                     flash('success', 'Marked as under review.');
                     break;
 
                 case 'mark_incomplete':
-                    Application::updateStatus($id, 'Incomplete', $userId);
-                    flash('warning', 'Marked as incomplete.');
+                    $incompleteRemarks = trim($_POST['remarks'] ?? '');
+                    if ($incompleteRemarks === '') {
+                        $pdo->rollBack();
+                        flash('danger', 'Please provide remarks explaining what needs to be corrected.');
+                        redirect('admin/applications/view&id=' . $id);
+                    }
+                    Application::markIncomplete($id, $userId, $incompleteRemarks);
+                    Notification::send($this->userIdFromApplicant((int)$app['applicant_id']),
+                        'Application Marked Incomplete',
+                        'Your scholarship application has been marked incomplete. Please review the remarks and update your application. ' .
+                        'Remarks: ' . $incompleteRemarks,
+                        'warning', url('applicant/application'), true);
+                    flash('warning', 'Marked as incomplete. The applicant has been notified.');
                     break;
 
                 case 'verify_documents':
@@ -296,16 +366,43 @@ final class AdminController
                         redirect('admin/applications/view&id=' . $id);
                     }
                     Application::updateStatus($id, 'Documents Verified', $userId);
+                    Notification::send($this->userIdFromApplicant((int)$app['applicant_id']),
+                        'Documents Verified',
+                        'All your submitted documents have been verified by the SK office.',
+                        'success', url('applicant/documents'), true);
                     flash('success', 'Documents marked verified.');
                     break;
 
                 case 'for_interview':
+                    // Server is the authority here — never trust the frontend checklist alone.
+                    $review = Application::reviewCompleteness($id);
+                    if (!$review['complete']) {
+                        $pdo->rollBack();
+                        $parts = [];
+                        if ($review['missing_documents']) $parts[] = 'Missing documents: ' . implode(', ', $review['missing_documents']) . '.';
+                        if ($review['missing_fields']) $parts[] = 'Missing/invalid information: ' . implode(', ', $review['missing_fields']) . '.';
+                        flash('danger', 'This application is incomplete. Please mark it as Incomplete and specify the missing or incorrect information. ' . implode(' ', $parts));
+                        redirect('admin/applications/view&id=' . $id);
+                    }
+
+                    // All required documents are present and valid — verify them as part of this one review decision.
+                    $verifiedTypes = [];
+                    foreach (Document::byApplication($id) as $doc) {
+                        if ($doc['file_path'] !== '' && $doc['status'] !== 'Verified') {
+                            Document::updateStatus((int)$doc['id'], 'Verified', $userId, 'Verified as part of application review.');
+                            $verifiedTypes[] = $doc['document_type'];
+                        }
+                    }
+
                     Application::updateStatus($id, 'For Interview', $userId);
+                    AuditLog::write('application_marked_for_interview', 'applications', $id,
+                        'Application marked For Interview after completeness review' .
+                        ($verifiedTypes ? '; auto-verified: ' . implode(', ', $verifiedTypes) : ''));
                     Notification::send($this->userIdFromApplicant((int)$app['applicant_id']),
                         'Eligible for Interview',
                         'You are now eligible for an interview. Please wait for scheduling.',
-                        'success', url('applicant/interview'));
-                    flash('success', 'Marked as For Interview.');
+                        'success', url('applicant/interview'), true);
+                    flash('success', 'Marked as For Interview. Required documents were automatically verified.');
                     break;
 
                 case 'for_final':
@@ -314,6 +411,21 @@ final class AdminController
                     break;
 
                 case 'approve':
+                    // Slot limit: lock the program row so two approvals cannot both take the last slot.
+                    $progStmt = $pdo->prepare("SELECT program_name, slots_available FROM scholarship_programs WHERE id = ? FOR UPDATE");
+                    $progStmt->execute([(int)$app['program_id']]);
+                    $program = $progStmt->fetch();
+                    $slots = (int)($program['slots_available'] ?? 0);   // 0 = no limit
+                    $used  = Program::slotsUsed((int)$app['program_id']);
+                    if ($slots > 0 && $used >= $slots) {
+                        if (!Application::canBypassTransitions($app)) {
+                            $pdo->rollBack();
+                            flash('danger', "Cannot approve — all $slots slot(s) for {$program['program_name']} are already filled ($used scholar(s)). An admin override is required.");
+                            redirect('admin/applications/view&id=' . $id);
+                        }
+                        AuditLog::write('slot_limit_override', 'applications', $id,
+                            "Approved over the slot limit via admin override ($used of $slots slots already used)");
+                    }
                     $this->approveApplication($id, $app, $userId, $_POST['remarks'] ?? '');
                     flash('success', 'Application approved and scholar created.');
                     break;
@@ -326,7 +438,7 @@ final class AdminController
                         'Application Not Approved',
                         'We regret to inform you that your scholarship application was not approved. ' .
                         ($_POST['remarks'] ?? ''),
-                        'danger', url('applicant/dashboard'));
+                        'danger', url('applicant/dashboard'), true);
                     flash('warning', 'Application rejected.');
                     break;
 
@@ -337,7 +449,7 @@ final class AdminController
                     Notification::send($this->userIdFromApplicant((int)$app['applicant_id']),
                         'Waitlisted',
                         'You have been placed on the waitlist. We will notify you if a slot opens.',
-                        'warning', url('applicant/dashboard'));
+                        'warning', url('applicant/dashboard'), true);
                     flash('info', 'Application waitlisted.');
                     break;
 
@@ -350,6 +462,12 @@ final class AdminController
 
                 default:
                     flash('danger', 'Unknown action.');
+            }
+
+            if ($overrideUsed) {
+                AuditLog::write('transition_override', 'applications', $id,
+                    "Admin override: '$action' performed while status was \"{$app['status']}\" (outside the normal workflow)",
+                    ['status' => $app['status']], ['action' => $action, 'override_reason' => $app['override_reason'] ?? null]);
             }
 
             $pdo->commit();
@@ -513,17 +631,59 @@ final class AdminController
                 'Verified' => 'success', 'Rejected' => 'danger',
                 'Resubmission Required' => 'warning', default => 'info'
             };
+            // Document Verified / Rejected: in-app only, no email (routine per-document review events).
+            // Resubmission Required / Under Review: unchanged, still emailed.
+            $sendEmail = !in_array($status, ['Verified', 'Rejected'], true);
             Notification::send(
                 (int)$row['user_id'], $title,
                 "Your {$row['document_type']} has been marked as: $status." .
                 ($remarks ? " Remarks: $remarks" : ''),
-                $type, url('applicant/documents')
+                $type, url('applicant/documents'), $sendEmail
             );
         }
 
         flash('success', "Document marked as $status.");
         $back = (string)($_POST['redirect'] ?? '');
-        redirect(preg_match('#^admin/[A-Za-z0-9_\-/]+(?:[&?][A-Za-z0-9_\-]+=[A-Za-z0-9_\-%.+]*)*$#', $back) === 1 ? $back : 'admin/documents');
+        redirect(preg_match('#^admin/[A-Za-z0-9_\-/]+(?:[&?][A-Za-z0-9_\-]+=[A-Za-z0-9_\-%.+]*)*(?:\#[A-Za-z0-9_\-]+)?$#', $back) === 1 ? $back : 'admin/documents');
+    }
+
+    /* ------------------------------------------------------------
+     *  VERIFY ALL DOCUMENTS for an application (bulk action)
+     * ------------------------------------------------------------ */
+    private function verifyAllDocuments(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/documents');
+        verify_csrf();
+
+        $appId = (int)($_POST['application_id'] ?? 0);
+        $app = Application::find($appId);
+        if (!$app) { flash('danger', 'Application not found.'); redirect('admin/applications'); }
+
+        $userId = (int)Auth::user()['id'];
+        $documents = Document::byApplication($appId);
+        $verifiedCount = 0;
+
+        foreach ($documents as $doc) {
+            if ($doc['file_path'] === '' || $doc['status'] === 'Verified') continue;
+            Document::updateStatus((int)$doc['id'], 'Verified', $userId, null);
+            $verifiedCount++;
+        }
+
+        if ($verifiedCount > 0) {
+            AuditLog::write('documents_verify_all', 'applications', $appId, "Verified $verifiedCount document(s) in bulk");
+            $applicantUserId = $this->userIdFromApplicant((int)$app['applicant_id']);
+            // Document Verified: in-app only, no email (same rule as the single-document Verify action).
+            Notification::send(
+                $applicantUserId, 'Documents Verified ✅',
+                "$verifiedCount of your submitted document(s) have been verified by the SK office.",
+                'success', url('applicant/documents'), false
+            );
+            flash('success', "Verified $verifiedCount document(s).");
+        } else {
+            flash('info', 'No submitted documents were pending verification.');
+        }
+
+        redirect('admin/applications/view&id=' . $appId . '#tab-docs');
     }
 
     /* ------------------------------------------------------------
@@ -572,6 +732,7 @@ final class AdminController
 
         $result = Interview::createSchedule([
             'program_id'     => (int)$_POST['program_id'],
+            'title'          => trim($_POST['title'] ?? ''),
             'interview_date' => $_POST['interview_date'],
             'start_time'     => $_POST['start_time'],
             'end_time'       => $_POST['end_time'],
@@ -594,6 +755,7 @@ final class AdminController
 
         $id = (int)$_POST['id'];
         $result = Interview::updateSchedule($id, [
+            'title'          => trim($_POST['title'] ?? ''),
             'interview_date' => $_POST['interview_date'],
             'start_time'     => $_POST['start_time'],
             'end_time'       => $_POST['end_time'],
@@ -617,6 +779,18 @@ final class AdminController
         $id = (int)$_POST['id'];
         Interview::cancelSchedule($id, (int)Auth::user()['id'], trim($_POST['reason'] ?? ''));
         flash('warning', 'Schedule cancelled. Assigned applicants were notified.');
+        redirect('admin/interview-scheduling&program_id=' . (int)$_POST['program_id']);
+    }
+
+    private function deleteInterviewSchedule(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/interview-scheduling');
+        verify_csrf();
+
+        $id = (int)$_POST['id'];
+        $result = Interview::deleteSchedule($id, (int)Auth::user()['id']);
+        if ($result['ok']) flash('success', 'Schedule deleted.');
+        else                flash('danger', $result['error']);
         redirect('admin/interview-scheduling&program_id=' . (int)$_POST['program_id']);
     }
 
@@ -647,6 +821,29 @@ final class AdminController
         $result = Interview::assign($scheduleId, $applicationId, (int)Auth::user()['id'], $instructions);
         if ($result['ok']) flash('success', 'Applicant assigned.');
         else                flash('danger', $result['error']);
+
+        redirect('admin/interview-schedule-detail&id=' . $scheduleId);
+    }
+
+    private function assignInterviewBatch(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/interview-scheduling');
+        verify_csrf();
+
+        $scheduleId = (int)$_POST['schedule_id'];
+        $applicationIds = array_filter(array_map('intval', (array)($_POST['application_ids'] ?? [])));
+
+        if (!$applicationIds) {
+            flash('warning', 'No applicants were selected.');
+            redirect('admin/interview-schedule-detail&id=' . $scheduleId);
+        }
+
+        $result = Interview::assignBatch($scheduleId, $applicationIds, (int)Auth::user()['id']);
+        $n = count($result['assigned']);
+        if ($n > 0) flash('success', "$n applicant(s) assigned.");
+        if ($result['failed']) {
+            flash('warning', count($result['failed']) . ' applicant(s) could not be assigned (schedule may now be full).');
+        }
 
         redirect('admin/interview-schedule-detail&id=' . $scheduleId);
     }
@@ -707,14 +904,13 @@ final class AdminController
                 default     => '#64748b'
             };
 
+            $title = trim((string)($s['title'] ?? ''));
+            if ($title === '') $title = 'Interview';
+            $title .= sprintf(' (%d/%d)', (int)$s['assigned_count'], (int)$s['max_slots']);
+
             $events[] = [
                 'id'    => (int)$s['id'],
-                'title' => sprintf('%s – %s (%d/%d)',
-                    date('g:iA', strtotime($s['start_time'])),
-                    date('g:iA', strtotime($s['end_time'])),
-                    (int)$s['assigned_count'],
-                    (int)$s['max_slots']
-                ),
+                'title' => $title,
                 'start' => $s['interview_date'] . 'T' . $s['start_time'],
                 'end'   => $s['interview_date'] . 'T' . $s['end_time'],
                 'url'   => url('admin/interview-schedule-detail&id=' . (int)$s['id']),
@@ -873,6 +1069,7 @@ final class AdminController
         $releases  = Scholar::releases($id);
         $renewals  = Scholar::renewals($id);
         $totalReleased = Scholar::totalReleased($id);
+        $budgetYears = Budget::yearsForProgram((int)$scholar['program_id']); // releases need a budget row for their year
 
         // Audit trail for this scholar
         $audit = Database::conn()->prepare(
@@ -1002,6 +1199,7 @@ final class AdminController
         // Budget info
         $budget = (float)$pdo->query("SELECT COALESCE(SUM(total_budget),0) FROM budgets")->fetchColumn();
         $remaining = $budget - $totalAllTime;
+        $years = Budget::academicYears();
 
         $pageTitle = 'Scholarship Releases';
         require VIEW_PATH . '/layouts/header.php';
@@ -1096,6 +1294,76 @@ final class AdminController
         redirect('admin/renewals');
     }
 
+    /* ================= BUDGET ================= */
+
+    private function budgetIndex(): void
+    {
+        $budgets  = Budget::all();
+        $summary  = Budget::summary();
+        $programs = Budget::programs();
+        $years    = Budget::academicYears();
+        $canEdit  = Auth::hasRole('admin'); // staff/official get read-only per the permission model
+
+        $pageTitle = 'Budget Management';
+        require VIEW_PATH . '/layouts/header.php';
+        require VIEW_PATH . '/admin/budget.php';
+        require VIEW_PATH . '/layouts/footer.php';
+    }
+
+    private function budgetSave(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/budget');
+        verify_csrf();
+        $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+        $result = Budget::save($_POST, $id);
+        if ($result['ok']) flash('success', $id ? 'Budget updated.' : 'Budget created.');
+        else               flash('danger', $result['error']);
+        redirect('admin/budget');
+    }
+
+    private function budgetDelete(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/budget');
+        verify_csrf();
+        Budget::delete((int)$_POST['id']);
+        flash('success', 'Budget deleted.');
+        redirect('admin/budget');
+    }
+
+    /* ================= SCHOLARSHIP PROGRAMS ================= */
+
+    private function programs(): void
+    {
+        $programs    = Program::all();
+        $openProgram = Program::open();
+
+        $pageTitle = 'Scholarship Programs';
+        require VIEW_PATH . '/layouts/header.php';
+        require VIEW_PATH . '/admin/programs.php';
+        require VIEW_PATH . '/layouts/footer.php';
+    }
+
+    private function programSave(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/programs');
+        verify_csrf();
+        $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+        $result = Program::save($_POST, $id, (int)Auth::user()['id']);
+        if ($result['ok']) flash('success', $id ? 'Program updated.' : 'Program created.');
+        else               flash('danger', $result['error']);
+        redirect('admin/programs');
+    }
+
+    private function programToggle(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/programs');
+        verify_csrf();
+        $state = Program::toggle((int)($_POST['id'] ?? 0));
+        if ($state === null) flash('danger', 'Program not found.');
+        else                 flash('success', $state ? 'Program activated.' : 'Program deactivated.');
+        redirect('admin/programs');
+    }
+
     /* ================= ANALYTICS ================= */
     private function analytics(): void
     {
@@ -1178,8 +1446,9 @@ final class AdminController
         $type      = $_POST['report_type'] ?? '';
         $format    = $_POST['format'] ?? 'pdf';   // pdf | csv
         $programId = !empty($_POST['program_id']) ? (int)$_POST['program_id'] : null;
-        $dateFrom  = $_POST['date_from'] ?? null;
-        $dateTo    = $_POST['date_to']   ?? null;
+        $isDate    = static fn($d): bool => is_string($d) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1;
+        $dateFrom  = $isDate($_POST['date_from'] ?? null) ? $_POST['date_from'] : null;
+        $dateTo    = $isDate($_POST['date_to'] ?? null)   ? $_POST['date_to']   : null;
 
         $catalog = self::reportCatalog();
         if (!isset($catalog[$type])) { flash('danger', 'Unknown report.'); redirect('admin/reports'); }
@@ -1206,11 +1475,18 @@ final class AdminController
     private static function buildReport(string $type, ?int $programId, ?string $from, ?string $to): array
     {
         $pdo = Database::conn();
-        $params = [];
-        $w = "";
-        if ($programId) { $w .= " AND a.program_id = :pid"; $params['pid'] = $programId; }
-        if ($from)      { $w .= " AND DATE(a.created_at) >= :df"; $params['df'] = $from; }
-        if ($to)        { $w .= " AND DATE(a.created_at) <= :dt"; $params['dt'] = $to; }
+        $params = array_filter(['pid' => $programId, 'df' => $from, 'dt' => $to], static fn($v) => $v !== null && $v !== '');
+
+        // Program/date filter for a given report: each report names the columns the filters apply to
+        // (null = that filter doesn't make sense for this report and is not applied).
+        $filter = static function (?string $programCol, ?string $dateCol) use ($programId, $from, $to): string {
+            $w = '';
+            if ($programId && $programCol) $w .= " AND $programCol = :pid";
+            if ($from && $dateCol)         $w .= " AND DATE($dateCol) >= :df";
+            if ($to && $dateCol)           $w .= " AND DATE($dateCol) <= :dt";
+            return $w;
+        };
+        $w = $filter('a.program_id', 'a.created_at');   // application-based reports
 
         switch ($type) {
             case 'applications':
@@ -1228,14 +1504,14 @@ final class AdminController
                 break;
 
             case 'approved': case 'rejected': case 'waitlisted':
-                $status = ucfirst($type);
+                $params['status'] = ucfirst($type);
                 $sql = "SELECT a.application_code AS 'Application Code', u.full_name AS 'Name',
                             u.email AS 'Email', a.status AS 'Status',
                             DATE(a.decided_at) AS 'Decided', a.decision_remarks AS 'Remarks'
                         FROM applications a
                         JOIN applicants ap ON ap.id = a.applicant_id
                         JOIN users u ON u.id = ap.user_id
-                        WHERE a.status = '$status' $w
+                        WHERE a.status = :status $w
                         ORDER BY a.decided_at DESC";
                 break;
 
@@ -1259,6 +1535,7 @@ final class AdminController
                             (SELECT COUNT(*) FROM interview_assignments ia WHERE ia.schedule_id=s.id) AS 'Assigned',
                             s.status AS 'Status'
                         FROM interview_schedules s
+                        WHERE 1=1 " . $filter('s.program_id', 's.interview_date') . "
                         ORDER BY s.interview_date DESC";
                 break;
 
@@ -1271,6 +1548,7 @@ final class AdminController
                         JOIN applications a ON a.id = ia.application_id
                         JOIN applicants ap ON ap.id = a.applicant_id
                         JOIN users u ON u.id = ap.user_id
+                        WHERE 1=1 " . $filter('s.program_id', 's.interview_date') . "
                         ORDER BY s.interview_date DESC, u.full_name";
                 break;
 
@@ -1283,9 +1561,11 @@ final class AdminController
                             DATE(ev.evaluated_at) AS 'Evaluated'
                         FROM interview_evaluations ev
                         JOIN interview_assignments ia ON ia.id = ev.assignment_id
+                        JOIN interview_schedules s ON s.id = ia.schedule_id
                         JOIN applications a ON a.id = ia.application_id
                         JOIN applicants ap ON ap.id = a.applicant_id
                         JOIN users u ON u.id = ap.user_id
+                        WHERE 1=1 " . $filter('s.program_id', 's.interview_date') . "
                         ORDER BY ev.total_score DESC";
                 break;
 
@@ -1297,7 +1577,7 @@ final class AdminController
                         JOIN applications a ON a.id = ia.application_id
                         JOIN applicants ap ON ap.id = a.applicant_id
                         JOIN users u ON u.id = ap.user_id
-                        WHERE ia.assignment_status = 'No Show'
+                        WHERE ia.assignment_status = 'No Show' " . $filter('s.program_id', 's.interview_date') . "
                         ORDER BY s.interview_date DESC";
                 break;
 
@@ -1310,6 +1590,7 @@ final class AdminController
                         JOIN applicants ap ON ap.id = s.applicant_id
                         JOIN users u ON u.id = ap.user_id
                         LEFT JOIN education_records e ON e.applicant_id = ap.id
+                        WHERE 1=1 " . $filter('s.program_id', 's.approval_date') . "
                         ORDER BY s.approval_date DESC";
                 break;
 
@@ -1318,7 +1599,7 @@ final class AdminController
                         FROM scholars s
                         JOIN applicants ap ON ap.id = s.applicant_id
                         LEFT JOIN education_records e ON e.applicant_id = ap.id
-                        WHERE s.status = 'Active'
+                        WHERE s.status = 'Active' " . $filter('s.program_id', 's.approval_date') . "
                         GROUP BY e.school_name ORDER BY COUNT(*) DESC";
                 break;
 
@@ -1327,7 +1608,7 @@ final class AdminController
                         FROM scholars s
                         JOIN applicants ap ON ap.id = s.applicant_id
                         LEFT JOIN education_records e ON e.applicant_id = ap.id
-                        WHERE s.status = 'Active'
+                        WHERE s.status = 'Active' " . $filter('s.program_id', 's.approval_date') . "
                         GROUP BY e.course_name ORDER BY COUNT(*) DESC";
                 break;
 
@@ -1336,7 +1617,7 @@ final class AdminController
                         FROM scholars s
                         JOIN applicants ap ON ap.id = s.applicant_id
                         LEFT JOIN education_records e ON e.applicant_id = ap.id
-                        WHERE s.status = 'Active'
+                        WHERE s.status = 'Active' " . $filter('s.program_id', 's.approval_date') . "
                         GROUP BY e.year_level
                         ORDER BY FIELD(e.year_level,'1st Year','2nd Year','3rd Year','4th Year','5th Year','Other')";
                 break;
@@ -1350,6 +1631,7 @@ final class AdminController
                         JOIN scholars s ON s.id = ar.scholar_id
                         JOIN applicants ap ON ap.id = s.applicant_id
                         JOIN users u ON u.id = ap.user_id
+                        WHERE 1=1 " . $filter('s.program_id', null) . "
                         ORDER BY ar.academic_year DESC, ar.gpa ASC";
                 break;
 
@@ -1362,16 +1644,22 @@ final class AdminController
                         JOIN scholars s ON s.id = r.scholar_id
                         JOIN applicants ap ON ap.id = s.applicant_id
                         JOIN users u ON u.id = ap.user_id
+                        WHERE 1=1 " . $filter('s.program_id', 'r.release_date') . "
                         ORDER BY r.release_date DESC";
                 break;
 
             case 'budget':
                 $sql = "SELECT sp.program_name AS 'Program', COALESCE(b.academic_year, '-') AS 'Academic Year',
                             COALESCE(b.total_budget, 0) AS 'Total Budget',
-                            COALESCE(b.released, 0) AS 'Released',
-                            COALESCE(b.total_budget, 0) - COALESCE(b.released, 0) AS 'Remaining'
+                            COALESCE(b.allocated, 0) AS 'Allocated',
+                            COALESCE(b.released, 0) AS 'Total Released',
+                            COALESCE(b.total_budget, 0) - COALESCE(b.released, 0) AS 'Remaining',
+                            CASE WHEN COALESCE(b.total_budget,0) > 0
+                                 THEN ROUND(COALESCE(b.released,0) / b.total_budget * 100, 1)
+                                 ELSE 0 END AS 'Utilization %'
                         FROM scholarship_programs sp
                         LEFT JOIN budgets b ON b.program_id = sp.id
+                        WHERE 1=1 " . $filter('sp.id', null) . "
                         ORDER BY sp.id DESC";
                 break;
 
@@ -1383,6 +1671,7 @@ final class AdminController
                         JOIN scholars s ON s.id = r.scholar_id
                         JOIN applicants ap ON ap.id = s.applicant_id
                         JOIN users u ON u.id = ap.user_id
+                        WHERE 1=1 " . $filter('s.program_id', null) . "
                         ORDER BY r.created_at DESC";
                 break;
 
@@ -1395,7 +1684,7 @@ final class AdminController
                         JOIN applicants ap ON ap.id = s.applicant_id
                         JOIN users u ON u.id = ap.user_id
                         LEFT JOIN education_records e ON e.applicant_id = ap.id
-                        WHERE s.status = 'Graduated'
+                        WHERE s.status = 'Graduated' " . $filter('s.program_id', null) . "
                         ORDER BY u.full_name";
                 break;
 
@@ -1428,20 +1717,25 @@ final class AdminController
                 $sql = "SELECT 1 AS 'N/A'";
         }
 
+        // Bind ONLY the placeholders this report's SQL actually uses (binding an unused one throws SQLSTATE[HY093]).
+        $uses = static fn(string $name): bool => preg_match('/:' . $name . '\b/', $sql) === 1;
         $stmt = $pdo->prepare($sql);
-        foreach ($params as $k => $v) $stmt->bindValue(":$k", $v);
+        foreach ($params as $k => $v) {
+            if ($uses($k)) $stmt->bindValue(":$k", $v, $k === 'pid' ? PDO::PARAM_INT : PDO::PARAM_STR);
+        }
         $stmt->execute();
         $rows = $stmt->fetchAll();
 
         $catalog = self::reportCatalog();
+        $notApplied = 'Not applicable to this report';
         return [
             'title'   => $catalog[$type][0],
             'headers' => $rows ? array_keys($rows[0]) : [],
             'rows'    => array_map('array_values', $rows),
             'meta'    => [
-                'Program' => $programId ? (self::programName($pdo, (int)$programId) ?: '—') : 'All Programs',
-                'From'    => $from ?: 'Any',
-                'To'      => $to   ?: 'Any',
+                'Program' => $programId ? ($uses('pid') ? (self::programName($pdo, (int)$programId) ?: '—') : $notApplied) : 'All Programs',
+                'From'    => $from ? ($uses('df') ? $from : $notApplied) : 'Any',
+                'To'      => $to   ? ($uses('dt') ? $to   : $notApplied) : 'Any',
                 'Generated' => date('F d, Y g:i A'),
             ],
         ];
@@ -1769,11 +2063,46 @@ final class AdminController
 
         $pdo = Database::conn();
         $settings = $pdo->query("SELECT * FROM system_settings ORDER BY setting_key")->fetchAll();
+        $mailStatus = Notification::mailConfigStatus();
 
         $pageTitle = 'System Settings';
         require VIEW_PATH . '/layouts/header.php';
         require VIEW_PATH . '/admin/settings.php';
         require VIEW_PATH . '/layouts/footer.php';
+    }
+
+    /**
+     * Admin-only development/testing helper (Task 10): sends a fixed test message to an address
+     * the admin types in. POST + CSRF + admin role only — there is no public/unauthenticated route
+     * for this. Never echoes SMTP credentials; in production shows a generic failure message.
+     */
+    private function settingsTestEmail(): void
+    {
+        if (!Auth::hasRole('admin')) { http_response_code(403); die('Admin access only.'); }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('admin/settings');
+        verify_csrf();
+
+        $to = strtolower(trim((string)($_POST['test_email'] ?? '')));
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            flash('danger', 'Enter a valid e-mail address to send the test to.');
+            redirect('admin/settings');
+        }
+
+        $result = Notification::sendTestEmail($to);
+        AuditLog::write(
+            $result['ok'] ? 'test_email_sent' : 'test_email_failed',
+            'system_settings', null,
+            $result['ok'] ? 'Test e-mail sent successfully' : 'Test e-mail failed to send'
+        );
+
+        if ($result['ok']) {
+            flash('success', 'SUCCESS: Test email sent successfully.');
+        } else {
+            flash('danger', APP_DEBUG
+                ? 'FAILED: Unable to send test email. Check storage/logs/app.log for the SMTP error.'
+                : 'FAILED: Unable to send test email.');
+        }
+        redirect('admin/settings');
     }
 
     private function settingsSave(): void

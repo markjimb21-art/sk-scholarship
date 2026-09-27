@@ -344,7 +344,14 @@ $canEdit = Auth::hasRole('admin','staff');
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Academic Year *</label>
-            <input name="academic_year" class="form-control" placeholder="2025-2026" required>
+            <select name="academic_year" class="form-select" required <?= $budgetYears ? '' : 'disabled' ?>>
+              <?php foreach ($budgetYears as $y): ?>
+                <option value="<?= e($y) ?>"><?= e($y) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <?php if (!$budgetYears): ?>
+              <div class="form-text text-danger">No budget exists for <?= e($scholar['program_name']) ?> yet. Create a budget first.</div>
+            <?php endif; ?>
           </div>
           <div class="col-md-6">
             <label class="form-label">Semester *</label>
@@ -382,7 +389,7 @@ $canEdit = Auth::hasRole('admin','staff');
           </div>
         </div>
       </div>
-      <div class="modal-footer"><button class="btn btn-success">Record Release</button></div>
+      <div class="modal-footer"><button class="btn btn-success" <?= $budgetYears ? '' : 'disabled' ?>>Record Release</button></div>
     </form>
   </div>
 </div>

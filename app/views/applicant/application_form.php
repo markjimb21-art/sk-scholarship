@@ -1,11 +1,49 @@
+<?php
+$app = $app ?? null;
+$editable = $editable ?? true;
+$documents = $documents ?? [];
+$docByType = [];
+foreach ($documents as $d) { $docByType[$d['document_type']] = $d; }
+$docsUploaded = 0;
+foreach (DOCUMENT_TYPES as $dt) { if (!empty($docByType[$dt]['file_path'])) $docsUploaded++; }
+$updatedAt = $app['updated_at'] ?? null;
+?>
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <div>
     <h4 class="fw-bold mb-1">Scholarship Application</h4>
-    <p class="text-muted small mb-0">Complete all steps, then submit. Your progress is saved at each step.</p>
+    <?php if (!empty($app['program_name'])): ?>
+      <p class="small mb-1"><strong><?= e($app['program_name']) ?></strong> · applications accepted
+        <?= e(date('M d, Y', strtotime($app['application_start']))) ?> – <?= e(date('M d, Y', strtotime($app['application_end']))) ?></p>
+    <?php endif; ?>
+    <p class="text-muted small mb-1">Your information is saved automatically as you complete the form.</p>
+    <span id="autosaveIndicator" class="autosave-indicator d-none"></span>
   </div>
   <?php if ($app): ?>
     <span class="badge bg-secondary px-3 py-2"><?= e($app['status']) ?></span>
   <?php endif; ?>
+</div>
+
+<?php if ($app && $app['status'] === 'Incomplete'): ?>
+  <div class="alert alert-warning">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-exclamation-triangle"></i> Application Status: INCOMPLETE</h6>
+    <p class="mb-1"><strong>SK Office Remarks:</strong></p>
+    <p class="mb-0"><?= nl2br(e($app['review_remarks'] ?? 'Please review and correct your application.')) ?></p>
+  </div>
+  <div class="alert alert-info small">
+    Your application was marked incomplete by the SK office. Please review the remarks above and update the required information, then resubmit.
+  </div>
+<?php elseif (!$editable && $app): ?>
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Your application has been submitted and is currently read-only.
+  </div>
+<?php endif; ?>
+
+<div id="restoreBanner" class="alert alert-secondary d-none">
+  <span>We found recently saved information from this device. Would you like to restore it?</span>
+  <div class="mt-2">
+    <button type="button" id="restoreLocalBtn" class="btn btn-sm btn-primary">Restore Local Information</button>
+    <button type="button" id="useServerBtn" class="btn btn-sm btn-outline-secondary">Use Server Information</button>
+  </div>
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -21,31 +59,40 @@
       <?php endforeach; ?>
     </div>
 
-    <div data-wizard>
+    <div data-wizard
+         data-editable="<?= $editable ? '1' : '0' ?>"
+         data-status="<?= e($app['status'] ?? 'Draft') ?>"
+         data-user-id="<?= (int)Auth::user()['id'] ?>"
+         data-application-id="<?= (int)($app['id'] ?? 0) ?>"
+         data-updated-at="<?= e($updatedAt ?? '') ?>"
+         data-autosave-url="<?= url('applicant/application/autosave') ?>"
+         data-upload-url="<?= url('applicant/documents/upload') ?>"
+         data-csrf="<?= e(csrf_token()) ?>">
 
       <!-- STEP 1: PERSONAL -->
-      <form method="POST" action="<?= url('applicant/application/save') ?>" class="form-step">
+      <form method="POST" action="<?= url('applicant/application/save') ?>" class="form-step" data-step="personal">
         <?= csrf_field() ?>
         <input type="hidden" name="step" value="personal">
         <h5 class="fw-semibold mb-3">I. Personal Information</h5>
 
+        <fieldset <?= $editable ? '' : 'disabled' ?>>
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label">First Name *</label>
-            <input name="first_name" class="form-control" required value="<?= e($personal['first_name'] ?? '') ?>">
+            <input name="first_name" class="form-control" required data-uppercase value="<?= e($personal['first_name'] ?? '') ?>">
           </div>
           <div class="col-md-4">
             <label class="form-label">Middle Name</label>
-            <input name="middle_name" class="form-control" value="<?= e($personal['middle_name'] ?? '') ?>">
+            <input name="middle_name" class="form-control" data-uppercase value="<?= e($personal['middle_name'] ?? '') ?>">
           </div>
           <div class="col-md-4">
             <label class="form-label">Last Name *</label>
-            <input name="last_name" class="form-control" required value="<?= e($personal['last_name'] ?? '') ?>">
+            <input name="last_name" class="form-control" required data-uppercase value="<?= e($personal['last_name'] ?? '') ?>">
           </div>
 
           <div class="col-md-3">
             <label class="form-label">Suffix</label>
-            <input name="suffix" class="form-control" placeholder="Jr., Sr., III" value="<?= e($personal['suffix'] ?? '') ?>">
+            <input name="suffix" class="form-control" placeholder="JR., SR., III" data-uppercase value="<?= e($personal['suffix'] ?? '') ?>">
           </div>
           <div class="col-md-3">
             <label class="form-label">Date of Birth *</label>
@@ -66,26 +113,38 @@
             </select>
           </div>
 
-          <div class="col-md-8">
+          <div class="col-12">
             <label class="form-label">Complete Address *</label>
-            <input name="complete_address" class="form-control" required value="<?= e($personal['complete_address'] ?? '') ?>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Purok (within Brgy. Estefania)</label>
-            <select name="purok_id" class="form-select">
-              <option value="">— Select —</option>
-              <?php foreach ($puroks as $p): ?>
-                <option value="<?= (int)$p['id'] ?>" <?= (int)($personal['purok_id'] ?? 0) === (int)$p['id'] ? 'selected' : '' ?>>
-                  <?= e($p['purok_name']) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
+            <div class="row g-2 align-items-center">
+              <div class="col-sm-3">
+                <input name="address_unit" class="form-control" placeholder="Unit/House No." data-uppercase
+                       value="<?= e($personal['address_unit'] ?? '') ?>">
+              </div>
+              <div class="col-auto text-muted">/</div>
+              <div class="col-sm-4">
+                <select name="purok_id" class="form-select" required>
+                  <option value="">— Select Purok/Subdivision —</option>
+                  <?php foreach ($puroks as $p): ?>
+                    <option value="<?= (int)$p['id'] ?>" <?= (int)($personal['purok_id'] ?? 0) === (int)$p['id'] ? 'selected' : '' ?>>
+                      <?= e($p['purok_name']) ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div class="col-auto text-muted">/</div>
+              <div class="col-sm-4">
+                <input class="form-control bg-light" readonly value="<?= e(ADDRESS_BARANGAY . ' / ' . ADDRESS_CITY) ?>">
+              </div>
+            </div>
+            <div class="form-text">Example: 12 / EAST HOMES 3 / BARANGAY ESTEFANIA / BACOLOD CITY. The barangay and city are fixed — this scholarship is exclusive to Barangay Estefania residents.</div>
           </div>
 
           <div class="col-md-4">
             <label class="form-label">Contact Number *</label>
-            <input name="contact_number" class="form-control" required pattern="^[0-9+\-\s()]{7,20}$"
+            <input name="contact_number" class="form-control" required maxlength="11" inputmode="numeric"
+                   pattern="^0[0-9]{10}$" data-phone
                    value="<?= e($personal['contact_number'] ?? '') ?>">
+            <div class="form-text">Enter exactly 11 digits. Example: 09171234567</div>
           </div>
           <div class="col-md-8">
             <label class="form-label">Email Address (from your account)</label>
@@ -107,25 +166,26 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">Religion</label>
-            <input name="religion" class="form-control" value="<?= e($personal['religion'] ?? '') ?>">
+            <input name="religion" class="form-control" data-uppercase value="<?= e($personal['religion'] ?? '') ?>">
           </div>
           <div class="col-md-3">
             <label class="form-label">Citizenship</label>
-            <input name="citizenship" class="form-control" value="<?= e($personal['citizenship'] ?? 'Filipino') ?>">
+            <input name="citizenship" class="form-control" data-uppercase value="<?= e($personal['citizenship'] ?? 'Filipino') ?>">
           </div>
         </div>
+        </fieldset>
 
         <div class="d-flex justify-content-end mt-4">
-          <button type="submit" class="btn btn-outline-secondary me-2">Save Draft</button>
           <button type="button" class="btn btn-primary" data-next>Next: Education <i class="bi bi-arrow-right"></i></button>
         </div>
       </form>
 
       <!-- STEP 2: EDUCATION -->
-      <form method="POST" action="<?= url('applicant/application/save') ?>" class="form-step">
+      <form method="POST" action="<?= url('applicant/application/save') ?>" class="form-step" data-step="education">
         <?= csrf_field() ?>
         <input type="hidden" name="step" value="education">
         <h5 class="fw-semibold mb-3">II. Education</h5>
+        <fieldset <?= $editable ? '' : 'disabled' ?>>
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Name of School *</label>
@@ -148,7 +208,21 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">Course *</label>
-            <input name="course_name" class="form-control" required value="<?= e($education['course_name'] ?? '') ?>">
+            <input name="course_name" class="form-control" required list="courseList" autocomplete="off" value="<?= e($education['course_name'] ?? '') ?>">
+            <div class="form-text">Start typing your course to see available recommendations.</div>
+            <datalist id="courseList">
+              <?php foreach ($courses as $c): ?><option value="<?= e($c['course_name']) ?>"><?php endforeach; ?>
+            </datalist>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Major</label>
+            <input name="major" class="form-control" placeholder="e.g. English, Mathematics" value="<?= e($education['major'] ?? '') ?>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">General Weighted Average (GWA)</label>
+            <input type="number" name="general_average" class="form-control" min="1" max="5" step="0.01"
+                   placeholder="e.g. 1.75" value="<?= e(isset($education['general_average']) ? number_format((float)$education['general_average'], 2) : '') ?>">
+            <div class="form-text">Optional. Your latest GWA on the 1.00 (highest) – 5.00 scale, as shown on your Form 138 / grades.</div>
           </div>
 
           <div class="col-12"><hr></div>
@@ -174,22 +248,21 @@
                    placeholder="Scholarship name / details" value="<?= e($education['current_scholarship_details'] ?? '') ?>">
           </div>
         </div>
+        </fieldset>
 
         <div class="d-flex justify-content-between mt-4">
           <button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Back</button>
-          <div>
-            <button type="submit" class="btn btn-outline-secondary me-2">Save Draft</button>
-            <button type="button" class="btn btn-primary" data-next>Next: Family <i class="bi bi-arrow-right"></i></button>
-          </div>
+          <button type="button" class="btn btn-primary" data-next>Next: Family <i class="bi bi-arrow-right"></i></button>
         </div>
       </form>
 
       <!-- STEP 3: FAMILY -->
-      <form method="POST" action="<?= url('applicant/application/save') ?>" class="form-step">
+      <form method="POST" action="<?= url('applicant/application/save') ?>" class="form-step" data-step="family">
         <?= csrf_field() ?>
         <input type="hidden" name="step" value="family">
         <h5 class="fw-semibold mb-3">III. Family Background</h5>
 
+        <fieldset <?= $editable ? '' : 'disabled' ?>>
         <h6 class="text-primary">Father's Information</h6>
         <div class="row g-3 mb-4">
           <div class="col-md-4">
@@ -218,7 +291,9 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">Contact Number</label>
-            <input name="father_contact" class="form-control" value="<?= e($family['father_contact'] ?? '') ?>">
+            <input name="father_contact" class="form-control" maxlength="11" inputmode="numeric" pattern="^0[0-9]{10}$" data-phone
+                   value="<?= e($family['father_contact'] ?? '') ?>">
+            <div class="form-text">11 digits, e.g. 09171234567</div>
           </div>
           <div class="col-md-3">
             <label class="form-label">Gross Monthly Income (₱)</label>
@@ -255,7 +330,9 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">Contact Number</label>
-            <input name="mother_contact" class="form-control" value="<?= e($family['mother_contact'] ?? '') ?>">
+            <input name="mother_contact" class="form-control" maxlength="11" inputmode="numeric" pattern="^0[0-9]{10}$" data-phone
+                   value="<?= e($family['mother_contact'] ?? '') ?>">
+            <div class="form-text">11 digits, e.g. 09171234567</div>
           </div>
           <div class="col-md-3">
             <label class="form-label">Gross Monthly Income (₱)</label>
@@ -280,56 +357,141 @@
             <input type="number" name="family_size" class="form-control" value="<?= e((string)($family['family_size'] ?? '')) ?>">
           </div>
         </div>
+        </fieldset>
 
         <div class="d-flex justify-content-between mt-4">
           <button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Back</button>
-          <div>
-            <button type="submit" class="btn btn-outline-secondary me-2">Save Draft</button>
-            <button type="button" class="btn btn-primary" data-next>Next: Documents <i class="bi bi-arrow-right"></i></button>
-          </div>
+          <button type="button" class="btn btn-primary" data-next>Next: Documents <i class="bi bi-arrow-right"></i></button>
         </div>
       </form>
 
-      <!-- STEP 4: DOCUMENTS -->
-      <div class="form-step">
+      <!-- STEP 4: DOCUMENTS (fully integrated — no navigation away from the wizard) -->
+      <div class="form-step" data-step="documents">
         <h5 class="fw-semibold mb-3">IV. Required Documents</h5>
         <div class="alert alert-info">
           <i class="bi bi-info-circle me-1"></i>
-          Upload each document. Accepted: <strong>PDF, JPG, PNG</strong> (max 5MB each).
+          Drag a file into each box below (or click to choose one), then click <strong>Upload Documents</strong> once.
+          Accepted: <strong>PDF, JPG, PNG</strong> (max 5MB each). All 5 documents are required.
         </div>
-        <ul class="list-group mb-3">
-          <?php foreach (DOCUMENT_TYPES as $dt): ?>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              <span><i class="bi bi-file-earmark-text me-2 text-primary"></i><?= e($dt) ?></span>
-              <a href="<?= url('applicant/documents') ?>" class="btn btn-sm btn-primary">
-                <i class="bi bi-cloud-upload"></i> Upload
-              </a>
-            </li>
+        <div class="row g-3 mb-3" id="wizardDocuments">
+          <?php foreach (DOCUMENT_TYPES as $dt):
+            $doc = $docByType[$dt] ?? null;
+            $status = $doc['status'] ?? 'Not Submitted';
+            $hasFile = $doc && $doc['file_path'];
+            $isImage = $hasFile && in_array(($doc['mime_type'] ?? ''), ['image/jpeg', 'image/png'], true);
+          ?>
+          <div class="col-md-6" data-doc-card data-doc-type="<?= e($dt) ?>" data-doc-has-file="<?= $hasFile ? '1' : '0' ?>">
+            <div class="card border-0 shadow-sm h-100">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <h6 class="fw-semibold mb-0"><i class="bi bi-file-earmark-text me-1 text-primary"></i><?= e($dt) ?> <span class="text-danger">*</span></h6>
+                  <span class="doc-pill doc-<?= e(str_replace(' ','-',$status)) ?>" data-doc-status-pill><?= e($status) ?></span>
+                </div>
+
+                <?php if ($editable): ?>
+                <div class="doc-dropzone" data-doc-dropzone tabindex="0" role="button">
+                  <div data-doc-preview class="doc-preview" style="<?= $hasFile ? '' : 'display:none' ?>">
+                    <?php if ($isImage): ?>
+                      <img src="<?= e(url('applicant/documents/view&id=' . (int)($doc['id'] ?? 0))) ?>" alt="Preview" data-doc-preview-img>
+                    <?php else: ?>
+                      <i class="bi bi-file-earmark-pdf display-6 text-danger" data-doc-preview-icon style="<?= $hasFile ? '' : 'display:none' ?>"></i>
+                      <img data-doc-preview-img class="d-none" alt="Preview">
+                    <?php endif; ?>
+                  </div>
+                  <div data-doc-dropzone-empty class="doc-dropzone-empty" style="<?= $hasFile ? 'display:none' : '' ?>">
+                    <i class="bi bi-cloud-arrow-up fs-3 text-muted"></i>
+                    <div class="small">Drop your file here or <span class="text-primary text-decoration-underline">Choose File</span></div>
+                  </div>
+                  <input type="file" class="d-none" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" data-doc-file>
+                </div>
+                <?php endif; ?>
+
+                <p class="small text-muted mb-1 mt-2" data-doc-meta style="<?= $hasFile ? '' : 'display:none' ?>">
+                  <i class="bi bi-paperclip"></i> <span data-doc-filename><?= e($doc['original_filename'] ?? '') ?></span>
+                  <span data-doc-filesize><?= $hasFile && !empty($doc['file_size']) ? ' · ' . number_format((int)$doc['file_size'] / 1024 / 1024, 2) . ' MB' : '' ?></span><br>
+                  <?php if ($hasFile): ?>
+                    <a href="<?= e(url('applicant/documents/view&id=' . (int)$doc['id'])) ?>" target="_blank" rel="noopener" data-doc-view-link>View</a>
+                  <?php endif; ?>
+                </p>
+                <div class="alert alert-danger py-2 small mb-0" data-doc-remarks style="<?= (!empty($doc['remarks'])) ? '' : 'display:none' ?>">
+                  <strong>Remarks:</strong> <span data-doc-remarks-text><?= e($doc['remarks'] ?? '') ?></span>
+                </div>
+                <div class="small text-danger mt-1 d-none" data-doc-error></div>
+              </div>
+            </div>
+          </div>
           <?php endforeach; ?>
-        </ul>
+        </div>
+
+        <?php if ($editable): ?>
+        <div class="d-flex justify-content-end mb-3">
+          <button type="button" class="btn btn-success" id="uploadAllDocsBtn" disabled>
+            <i class="bi bi-cloud-upload"></i> Upload Documents
+          </button>
+        </div>
+        <?php endif; ?>
+
+        <div class="alert alert-warning d-none" id="docsIncompleteWarning">
+          Please upload all required documents before continuing.
+        </div>
+
         <div class="d-flex justify-content-between mt-4">
           <button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Back</button>
-          <div>
-            <a href="<?= url('applicant/documents') ?>" class="btn btn-outline-primary me-2">
-              <i class="bi bi-folder2-open"></i> Open Documents Page
-            </a>
-            <button type="button" class="btn btn-primary" data-next>Next: Review <i class="bi bi-arrow-right"></i></button>
-          </div>
+          <button type="button" class="btn btn-primary" data-next data-requires-documents>Next: Review <i class="bi bi-arrow-right"></i></button>
         </div>
       </div>
 
       <!-- STEP 5: REVIEW & SUBMIT -->
-      <div class="form-step">
+      <div class="form-step" data-step="review">
         <h5 class="fw-semibold mb-3">V. Review & Submit</h5>
+
+        <?php if ($editable): ?>
         <div class="alert alert-warning">
           <i class="bi bi-exclamation-triangle me-1"></i>
           Once submitted, your application will be reviewed by the SK. Please make sure all information is correct.
         </div>
+        <?php endif; ?>
+
+        <?php if ($app && $app['status'] === 'Incomplete' && !empty($app['review_remarks'])): ?>
+        <div class="alert alert-warning">
+          <strong>SK Office Remarks:</strong> <?= nl2br(e($app['review_remarks'])) ?>
+        </div>
+        <?php endif; ?>
+
         <div class="mb-3">
           <p class="mb-1"><strong>Applicant:</strong> <?= e(Auth::user()['full_name']) ?></p>
           <p class="mb-1"><strong>Email:</strong> <?= e(Auth::user()['email']) ?></p>
           <p class="mb-1"><strong>Application Code:</strong> <?= e($applicant['application_code']) ?></p>
         </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="text-muted small">Personal Information</div>
+              <div class="fw-semibold"><?= e(trim(($personal['first_name'] ?? '') . ' ' . ($personal['last_name'] ?? ''))) ?: 'Not yet provided' ?></div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="text-muted small">Education</div>
+              <div class="fw-semibold"><?= e($education['school_name'] ?? 'Not yet provided') ?><?= !empty($education['course_name']) ? ' · ' . e($education['course_name']) : '' ?></div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="text-muted small">Family Background</div>
+              <div class="fw-semibold">Total income: ₱<?= e(number_format((float)($family['total_family_income'] ?? 0), 2)) ?></div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="border rounded p-3">
+              <div class="text-muted small mb-1">Required Documents</div>
+              <div class="fw-semibold"><?= $docsUploaded ?> of <?= count(DOCUMENT_TYPES) ?> uploaded</div>
+            </div>
+          </div>
+        </div>
+
+        <?php if ($editable): ?>
         <form method="POST" action="<?= url('applicant/application/submit') ?>">
           <?= csrf_field() ?>
           <div class="form-check mb-3">
@@ -341,9 +503,17 @@
           </div>
           <div class="d-flex justify-content-between">
             <button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Back</button>
-            <button class="btn btn-success px-4"><i class="bi bi-send-check"></i> Submit Application</button>
+            <button class="btn btn-success px-4">
+              <i class="bi bi-send-check"></i> <?= ($app && $app['status'] === 'Incomplete') ? 'Resubmit Application' : 'Submit Application' ?>
+            </button>
           </div>
         </form>
+        <?php else: ?>
+        <div class="d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Back</button>
+          <span class="badge bg-secondary px-3 py-2 align-self-center"><?= e($app['status'] ?? '') ?></span>
+        </div>
+        <?php endif; ?>
       </div>
 
     </div>

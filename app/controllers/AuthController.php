@@ -10,10 +10,26 @@ final class AuthController
             $password = (string)($_POST['password'] ?? '');
 
             $result = Auth::login($email, $password);
+
+            if (!$result['ok'] && ($result['error'] ?? '') === 'unverified') {
+                // Correct password, but the applicant never finished OTP verification. Re-issue a
+                // code and send them straight to the verification screen rather than a dead end.
+                $otp = $this->startOtp((int)$result['user_id'], 'registration');
+                if (($otp['ok'] ?? false) && !empty($otp['email_sent'])) {
+                    flash('warning', 'Please verify your e-mail first. We just sent you a new code.');
+                } elseif (!($otp['ok'] ?? false) && isset($otp['wait'])) {
+                    flash('warning', 'Please verify your e-mail first. A code was already sent — check your inbox, or wait ' . (int)$otp['wait'] . ' seconds to request another.');
+                } else {
+                    flash('danger', 'Please verify your e-mail first. We generated a new code, but could not send it — use "Resend code" on the next screen to try again.');
+                }
+                redirect('verify-otp');
+            }
+
             if ($result['ok']) {
                 $role = $result['user']['role_name'];
                 redirect($role === 'applicant' ? 'applicant/dashboard' : 'admin/dashboard');
             }
+
             flash('danger', $result['error']);
             $_SESSION['_old'] = ['email' => $email];
             redirect('login');
@@ -57,82 +73,196 @@ final class AuthController
                 redirect('register');
             }
 
-            flash('success', 'Registration successful. Please log in.');
-            redirect('login');
+            $userId = (int)$result['user_id'];
+            Notification::send($userId, 'Account Created', 'Your SK Scholarship account has been created. Verify your e-mail to activate it.', 'info');
+            $otp = $this->startOtp($userId, 'registration');
+            if (!empty($otp['email_sent'])) {
+                flash('success', 'Account created. We sent a 6-digit code to your e-mail — enter it below to verify your account.');
+            } else {
+                flash('warning', 'Account created, but we could not send the verification e-mail. Use "Resend code" on the next screen to try again.');
+            }
+            redirect('verify-otp');
         }
         require VIEW_PATH . '/auth/register.php';
         unset($_SESSION['_old']);
     }
 
-    public function forgotPassword(): void
-    {
+    /* ================= OTP: registration ================= */
+
+    /** Issue (or re-issue) an OTP and stash the pending user+purpose in the session for the verify screen. */
+    private function startOtp(int $userId, string $purpose): array {
+        $_SESSION['otp_user_id'] = $userId;
+        $_SESSION['otp_purpose'] = $purpose;
+        return $this->sendOtpEmail($userId, $purpose);
+    }
+
+    /**
+     * Generates the OTP and attempts to e-mail it, then returns BOTH outcomes distinctly:
+     *   ['ok'=>true,  'code'=>..., 'ttl_minutes'=>..., 'email_sent'=>true|false]
+     *   ['ok'=>false, 'wait'=>seconds]                        (resend cooldown still active)
+     * 'ok' reflects whether a code exists/was generated; 'email_sent' reflects whether PHPMailer
+     * actually delivered it — callers must check both instead of assuming "generated" == "sent".
+     */
+    private function sendOtpEmail(int $userId, string $purpose): array {
+        $result = Otp::issue($userId, $purpose);
+        if (!$result['ok']) return $result; // cooldown active; caller decides what to show
+
+        $emailSent = false;
+        $stmt = Database::conn()->prepare("SELECT full_name, email FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch();
+        if ($user) {
+            $subject = $purpose === 'registration' ? 'Verify your SK Scholarship account' : 'Your password reset code';
+            $intro = $purpose === 'registration'
+                ? 'Use this code to verify your e-mail and activate your SK Scholarship account.'
+                : 'Use this code to reset your SK Scholarship password.';
+            $body = '<p>' . $intro . '</p>'
+                  . '<p style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#0d3b66;text-align:center;margin:24px 0;">' . e($result['code']) . '</p>'
+                  . '<p>This code expires in ' . (int)$result['ttl_minutes'] . ' minutes and can only be used once. '
+                  . 'If you did not request this, you can safely ignore this e-mail.</p>';
+            $html = Notification::brand($subject, $user['full_name'], $body);
+            $text = strip_tags($intro) . " Code: {$result['code']} (expires in {$result['ttl_minutes']} minutes)";
+            $emailSent = Notification::sendMail($user['email'], $user['full_name'], $subject, $html, $text);
+        }
+
+        // Audit event and description now distinguish "generated" from "generated AND delivered" —
+        // never claim "OTP sent" when PHPMailer actually failed. The OTP code itself is never logged.
+        $prefix = $purpose === 'registration' ? 'registration_otp' : 'password_reset_otp';
+        AuditLog::write(
+            $emailSent ? "{$prefix}_sent" : "{$prefix}_email_failed",
+            'users', $userId,
+            $emailSent ? 'OTP generated and e-mailed successfully' : 'OTP generated, but e-mail delivery failed'
+        );
+
+        $result['email_sent'] = $emailSent;
+        return $result;
+    }
+
+    public function verifyOtp(): void {
+        $userId = (int)($_SESSION['otp_user_id'] ?? 0);
+        $purpose = (string)($_SESSION['otp_purpose'] ?? '');
+        if ($userId === 0 || $purpose !== 'registration') redirect('register');
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            verify_csrf();
+            $code = trim((string)($_POST['otp'] ?? ''));
+            $result = Otp::verify($userId, 'registration', $code);
+
+            if ($result['ok']) {
+                Database::conn()->prepare("UPDATE users SET email_verified = 1 WHERE id = ?")->execute([$userId]);
+                AuditLog::write('registration_otp_verified', 'users', $userId, 'E-mail verified');
+                Notification::send($userId, 'Email Verified', 'Your e-mail has been verified. Your SK Scholarship account is now active.', 'success', url('login'));
+                unset($_SESSION['otp_user_id'], $_SESSION['otp_purpose']);
+                flash('success', 'E-mail verified successfully. You can now log in.');
+                redirect('login');
+            }
+
+            flash('danger', match ($result['error']) {
+                'expired' => 'That code has expired. Request a new one below.',
+                'locked'  => 'Too many incorrect attempts. Request a new code below.',
+                'none'    => 'No active code found. Request a new one below.',
+                default   => 'Incorrect code. Please try again.',
+            });
+            redirect('verify-otp');
+        }
+
+        $stmt = Database::conn()->prepare("SELECT email FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $email = (string)($stmt->fetchColumn() ?: '');
+        require VIEW_PATH . '/auth/verify_otp.php';
+    }
+
+    public function resendOtp(): void {
+        verify_csrf();
+        $purpose = (string)($_POST['purpose'] ?? $_SESSION['otp_purpose'] ?? '');
+        $userId = (int)($_SESSION['otp_user_id'] ?? 0);
+        if ($userId === 0 || !in_array($purpose, ['registration', 'password_reset'], true)) {
+            redirect('login');
+        }
+
+        $result = $this->sendOtpEmail($userId, $purpose);
+        if (!$result['ok']) {
+            flash('warning', 'Please wait ' . (int)$result['wait'] . ' seconds before requesting another code.');
+        } elseif (!empty($result['email_sent'])) {
+            flash('success', 'A new code has been sent to your e-mail.');
+        } else {
+            flash('danger', 'We generated a new code, but could not send it to your e-mail. Please try again in a moment.');
+        }
+        redirect($purpose === 'registration' ? 'verify-otp' : 'verify-reset-otp');
+    }
+
+    /* ================= OTP: forgot password ================= */
+
+    public function forgotPassword(): void {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             verify_csrf();
             $email = strtolower(trim((string)($_POST['email'] ?? '')));
-            $pdo = Database::conn();
-            $stmt = $pdo->prepare("SELECT id, full_name, email FROM users WHERE email = ? AND is_active = 1 LIMIT 1");
+            $stmt = Database::conn()->prepare("SELECT id FROM users WHERE email = ? AND is_active = 1 LIMIT 1");
             $stmt->execute([$email]);
-            $user = $stmt->fetch();
+            $userId = $stmt->fetchColumn();
 
-            // Always respond the same (don't leak whether email exists)
-            if ($user) {
-                $ttl = (int)RESET_TOKEN_TTL_MINUTES;
-                // Throttle: if a token was issued during the last minute, do not issue/send another one.
-                $recent = $pdo->prepare(
-                    "SELECT 1 FROM users WHERE id = ? AND reset_expires IS NOT NULL
-                     AND reset_expires > DATE_ADD(NOW(), INTERVAL " . ($ttl - 1) . " MINUTE)"
-                );
-                $recent->execute([$user['id']]);
-
-                if (!$recent->fetchColumn()) {
-                    // 256-bit random token. Only its SHA-256 hash is stored, so a DB leak cannot be used to reset passwords.
-                    $token = bin2hex(random_bytes(32));
-                    $pdo->prepare(
-                        "UPDATE users SET reset_token = ?, reset_expires = DATE_ADD(NOW(), INTERVAL $ttl MINUTE) WHERE id = ?"
-                    )->execute([hash('sha256', $token), $user['id']]);
-
-                    $link = url('reset-password?token=' . $token);
-                    $text = "Hello {$user['full_name']},\n\nUse this link to reset your SK Scholarship password "
-                          . "(valid for $ttl minutes and usable once):\n$link\n\n"
-                          . "If you did not request this, you can ignore this email.";
-                    $html = '<p>Hello ' . htmlspecialchars($user['full_name'], ENT_QUOTES, 'UTF-8') . ',</p>'
-                          . '<p>Use the link below to reset your SK Scholarship password (valid for ' . $ttl . ' minutes and usable once):</p>'
-                          . '<p><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">Reset my password</a></p>'
-                          . '<p>If you did not request this, you can ignore this email.</p>';
-                    Notification::sendMail($user['email'], $user['full_name'], 'Reset your SK Scholarship password', $html, $text);
-
-                    // In-app notice WITHOUT the token/link (the token must not be persisted anywhere but the e-mail).
-                    Notification::send((int)$user['id'], 'Password Reset Requested',
-                        'A password reset link was sent to your e-mail address. If this was not you, contact the SK office.',
-                        'warning');
-
-                    AuditLog::write('password_reset_requested', 'users', (int)$user['id'], 'Reset link generated');
-                }
+            // Always the same response and the same redirect, whether or not the e-mail exists —
+            // this alone never reveals account existence.
+            if ($userId) {
+                $_SESSION['otp_user_id'] = (int)$userId;
+                $_SESSION['otp_purpose'] = 'password_reset';
+                $this->sendOtpEmail((int)$userId, 'password_reset');
+            } else {
+                // No real user id to attach a code to; verify-reset-otp will just always report
+                // "invalid or expired code" for this session, which looks identical to a real,
+                // expired attempt.
+                unset($_SESSION['otp_user_id']);
+                $_SESSION['otp_purpose'] = 'password_reset';
             }
 
-            flash('success', 'If your email is registered, you will receive a reset link shortly.');
-            redirect('login');
+            flash('success', 'If that e-mail is registered, a verification code has been sent to it.');
+            redirect('verify-reset-otp');
         }
-
         require VIEW_PATH . '/auth/forgot_password.php';
     }
 
-    public function resetPassword(): void
-    {
-        $token = $_GET['token'] ?? '';
-        $pdo = Database::conn();
-        $user = null;
-        if (is_string($token) && preg_match('/^[0-9a-f]{64}$/', $token) === 1) {
-            $stmt = $pdo->prepare(
-                "SELECT id FROM users WHERE reset_token = ? AND reset_expires > NOW() AND is_active = 1 LIMIT 1"
-            );
-            $stmt->execute([hash('sha256', $token)]);
-            $user = $stmt->fetch();
+    public function verifyResetOtp(): void {
+        if (($_SESSION['otp_purpose'] ?? '') !== 'password_reset') redirect('forgot-password');
+        $userId = (int)($_SESSION['otp_user_id'] ?? 0);
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            verify_csrf();
+            $code = trim((string)($_POST['otp'] ?? ''));
+            // No user id in session (unknown e-mail case) -> always report generic invalid/expired.
+            $result = $userId > 0 ? Otp::verify($userId, 'password_reset', $code) : ['ok' => false, 'error' => 'none'];
+
+            if ($result['ok']) {
+                // Short-lived proof that this browser just verified the code; reset-password checks this.
+                $_SESSION['otp_reset_verified_for'] = $userId;
+                redirect('reset-password');
+            }
+
+            flash('danger', match ($result['error']) {
+                'expired' => 'That code has expired. Request a new one below.',
+                'locked'  => 'Too many incorrect attempts. Request a new code below.',
+                default   => 'Invalid or expired code.',
+            });
+            redirect('verify-reset-otp');
         }
 
-        if (!$user) {
-            flash('danger', 'Reset link is invalid or expired.');
-            redirect('login');
+        require VIEW_PATH . '/auth/verify_reset_otp.php';
+    }
+
+    public function resetPassword(): void {
+        $token = $_GET['token'] ?? '';
+
+        // Legacy path: a previously-emailed reset LINK (kept working for any link already sent;
+        // new "forgot password" requests no longer generate one — see forgotPassword() above).
+        if (is_string($token) && $token !== '') {
+            $this->resetPasswordViaToken($token);
+            return;
+        }
+
+        // Current path: OTP-verified in this session.
+        $userId = (int)($_SESSION['otp_reset_verified_for'] ?? 0);
+        if ($userId === 0) {
+            flash('danger', 'Please verify your reset code first.');
+            redirect('forgot-password');
         }
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -142,14 +272,71 @@ final class AuthController
 
             if (mb_strlen($pw) < PASSWORD_MIN_LENGTH) {
                 flash('danger', 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.');
+                redirect('reset-password');
+            }
+            if ($pw !== $cpw) {
+                flash('danger', 'Passwords do not match.');
+                redirect('reset-password');
+            }
+
+            $pdo = Database::conn();
+            $pdo->prepare(
+                "UPDATE users SET password_hash = ?, reset_token = NULL, reset_expires = NULL,
+                 failed_attempts = 0, locked_until = NULL WHERE id = ?"
+            )->execute([password_hash($pw, PASSWORD_DEFAULT), $userId]);
+
+            AuditLog::write('password_reset_completed', 'users', $userId, 'Password reset via OTP');
+            unset($_SESSION['otp_reset_verified_for'], $_SESSION['otp_user_id'], $_SESSION['otp_purpose']);
+
+            $stmt = $pdo->prepare("SELECT full_name, email FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+            if ($user = $stmt->fetch()) {
+                $html = Notification::brand('Your password was changed', $user['full_name'],
+                    '<p>Your SK Scholarship account password was just changed. If this was not you, contact the SK office immediately.</p>');
+                $confirmSent = Notification::sendMail($user['email'], $user['full_name'], 'Your SK Scholarship password was changed', $html,
+                    'Your password was just changed. If this was not you, contact the SK office immediately.');
+                // Password is already changed at this point regardless — a failed confirmation e-mail
+                // must never block or roll back the password change itself, only be logged.
+                AuditLog::write(
+                    $confirmSent ? 'password_changed_email_sent' : 'password_changed_email_failed',
+                    'users', $userId,
+                    $confirmSent ? 'Password-changed confirmation e-mailed' : 'Password changed, but confirmation e-mail failed to send'
+                );
+            }
+
+            flash('success', 'Password reset successful. Please log in.');
+            redirect('login');
+        }
+
+        require VIEW_PATH . '/auth/reset_password.php';
+    }
+
+    /** Legacy reset-link flow (SHA-256-hashed token), preserved for any link already sent before OTP existed. */
+    private function resetPasswordViaToken(string $token): void {
+        $pdo = Database::conn();
+        $user = null;
+        if (preg_match('/^[0-9a-f]{64}$/', $token) === 1) {
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE reset_token = ? AND reset_expires > NOW() AND is_active = 1 LIMIT 1");
+            $stmt->execute([hash('sha256', $token)]);
+            $user = $stmt->fetch();
+        }
+        if (!$user) {
+            flash('danger', 'Reset link is invalid or expired.');
+            redirect('login');
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            verify_csrf();
+            $pw = (string)($_POST['password'] ?? '');
+            $cpw = (string)($_POST['confirm_password'] ?? '');
+            if (mb_strlen($pw) < PASSWORD_MIN_LENGTH) {
+                flash('danger', 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.');
                 redirect('reset-password?token=' . urlencode($token));
             }
             if ($pw !== $cpw) {
                 flash('danger', 'Passwords do not match.');
                 redirect('reset-password?token=' . urlencode($token));
             }
-
-            // Atomic one-time use: the WHERE clause re-checks the token, so two concurrent requests cannot both succeed.
             $upd = $pdo->prepare(
                 "UPDATE users SET password_hash = ?, reset_token = NULL, reset_expires = NULL, failed_attempts = 0, locked_until = NULL
                  WHERE id = ? AND reset_token = ? AND reset_expires > NOW()"
@@ -159,8 +346,7 @@ final class AuthController
                 flash('danger', 'Reset link is invalid or expired.');
                 redirect('login');
             }
-
-            AuditLog::write('password_reset_completed', 'users', (int)$user['id'], 'Password reset via token');
+            AuditLog::write('password_reset_completed', 'users', (int)$user['id'], 'Password reset via legacy link');
             flash('success', 'Password reset successful. Please log in.');
             redirect('login');
         }

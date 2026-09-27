@@ -61,10 +61,11 @@ final class Interview
         $pdo = Database::conn();
         $pdo->prepare(
             "INSERT INTO interview_schedules
-             (program_id, interview_date, start_time, end_time, venue, interviewer, max_slots, remarks, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             (program_id, title, interview_date, start_time, end_time, venue, interviewer, max_slots, remarks, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )->execute([
-            $data['program_id'], $data['interview_date'], $data['start_time'], $data['end_time'],
+            $data['program_id'], trim((string)($data['title'] ?? '')) ?: null,
+            $data['interview_date'], $data['start_time'], $data['end_time'],
             $data['venue'], $data['interviewer'], (int)$data['max_slots'],
             $data['remarks'] ?? null, $createdBy
         ]);
@@ -89,9 +90,10 @@ final class Interview
 
         Database::conn()->prepare(
             "UPDATE interview_schedules
-             SET interview_date=?, start_time=?, end_time=?, venue=?, interviewer=?, max_slots=?, status=?, remarks=?
+             SET title=?, interview_date=?, start_time=?, end_time=?, venue=?, interviewer=?, max_slots=?, status=?, remarks=?
              WHERE id=?"
         )->execute([
+            trim((string)($data['title'] ?? '')) ?: null,
             $data['interview_date'], $data['start_time'], $data['end_time'],
             $data['venue'], $data['interviewer'], (int)$data['max_slots'],
             $data['status'] ?? 'Open', $data['remarks'] ?? null, $id
@@ -99,6 +101,13 @@ final class Interview
 
         AuditLog::write('schedule_updated', 'interview_schedules', $id,
             "Updated schedule", $old, $data);
+
+        // Date/start time moved: everyone on this schedule should get a fresh reminder for the new time.
+        $hm = static fn(string $t): string => date('H:i', strtotime($t));
+        if ($old['interview_date'] !== $data['interview_date'] || $hm($old['start_time']) !== $hm($data['start_time'])) {
+            Database::conn()->prepare("UPDATE interview_assignments SET reminder_sent_at = NULL WHERE schedule_id = ?")
+                ->execute([$id]);
+        }
 
         // Notify affected applicants if date/time/venue changed
         $notify = ($old['interview_date'] !== $data['interview_date'])
@@ -126,7 +135,38 @@ final class Interview
         AuditLog::write('schedule_cancelled', 'interview_schedules', $id, 'Cancelled schedule');
     }
 
+    /**
+     * A hard delete, distinct from cancelSchedule() (which keeps history and notifies assigned applicants).
+     * Only permitted while the schedule has zero assignments — otherwise deleting it would cascade-delete
+     * assignment/history rows and silently strand applicants at "Interview Scheduled". Use Cancel for that case.
+     */
+    public static function deleteSchedule(int $id, int $actorId): array
+    {
+        $sched = self::schedule($id);
+        if (!$sched) return ['ok' => false, 'error' => 'Schedule not found.'];
+        if ((int)$sched['assigned_count'] > 0) {
+            return ['ok' => false, 'error' => 'Cannot delete a schedule with assigned applicants. Cancel it instead.'];
+        }
+        Database::conn()->prepare("DELETE FROM interview_schedules WHERE id = ?")->execute([$id]);
+        AuditLog::write('schedule_deleted', 'interview_schedules', $id,
+            'Deleted empty interview schedule for ' . $sched['interview_date']);
+        return ['ok' => true];
+    }
+
     /* ---------------- ASSIGNMENTS ---------------- */
+
+    /** Assigns multiple applicants to one schedule in a single batch, stopping cleanly at the remaining slot count. */
+    public static function assignBatch(int $scheduleId, array $applicationIds, int $assignedBy): array
+    {
+        $assigned = [];
+        $failed = [];
+        foreach ($applicationIds as $applicationId) {
+            $result = self::assign($scheduleId, (int)$applicationId, $assignedBy);
+            if ($result['ok']) $assigned[] = (int)$applicationId;
+            else $failed[(int)$applicationId] = $result['error'];
+        }
+        return ['assigned' => $assigned, 'failed' => $failed];
+    }
 
     public static function assignmentByApplication(int $applicationId): ?array
     {
@@ -208,10 +248,11 @@ final class Interview
         $pdo = Database::conn();
         $pdo->beginTransaction();
         try {
+            // reminder_sent_at starts NULL: a new (or moved) assignment always gets its own reminder.
             $pdo->prepare(
                 "INSERT INTO interview_assignments
-                 (schedule_id, application_id, assignment_status, instructions, assigned_by)
-                 VALUES (?, ?, 'Scheduled', ?, ?)"
+                 (schedule_id, application_id, assignment_status, instructions, assigned_by, reminder_sent_at)
+                 VALUES (?, ?, 'Scheduled', ?, ?, NULL)"
             )->execute([$scheduleId, $applicationId, $instructions, $assignedBy]);
 
             $assignmentId = (int)$pdo->lastInsertId();
@@ -284,9 +325,14 @@ final class Interview
         $row = $stmt->fetch();
         if (!$row) return;
 
+        // Rescheduled (or put back to Scheduled from another status) => the old reminder no longer applies.
+        $clearReminder = $status === 'Rescheduled' || ($status === 'Scheduled' && $row['assignment_status'] !== 'Scheduled');
         Database::conn()->prepare(
-            "UPDATE interview_assignments SET assignment_status = ?, confirmed_at = IF(?='Confirmed', NOW(), confirmed_at) WHERE id=?"
-        )->execute([$status, $status, $assignmentId]);
+            "UPDATE interview_assignments
+             SET assignment_status = ?, confirmed_at = IF(?='Confirmed', NOW(), confirmed_at),
+                 reminder_sent_at = IF(?, NULL, reminder_sent_at)
+             WHERE id=?"
+        )->execute([$status, $status, $clearReminder ? 1 : 0, $assignmentId]);
 
         // Sync application status
         $newAppStatus = match($status) {
@@ -430,7 +476,7 @@ final class Interview
         );
         $stmt->execute([$scheduleId]);
         foreach ($stmt->fetchAll() as $row) {
-            Notification::send((int)$row['user_id'], $title, $msg, $type, url('applicant/interview'));
+            Notification::send((int)$row['user_id'], $title, $msg, $type, url('applicant/interview'), true);
         }
     }
 
@@ -441,6 +487,6 @@ final class Interview
         );
         $stmt->execute([$applicationId]);
         $uid = (int)$stmt->fetchColumn();
-        if ($uid) Notification::send($uid, $title, $msg, $type, url('applicant/interview'));
+        if ($uid) Notification::send($uid, $title, $msg, $type, url('applicant/interview'), true);
     }
 }

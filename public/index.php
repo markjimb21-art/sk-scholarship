@@ -9,6 +9,7 @@ require_once __DIR__ . '/../core/Auth.php';
 require_once __DIR__ . '/../core/AuditLog.php';
 require_once __DIR__ . '/../core/Validator.php';
 require_once __DIR__ . '/../core/Notification.php';
+require_once __DIR__ . '/../core/Otp.php';
 
 if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
@@ -38,7 +39,8 @@ $route = $_GET['r'] ?? 'home';
 $route = is_string($route) ? preg_replace('/[^a-zA-Z0-9_\-\/]/', '', $route) : 'home';
 
 // Public routes
-$publicRoutes = ['home','login','register','logout','forgot-password','reset-password'];
+$publicRoutes = ['home','login','register','logout','forgot-password','reset-password',
+    'verify-otp','resend-otp','verify-reset-otp'];
 
 if (!in_array($route, $publicRoutes, true) && !Auth::check()) {
     redirect('login');
@@ -68,6 +70,21 @@ switch ($route) {
     case 'forgot-password':
         require __DIR__ . '/../app/controllers/AuthController.php';
         (new AuthController())->forgotPassword();
+        break;
+
+    case 'verify-otp':
+        require __DIR__ . '/../app/controllers/AuthController.php';
+        (new AuthController())->verifyOtp();
+        break;
+
+    case 'resend-otp':
+        require __DIR__ . '/../app/controllers/AuthController.php';
+        (new AuthController())->resendOtp();
+        break;
+
+    case 'verify-reset-otp':
+        require __DIR__ . '/../app/controllers/AuthController.php';
+        (new AuthController())->verifyResetOtp();
         break;
 
     case 'reset-password':

@@ -7,7 +7,7 @@
     <div class="card shadow-lg border-0 rounded-4">
       <div class="card-body p-4 p-md-5">
         <h4 class="fw-bold mb-3">Forgot Password</h4>
-        <p class="text-muted small">Enter your registered email to receive a reset link.</p>
+        <p class="text-muted small">Enter your registered email and we'll send you a 6-digit verification code.</p>
         <?php foreach (get_flashes() as $f): ?>
           <div class="alert alert-<?= e($f['type']) ?> py-2 small"><?= e($f['message']) ?></div>
         <?php endforeach; ?>
@@ -17,7 +17,7 @@
             <label class="form-label">Email</label>
             <input type="email" name="email" class="form-control" required autofocus>
           </div>
-          <button class="btn btn-primary w-100">Send Reset Link</button>
+          <button class="btn btn-primary w-100">Send Verification Code</button>
         </form>
         <p class="text-center small mt-3"><a href="<?= url('login') ?>">Back to login</a></p>
       </div>

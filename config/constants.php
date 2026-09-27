@@ -20,6 +20,12 @@ const DOC_STATUS = ['Not Submitted','Submitted','Under Review','Verified','Rejec
 // Interview assignment statuses
 const INTERVIEW_STATUS = ['For Interview','Scheduled','Confirmed','Completed','No Show','Rescheduled','Cancelled'];
 
+// Scholarship eligibility is fixed to this barangay/city; the applicant's Complete Address
+// is always composed server-side as "<unit> / <street or purok> / <barangay> / <city>" so the
+// barangay/city portion can never be spoofed via a manually crafted request.
+const ADDRESS_BARANGAY = 'BARANGAY ESTEFANIA';
+const ADDRESS_CITY = 'BACOLOD CITY';
+
 // Year levels
 const YEAR_LEVELS = ['1st Year','2nd Year','3rd Year','4th Year','5th Year','Other'];
 

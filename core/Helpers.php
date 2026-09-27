@@ -3,6 +3,12 @@ declare(strict_types=1);
 
 function e(?string $v): string { return htmlspecialchars($v ?? '', ENT_QUOTES, 'UTF-8'); }
 
+/** UTF-8-safe uppercase + trim, for free-text fields that must be normalized server-side (never for emails/passwords/tokens). */
+function up(?string $v): string { return mb_strtoupper(trim($v ?? ''), 'UTF-8'); }
+
+/** Keeps digits only, capped at $max length — used to sanitize phone numbers before storage. */
+function digits_only(?string $v, int $max = 11): string { return substr(preg_replace('/\D+/', '', $v ?? ''), 0, $max); }
+
 function redirect(string $path): void {
     header('Location: ' . BASE_URL . '/' . ltrim($path, '/'));
     exit;

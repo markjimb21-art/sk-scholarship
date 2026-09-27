@@ -6,11 +6,11 @@
   <div class="row justify-content-center"><div class="col-md-5">
     <div class="card shadow-lg border-0 rounded-4">
       <div class="card-body p-4 p-md-5">
-        <h4 class="fw-bold mb-3">Reset Password</h4>
+        <h4 class="fw-bold mb-3">Set a New Password</h4>
         <?php foreach (get_flashes() as $f): ?>
           <div class="alert alert-<?= e($f['type']) ?> py-2 small"><?= e($f['message']) ?></div>
         <?php endforeach; ?>
-        <form method="POST" action="<?= e(url('reset-password?token=' . urlencode((string)($_GET['token'] ?? '')))) ?>">
+        <form method="POST" action="<?= e(url('reset-password' . (isset($_GET['token']) ? '?token=' . urlencode((string)$_GET['token']) : ''))) ?>">
           <?= csrf_field() ?>
           <div class="mb-3">
             <label class="form-label">New Password</label>

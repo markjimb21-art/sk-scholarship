@@ -1,0 +1,7 @@
+.env
+storage/logs/*
+!storage/logs/.gitkeep
+
+# Private applicant/scholar uploads — never commit personal documents
+storage/documents/
+storage/term-documents/

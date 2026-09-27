@@ -6,6 +6,14 @@ $statusBadge = [
   'Approved'=>'success','Rejected'=>'danger','Waitlisted'=>'warning'
 ][$app['status']] ?? 'secondary';
 $canAct = Auth::hasRole('admin','staff');
+// Buttons come from the same transition map the server enforces (Application::TRANSITIONS).
+$can = static fn(string $action): bool => Application::actionAllowed($action, $app);
+// Marks a button that is only available because an admin override is active on this application.
+$viaOverride = static fn(string $action): string => Application::transitionAllowed($action, $app['status'])
+    ? '' : ' <span class="badge bg-dark ms-1">override</span>';
+$review = $can('for_interview') ? Application::reviewCompleteness((int)$app['id']) : null;
+$slotLimit = (int)($program['slots_available'] ?? 0);
+$slotsFull = $slotLimit > 0 && $slotsUsed >= $slotLimit;
 ?>
 
 <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
@@ -16,6 +24,9 @@ $canAct = Auth::hasRole('admin','staff');
     <h4 class="fw-bold mb-1 mt-1">
       <?= e($app['applicant']['full_name'] ?? '') ?>
       <span class="badge bg-<?= $statusBadge ?> ms-2"><?= e($app['status']) ?></span>
+      <?php if (!empty($app['admin_override'])): ?>
+        <span class="badge bg-dark ms-1" title="<?= e($app['override_reason'] ?? '') ?>"><i class="bi bi-shield-lock"></i> Override active</span>
+      <?php endif; ?>
     </h4>
     <div class="text-muted small">
       <code><?= e($app['application_code']) ?></code> ·
@@ -29,71 +40,171 @@ $canAct = Auth::hasRole('admin','staff');
   </div>
 </div>
 
-<!-- STATUS ACTION BAR -->
+<?php if ($app['status'] === 'Incomplete' && !empty($app['review_remarks'])): ?>
+<div class="alert alert-warning mb-4">
+  <h6 class="fw-semibold mb-2"><i class="bi bi-exclamation-circle"></i> Application Status: Incomplete</h6>
+  <p class="mb-2"><strong>Remarks:</strong> <?= nl2br(e($app['review_remarks'])) ?></p>
+  <p class="small text-muted mb-0">
+    Marked Incomplete on <?= e(date('M d, Y g:i A', strtotime($app['review_remarks_at']))) ?>
+    by <?= e($app['review_remarks_by_name'] ?? 'SK Office') ?>
+  </p>
+</div>
+<?php endif; ?>
+
+<!-- REVIEW SUMMARY (only meaningful while the application is awaiting initial review) -->
+<?php if ($review): ?>
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body">
+    <h6 class="fw-semibold mb-3">Application Review</h6>
+    <ul class="list-unstyled mb-3">
+      <li class="mb-1">
+        <i class="bi bi-<?= $review['personal_ok'] ? 'check-circle-fill text-success' : 'exclamation-triangle-fill text-warning' ?>"></i>
+        Personal Information <?= $review['personal_ok'] ? 'complete' : 'needs attention' ?>
+      </li>
+      <li class="mb-1">
+        <i class="bi bi-<?= $review['education_ok'] ? 'check-circle-fill text-success' : 'exclamation-triangle-fill text-warning' ?>"></i>
+        Education <?= $review['education_ok'] ? 'complete' : 'needs attention' ?>
+      </li>
+      <li class="mb-1">
+        <i class="bi bi-<?= $review['family_ok'] ? 'check-circle-fill text-success' : 'exclamation-triangle-fill text-warning' ?>"></i>
+        Family Background <?= $review['family_ok'] ? 'complete' : 'needs attention' ?>
+      </li>
+      <li class="mb-1">
+        <i class="bi bi-<?= empty($review['missing_documents']) ? 'check-circle-fill text-success' : 'exclamation-triangle-fill text-warning' ?>"></i>
+        Required Documents <?= $review['docs_uploaded'] ?>/<?= $review['docs_required'] ?>
+      </li>
+    </ul>
+    <?php if ($review['complete']): ?>
+      <div class="alert alert-success py-2 mb-0"><i class="bi bi-check-circle"></i> <strong>Ready for Interview</strong> — everything required has been submitted.</div>
+    <?php else: ?>
+      <div class="alert alert-warning py-2 mb-0">
+        <i class="bi bi-exclamation-triangle"></i> <strong>Needs correction</strong> —
+        <?php if ($review['missing_documents']): ?>missing: <?= e(implode(', ', $review['missing_documents'])) ?>. <?php endif; ?>
+        <?php if ($review['missing_fields']): ?>check: <?= e(implode(', ', $review['missing_fields'])) ?>.<?php endif; ?>
+      </div>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
+<!-- ELIGIBILITY (program rules checked at submission; informational only — staff make the decision) -->
+<?php if ($eligibility):
+  $eScore = (float)$eligibility['score'];
+  $eLines = array_values(array_filter(explode("\n", (string)($eligibility['notes'] ?? '')), static fn($l) => trim($l) !== ''));
+  $eFailed = array_values(array_filter($eLines, static fn($l) => !str_starts_with($l, 'Not checked:')));
+  $eColor = $eFailed ? ($eScore >= 50 ? 'warning' : 'danger') : 'success';
+?>
+<div class="card border-0 shadow-sm mb-3 border-start border-4 border-<?= $eColor ?>">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+      <h6 class="fw-semibold mb-0"><i class="bi bi-clipboard-data"></i> Eligibility Check</h6>
+      <span class="badge bg-<?= $eColor ?> px-3 py-2">Score <?= e(number_format($eScore, 0)) ?>%</span>
+    </div>
+    <?php if ($eligibility['live']): ?>
+      <p class="small text-muted mb-2">Computed now from the applicant's current data (this application was submitted before eligibility checks were recorded).</p>
+    <?php endif; ?>
+    <?php if (!$eFailed): ?>
+      <div class="text-success small mb-2"><i class="bi bi-check-circle-fill"></i> Meets all checked program criteria.</div>
+    <?php endif; ?>
+    <?php if ($eLines): ?>
+      <ul class="list-unstyled small mb-2">
+        <?php foreach ($eLines as $line): $notChecked = str_starts_with($line, 'Not checked:'); ?>
+          <li class="mb-1">
+            <i class="bi bi-<?= $notChecked ? 'dash-circle text-secondary' : 'x-circle-fill text-danger' ?>"></i>
+            <?= e($line) ?>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+    <?php endif; ?>
+    <?php if ($program): ?>
+      <div class="small text-muted border-top pt-2">
+        <strong>Program rules:</strong>
+        max age <?= $program['max_age'] ? (int)$program['max_age'] : 'none' ?> ·
+        max family income <?= (float)$program['max_family_income'] > 0 ? '₱' . number_format((float)$program['max_family_income'], 2) : 'none' ?> ·
+        citizenship <?= e($program['citizenship_required'] ?: 'any') ?> ·
+        min GPA <?= (float)$program['min_gpa'] > 0 ? e(number_format((float)$program['min_gpa'], 2)) : 'none' ?>
+        (applicant: <?= isset($app['education']['general_average']) ? e(number_format((float)$app['education']['general_average'], 2)) : 'not provided' ?>) ·
+        slots <?= $slotLimit > 0 ? $slotsUsed . ' / ' . $slotLimit . ' filled' : 'unlimited' ?>
+      </div>
+    <?php endif; ?>
+    <div class="small text-muted mt-1">This check never rejects automatically — use it to inform your decision.</div>
+  </div>
+</div>
+<?php endif; ?>
+
+<!-- STATUS ACTION BAR — generated from Application::TRANSITIONS, the same map the server enforces. -->
 <?php if ($canAct && !in_array($app['status'], ['Approved','Rejected'])): ?>
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body">
     <h6 class="fw-semibold mb-3">Available Actions</h6>
     <div class="d-flex flex-wrap gap-2">
-      <?php if ($app['status'] === 'Submitted'): ?>
+      <?php if ($can('start_review')): ?>
         <form method="POST" action="<?= url('admin/applications/update') ?>" class="d-inline">
           <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$app['id'] ?>">
           <input type="hidden" name="action" value="start_review">
-          <button class="btn btn-primary btn-sm"><i class="bi bi-hourglass"></i> Start Initial Review</button>
+          <button class="btn btn-primary btn-sm"><i class="bi bi-hourglass"></i> Start Initial Review<?= $viaOverride('start_review') ?></button>
         </form>
       <?php endif; ?>
 
-      <?php if ($app['status'] === 'Under Initial Review'): ?>
+      <?php if ($can('for_interview')): ?>
         <form method="POST" action="<?= url('admin/applications/update') ?>" class="d-inline">
           <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$app['id'] ?>">
-          <input type="hidden" name="action" value="mark_incomplete">
-          <button class="btn btn-warning btn-sm"><i class="bi bi-exclamation-circle"></i> Mark Incomplete</button>
-        </form>
-      <?php endif; ?>
-
-      <?php if (in_array($app['status'], ['Under Initial Review','Documents Under Review'])): ?>
-        <form method="POST" action="<?= url('admin/applications/update') ?>" class="d-inline">
-          <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$app['id'] ?>">
-          <input type="hidden" name="action" value="verify_documents">
-          <button class="btn btn-success btn-sm" <?= Document::verifiedCount((int)$app['id']) < count(DOCUMENT_TYPES) ? 'disabled' : '' ?>>
-            <i class="bi bi-check2-circle"></i> Mark Documents Verified
+          <input type="hidden" name="action" value="for_interview">
+          <button class="btn btn-success btn-sm" <?= (!$review || !$review['complete']) ? 'disabled title="Application is incomplete — see the review summary above."' : '' ?>>
+            <i class="bi bi-calendar-check"></i> Mark as For Interview<?= $viaOverride('for_interview') ?>
           </button>
         </form>
       <?php endif; ?>
 
-    <?php if ($app['status'] === 'Documents Verified'): ?>
-    <form method="POST" action="<?= url('admin/applications/update') ?>" class="d-inline">
-        <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$app['id'] ?>">
-        <input type="hidden" name="action" value="for_interview">
-        <button class="btn btn-info btn-sm text-white">
-        <i class="bi bi-calendar-plus"></i> Mark as For Interview
+      <?php if ($can('mark_incomplete')): ?>
+        <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#incompleteModal">
+          <i class="bi bi-exclamation-circle"></i> Mark Incomplete<?= $viaOverride('mark_incomplete') ?>
         </button>
-    </form>
-    <?php endif; ?>
+      <?php endif; ?>
 
-    <?php if (in_array($app['status'], ['For Final Evaluation','Interview Completed','Documents Verified','Waitlisted'])): ?>
-    <form method="POST" action="<?= url('admin/applications/update') ?>" class="d-inline">
-        <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$app['id'] ?>">
-        <input type="hidden" name="action" value="for_final">
-        <button class="btn btn-primary btn-sm">
-        <i class="bi bi-clipboard-check"></i> Move to Final Evaluation
-        </button>
-    </form>
-    <?php endif; ?>
+      <?php if ($app['status'] === 'For Interview'): ?>
+        <a href="<?= url('admin/interview-scheduling&program_id=' . (int)$app['program_id'] . '&focus=' . (int)$app['id']) ?>" class="btn btn-info btn-sm text-white">
+          <i class="bi bi-calendar-plus"></i> Schedule Interview
+        </a>
+      <?php endif; ?>
 
-    <?php if (in_array($app['status'], ['For Final Evaluation','Interview Completed','Interview Scheduled','Documents Verified','Waitlisted'])): ?>
+      <?php if ($app['status'] === 'Interview Scheduled' && $app['interview']): ?>
+        <a href="<?= url('admin/interview-schedule-detail&id=' . (int)$app['interview']['schedule_id']) ?>" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-calendar-event"></i> View Interview
+        </a>
+      <?php endif; ?>
+
+      <?php if ($can('for_final')): ?>
+        <form method="POST" action="<?= url('admin/applications/update') ?>" class="d-inline">
+          <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$app['id'] ?>">
+          <input type="hidden" name="action" value="for_final">
+          <button class="btn btn-primary btn-sm">
+            <i class="bi bi-clipboard-check"></i> Move to Final Evaluation<?= $viaOverride('for_final') ?>
+          </button>
+        </form>
+      <?php endif; ?>
+
+      <?php if ($can('approve')):
+        $slotBlocked = $slotsFull && !Application::canBypassTransitions($app); ?>
         <form method="POST" action="<?= url('admin/applications/update') ?>" class="d-inline" onsubmit="return confirm('Approve this application? This will create a scholar record.');">
           <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$app['id'] ?>">
           <input type="hidden" name="action" value="approve">
           <input type="hidden" name="remarks" value="Approved after final evaluation.">
-          <button class="btn btn-success btn-sm"><i class="bi bi-check-circle"></i> Approve & Create Scholar</button>
+          <button class="btn btn-success btn-sm" <?= $slotBlocked ? 'disabled title="All ' . $slotLimit . ' program slots are filled — an admin override is required."' : '' ?>>
+            <i class="bi bi-check-circle"></i> Approve & Create Scholar<?= $viaOverride('approve') ?>
+          </button>
         </form>
+      <?php endif; ?>
 
+      <?php if ($can('reject')): ?>
         <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#rejectModal">
-          <i class="bi bi-x-circle"></i> Reject
+          <i class="bi bi-x-circle"></i> Reject<?= $viaOverride('reject') ?>
         </button>
+      <?php endif; ?>
+
+      <?php if ($can('waitlist')): ?>
         <button class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#waitlistModal">
-          <i class="bi bi-hourglass"></i> Waitlist
+          <i class="bi bi-hourglass"></i> Waitlist<?= $viaOverride('waitlist') ?>
         </button>
       <?php endif; ?>
 
@@ -150,6 +261,8 @@ $canAct = Auth::hasRole('admin','staff');
         <div class="col-md-6"><label class="small text-muted">School</label><div class="fw-semibold"><?= e($edu['school_name'] ?? '—') ?></div></div>
         <div class="col-md-3"><label class="small text-muted">Year Level</label><div class="fw-semibold"><?= e($edu['year_level'] ?? '—') ?></div></div>
         <div class="col-md-3"><label class="small text-muted">Course</label><div class="fw-semibold"><?= e($edu['course_name'] ?? '—') ?></div></div>
+        <div class="col-md-3"><label class="small text-muted">Major</label><div class="fw-semibold"><?= e($edu['major'] ?? '—') ?></div></div>
+        <div class="col-md-3"><label class="small text-muted">General Average</label><div class="fw-semibold"><?= isset($edu['general_average']) ? e(number_format((float)$edu['general_average'], 2)) : '—' ?></div></div>
         <div class="col-md-6"><label class="small text-muted">Previous Scholarship</label><div class="fw-semibold"><?= !empty($edu['previous_scholarship']) ? 'Yes — ' . e($edu['previous_scholarship_details'] ?? '') : 'None' ?></div></div>
         <div class="col-md-6"><label class="small text-muted">Current Scholarship</label><div class="fw-semibold"><?= !empty($edu['current_scholarship']) ? 'Yes — ' . e($edu['current_scholarship_details'] ?? '') : 'None' ?></div></div>
       </div>
@@ -183,9 +296,21 @@ $canAct = Auth::hasRole('admin','staff');
     </div></div>
   </div>
 
-  <!-- DOCUMENTS -->
+  <!-- DOCUMENTS: review/view interface only — verification happens automatically via "Mark as For Interview". -->
   <div class="tab-pane fade" id="tab-docs">
     <div class="card border-0 shadow-sm"><div class="card-body">
+      <?php
+        $docsUploaded = 0;
+        foreach ($app['documents'] as $d) { if ($d['file_path'] !== '') $docsUploaded++; }
+        $docsTotal = count(DOCUMENT_TYPES);
+        $docsReady = $docsUploaded >= $docsTotal;
+      ?>
+      <div class="alert <?= $docsReady ? 'alert-success' : 'alert-warning' ?> d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <strong>Required Documents</strong> — <?= $docsUploaded ?>/<?= $docsTotal ?> Uploaded
+        </div>
+        <span class="fw-semibold"><?= $docsReady ? 'READY FOR REVIEW' : 'INCOMPLETE' ?></span>
+      </div>
       <div class="row g-3">
         <?php foreach ($app['documents'] as $d):
           $docStatusClass = 'doc-' . str_replace(' ', '-', $d['status']);
@@ -214,20 +339,6 @@ $canAct = Auth::hasRole('admin','staff');
                 <a href="<?= url('admin/documents/view&id=' . (int)$d['id'] . '&download=1') ?>" class="btn btn-sm btn-outline-secondary">
                   <i class="bi bi-download"></i>
                 </a>
-                <?php if ($canAct): ?>
-                  <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#docReviewModal"
-                          data-id="<?= (int)$d['id'] ?>" data-type="<?= e($d['document_type']) ?>" data-status="Verified">
-                    Verify
-                  </button>
-                  <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#docReviewModal"
-                          data-id="<?= (int)$d['id'] ?>" data-type="<?= e($d['document_type']) ?>" data-status="Rejected">
-                    Reject
-                  </button>
-                  <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#docReviewModal"
-                          data-id="<?= (int)$d['id'] ?>" data-type="<?= e($d['document_type']) ?>" data-status="Resubmission Required">
-                    Resubmit
-                  </button>
-                <?php endif; ?>
               </div>
             <?php else: ?>
               <p class="text-muted small mb-0">Not yet uploaded.</p>
@@ -244,6 +355,11 @@ $canAct = Auth::hasRole('admin','staff');
     <div class="card border-0 shadow-sm"><div class="card-body">
       <?php if (!$app['interview']): ?>
         <p class="text-muted mb-0">No interview schedule assigned yet.</p>
+        <?php if ($app['status'] === 'For Interview' && $canAct): ?>
+          <a href="<?= url('admin/interview-scheduling&program_id=' . (int)$app['program_id'] . '&focus=' . (int)$app['id']) ?>" class="btn btn-info btn-sm text-white mt-2">
+            <i class="bi bi-calendar-plus"></i> Schedule Interview
+          </a>
+        <?php endif; ?>
       <?php else: ?>
         <div class="row g-3">
           <div class="col-md-6"><label class="small text-muted">Date</label><div class="fw-semibold"><?= e($app['interview']['interview_date']) ?></div></div>
@@ -251,6 +367,11 @@ $canAct = Auth::hasRole('admin','staff');
           <div class="col-md-6"><label class="small text-muted">Venue</label><div class="fw-semibold"><?= e($app['interview']['venue']) ?></div></div>
           <div class="col-md-6"><label class="small text-muted">Interviewer</label><div class="fw-semibold"><?= e($app['interview']['interviewer']) ?></div></div>
           <div class="col-md-6"><label class="small text-muted">Status</label><div><span class="badge bg-primary"><?= e($app['interview']['assignment_status']) ?></span></div></div>
+          <div class="col-md-6">
+            <a href="<?= url('admin/interview-schedule-detail&id=' . (int)$app['interview']['schedule_id']) ?>" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-calendar-event"></i> View Interview Details
+            </a>
+          </div>
           <?php if ($app['evaluation']): ?>
             <div class="col-12"><hr></div>
             <div class="col-md-4"><label class="small text-muted">Total Score</label><div class="fw-bold"><?= e((string)$app['evaluation']['total_score']) ?></div></div>
@@ -288,27 +409,35 @@ $canAct = Auth::hasRole('admin','staff');
   </div>
 </div>
 
-<!-- Doc review modal -->
-<div class="modal fade" id="docReviewModal" tabindex="-1">
+<!-- Mark Incomplete modal -->
+<div class="modal fade" id="incompleteModal" tabindex="-1">
   <div class="modal-dialog">
-    <form method="POST" action="<?= url('admin/documents/review') ?>" class="modal-content">
+    <form method="POST" action="<?= url('admin/applications/update') ?>" class="modal-content">
       <?= csrf_field() ?>
-      <input type="hidden" name="id" value="" id="docReviewId">
-      <input type="hidden" name="status" value="" id="docReviewStatus">
-      <input type="hidden" name="redirect" value="admin/applications/view&id=<?= (int)$app['id'] ?>">
+      <input type="hidden" name="id" value="<?= (int)$app['id'] ?>">
+      <input type="hidden" name="action" value="mark_incomplete">
       <div class="modal-header">
-        <h5 class="modal-title">Review Document</h5>
-        <button class="btn-close" data-bs-dismiss="modal"></button>
+        <h5 class="modal-title text-warning">Mark Application as Incomplete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <p class="mb-2"><strong>Document:</strong> <span id="docReviewType"></span></p>
-        <p class="mb-2"><strong>Action:</strong> <span id="docReviewAction"></span></p>
-        <label class="form-label">Remarks (optional)</label>
-        <textarea name="remarks" class="form-control" rows="3" placeholder="Add remarks for the applicant…"></textarea>
+        <p class="mb-1"><strong>Applicant:</strong> <?= e($app['applicant']['full_name'] ?? '') ?></p>
+        <p class="mb-3"><strong>Application Code:</strong> <code><?= e($app['application_code']) ?></code></p>
+        <?php if ($review && !$review['complete']): ?>
+          <div class="alert alert-light border small mb-3">
+            <strong>Review found:</strong>
+            <?php if ($review['missing_documents']): ?><br>Missing documents: <?= e(implode(', ', $review['missing_documents'])) ?>.<?php endif; ?>
+            <?php if ($review['missing_fields']): ?><br>Check: <?= e(implode(', ', $review['missing_fields'])) ?>.<?php endif; ?>
+          </div>
+        <?php endif; ?>
+        <label class="form-label">What needs to be corrected? <span class="text-danger">*</span></label>
+        <textarea name="remarks" class="form-control" rows="5" required
+                  placeholder="Example:&#10;1. Certificate of Residency is missing.&#10;2. School ID image is unclear.&#10;3. Please correct the father's contact number.&#10;4. Please complete the mother's occupation."></textarea>
+        <div class="form-text">Specify the missing, incorrect, or unclear information so the applicant knows exactly what to correct. You may list multiple issues in one remark.</div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-primary">Confirm</button>
+        <button class="btn btn-warning">Mark as Incomplete</button>
       </div>
     </form>
   </div>
@@ -364,7 +493,9 @@ $canAct = Auth::hasRole('admin','staff');
       <div class="modal-header"><h5 class="modal-title text-dark">Admin Override</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
         <div class="alert alert-warning small">
-          Enabling override allows approval even if mandatory documents are not all verified. Use sparingly and document your reason.
+          Enabling override lets an <strong>admin</strong> take decision actions outside the normal workflow order
+          (for example approving before final evaluation) and approve beyond the program's slot limit.
+          Every action taken this way is recorded in the audit log. Use sparingly and document your reason.
         </div>
         <label class="form-label">Reason for override</label>
         <textarea name="reason" class="form-control" rows="3" required></textarea>
@@ -379,15 +510,12 @@ $canAct = Auth::hasRole('admin','staff');
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const modal = document.getElementById('docReviewModal');
-  if (modal) {
-    modal.addEventListener('show.bs.modal', e => {
-      const btn = e.relatedTarget;
-      modal.querySelector('#docReviewId').value    = btn.dataset.id;
-      modal.querySelector('#docReviewType').textContent   = btn.dataset.type;
-      modal.querySelector('#docReviewStatus').value = btn.dataset.status;
-      modal.querySelector('#docReviewAction').textContent = btn.dataset.status;
-    });
+  // Restore the active tab (e.g. #tab-docs) after a form POST redirects back to this page.
+  if (window.location.hash) {
+    const trigger = document.querySelector('.nav-link[href="' + window.location.hash + '"]');
+    if (trigger && window.bootstrap) {
+      new bootstrap.Tab(trigger).show();
+    }
   }
 });
 </script>

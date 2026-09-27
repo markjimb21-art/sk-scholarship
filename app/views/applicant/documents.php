@@ -1,7 +1,10 @@
 <h4 class="fw-bold mb-3">My Documents</h4>
 <?php if (!$app): ?>
-  <div class="alert alert-warning">Please submit your application first (Step 5 of the form).</div>
+  <div class="alert alert-warning">Please start your application first (Step 1 of the form).</div>
 <?php else: ?>
+<?php if (!$editable): ?>
+  <div class="alert alert-info"><i class="bi bi-info-circle"></i> Your application is <?= e($app['status']) ?> — documents are view-only. They can only be replaced while the application is a Draft or marked Incomplete.</div>
+<?php endif; ?>
 <div class="row g-3">
   <?php foreach (DOCUMENT_TYPES as $type):
     $doc = null;
@@ -27,6 +30,7 @@
             </div>
           <?php endif; ?>
         <?php endif; ?>
+        <?php if ($editable): ?>
         <form method="POST" action="<?= url('applicant/documents/upload') ?>" enctype="multipart/form-data" class="mt-2">
           <?= csrf_field() ?>
           <input type="hidden" name="document_type" value="<?= e($type) ?>">
@@ -35,6 +39,7 @@
             <button class="btn btn-primary">Upload</button>
           </div>
         </form>
+        <?php endif; ?>
       </div>
     </div>
   </div>

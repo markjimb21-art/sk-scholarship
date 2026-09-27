@@ -15,7 +15,14 @@
   <div class="card-body">
     <div class="row g-2">
       <div class="col-md-5"><input name="q" class="form-control" placeholder="Search scholar, code, reference…" value="<?= e($filters['q']) ?>"></div>
-      <div class="col-md-3"><input name="year" class="form-control" placeholder="Academic year (e.g., 2025-2026)" value="<?= e($filters['year']) ?>"></div>
+      <div class="col-md-3">
+        <select name="year" class="form-select">
+          <option value="">All academic years</option>
+          <?php foreach ($years as $y): ?>
+            <option value="<?= e($y) ?>" <?= $filters['year'] === $y ? 'selected' : '' ?>><?= e($y) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
       <div class="col-md-2 d-flex gap-2">
         <button class="btn btn-primary flex-grow-1"><i class="bi bi-search"></i></button>
         <a href="<?= url('admin/releases') ?>" class="btn btn-outline-secondary"><i class="bi bi-x"></i></a>
