@@ -1,359 +1,162 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * The two analyses in docs/PROCESS.md §6 — one small function per number, so each figure on the
+ * analytics page can be explained by the formula printed under it.
+ */
 final class Analytics
 {
-    /* ============ KPIs ============ */
-    public static function kpis(?int $programId = null): array
+    /** Stages shown in the funnel, in process order. */
+    public const STAGES = ['Submitted', 'Returned', 'Qualified', 'Interview Scheduled', 'Interviewed', 'Approved', 'Waitlisted', 'Rejected'];
+
+    /** Stages that can still turn into Approved. */
+    public const OPEN_STAGES = ['Submitted', 'Returned', 'Qualified', 'Interview Scheduled', 'Interviewed', 'Waitlisted'];
+
+    /**
+     * SQL condition "application a reached stage S at some point" (not just "is in S now").
+     * Returned/Qualified/Waitlisted are timestamped; the interview stages come from the interview tables.
+     */
+    private static function reachedCondition(string $stage): string
     {
-        $pdo = Database::conn();
-        $where = $programId ? " WHERE program_id = " . (int)$programId : "";
-
-        $apps = $pdo->query(
-            "SELECT
-                COUNT(*) AS total_applicants,
-                SUM(status='Approved') AS approved,
-                SUM(status='Rejected') AS rejected,
-                SUM(status='Waitlisted') AS waitlisted,
-                SUM(status IN ('Interview Completed','For Final Evaluation')) AS interviewed,
-                SUM(status IN ('For Interview','Interview Scheduled')) AS scheduled_interviews,
-                SUM(status IN ('Submitted','Under Initial Review','Incomplete','Documents Under Review')) AS pending
-             FROM applications $where"
-        )->fetch();
-
-        $scholars = $pdo->query(
-            "SELECT
-                COUNT(*) AS total_scholars,
-                SUM(status='Active') AS active_scholars,
-                SUM(status='Graduated') AS graduated,
-                SUM(status='On Probation') AS on_probation,
-                SUM(status='Withdrawn') AS withdrawn,
-                SUM(status='Suspended') AS suspended
-             FROM scholars"
-        )->fetch();
-
-        $funds = $pdo->query(
-            "SELECT COALESCE(SUM(amount),0) AS total_released FROM scholarship_releases"
-        )->fetch();
-
-        $budget = $pdo->query(
-            "SELECT COALESCE(SUM(total_budget),0) AS total_budget FROM budgets"
-        )->fetch();
-
-        $gpa = $pdo->query("SELECT AVG(gpa) AS avg_gpa FROM academic_records")->fetch();
-
-        $interview = $pdo->query(
-            "SELECT
-                COUNT(*) AS total_assigned,
-                SUM(assignment_status='Completed') AS completed,
-                SUM(assignment_status='No Show') AS no_shows
-             FROM interview_assignments"
-        )->fetch();
-
-        $attendanceRate = ((int)($interview['total_assigned'] ?? 0)) > 0
-            ? round(((int)$interview['completed'] / (int)$interview['total_assigned']) * 100, 1)
-            : 0.0;
-
-        $approvalRate = ((int)($apps['total_applicants'] ?? 0)) > 0
-            ? round(((int)$apps['approved'] / (int)$apps['total_applicants']) * 100, 1)
-            : 0.0;
-
-        return [
-            'total_applicants'   => (int)($apps['total_applicants'] ?? 0),
-            'approved'           => (int)($apps['approved'] ?? 0),
-            'rejected'           => (int)($apps['rejected'] ?? 0),
-            'waitlisted'         => (int)($apps['waitlisted'] ?? 0),
-            'interviewed'        => (int)($apps['interviewed'] ?? 0),
-            'scheduled'          => (int)($apps['scheduled_interviews'] ?? 0),
-            'pending'            => (int)($apps['pending'] ?? 0),
-            'active_scholars'    => (int)($scholars['active_scholars'] ?? 0),
-            'total_scholars'     => (int)($scholars['total_scholars'] ?? 0),
-            'graduated'          => (int)($scholars['graduated'] ?? 0),
-            'on_probation'       => (int)($scholars['on_probation'] ?? 0),
-            'withdrawn'          => (int)($scholars['withdrawn'] ?? 0),
-            'suspended'          => (int)($scholars['suspended'] ?? 0),
-            'total_released'     => (float)($funds['total_released'] ?? 0),
-            'total_budget'       => (float)($budget['total_budget'] ?? 0),
-            'remaining_budget'   => (float)$budget['total_budget'] - (float)$funds['total_released'],
-            'avg_gpa'            => $gpa['avg_gpa'] !== null ? round((float)$gpa['avg_gpa'], 2) : null,
-            'attendance_rate'    => $attendanceRate,
-            'approval_rate'      => $approvalRate,
-        ];
+        return match ($stage) {
+            'Submitted'           => 'a.submitted_at IS NOT NULL',
+            'Returned'            => 'a.review_remarks_at IS NOT NULL',
+            'Qualified'           => 'a.qualified_at IS NOT NULL',
+            'Interview Scheduled' => 'EXISTS (SELECT 1 FROM interview_assignments ia WHERE ia.application_id = a.id)',
+            'Interviewed'         => 'EXISTS (SELECT 1 FROM interview_assignments ia JOIN interview_evaluations ev ON ev.assignment_id = ia.id WHERE ia.application_id = a.id)',
+            'Waitlisted'          => 'a.waitlisted_at IS NOT NULL',
+            default               => "a.status = '" . ($stage === 'Approved' ? 'Approved' : 'Rejected') . "'",
+        };
     }
 
-    /* ============ APPLICANT ANALYTICS ============ */
-    public static function applicantsByStatus(?int $programId = null): array
-    {
-        $w = $programId ? " WHERE program_id = " . (int)$programId : "";
-        return Database::conn()->query(
-            "SELECT status AS label, COUNT(*) AS value FROM applications $w GROUP BY status ORDER BY value DESC"
-        )->fetchAll();
-    }
+    /* ---------------- (1) Possible scholars ---------------- */
 
-    public static function applicantsBySchool(?int $programId = null): array
+    /** Count of the program's applications currently in each stage. */
+    public static function stageCounts(int $programId): array
     {
-        $w = $programId ? " AND a.program_id = " . (int)$programId : "";
-        return Database::conn()->query(
-            "SELECT COALESCE(e.school_name, 'Unknown') AS label, COUNT(*) AS value
-             FROM applications a
-             JOIN applicants ap ON ap.id = a.applicant_id
-             LEFT JOIN education_records e ON e.applicant_id = ap.id
-             WHERE 1=1 $w
-             GROUP BY e.school_name ORDER BY value DESC LIMIT 15"
-        )->fetchAll();
-    }
-
-    public static function applicantsByCourse(?int $programId = null): array
-    {
-        $w = $programId ? " AND a.program_id = " . (int)$programId : "";
-        return Database::conn()->query(
-            "SELECT COALESCE(e.course_name, 'Unknown') AS label, COUNT(*) AS value
-             FROM applications a
-             JOIN applicants ap ON ap.id = a.applicant_id
-             LEFT JOIN education_records e ON e.applicant_id = ap.id
-             WHERE 1=1 $w
-             GROUP BY e.course_name ORDER BY value DESC LIMIT 15"
-        )->fetchAll();
-    }
-
-    public static function applicantsByYearLevel(?int $programId = null): array
-    {
-        $w = $programId ? " AND a.program_id = " . (int)$programId : "";
-        return Database::conn()->query(
-            "SELECT COALESCE(e.year_level, 'Unknown') AS label, COUNT(*) AS value
-             FROM applications a
-             JOIN applicants ap ON ap.id = a.applicant_id
-             LEFT JOIN education_records e ON e.applicant_id = ap.id
-             WHERE 1=1 $w
-             GROUP BY e.year_level ORDER BY FIELD(e.year_level, '1st Year','2nd Year','3rd Year','4th Year','5th Year','Other')"
-        )->fetchAll();
-    }
-
-    public static function applicantsByCivilStatus(?int $programId = null): array
-    {
-        $w = $programId ? " AND a.program_id = " . (int)$programId : "";
-        return Database::conn()->query(
-            "SELECT COALESCE(p.civil_status, 'Unknown') AS label, COUNT(*) AS value
-             FROM applications a
-             JOIN applicants ap ON ap.id = a.applicant_id
-             LEFT JOIN applicants_personal_information p ON p.applicant_id = ap.id
-             WHERE 1=1 $w
-             GROUP BY p.civil_status ORDER BY value DESC"
-        )->fetchAll();
-    }
-
-    public static function applicantsByPurok(?int $programId = null): array
-    {
-        $w = $programId ? " AND a.program_id = " . (int)$programId : "";
-        return Database::conn()->query(
-            "SELECT COALESCE(pr.purok_name, 'Not specified') AS label, COUNT(*) AS value
-             FROM applications a
-             JOIN applicants ap ON ap.id = a.applicant_id
-             LEFT JOIN applicants_personal_information p ON p.applicant_id = ap.id
-             LEFT JOIN puroks pr ON pr.id = p.purok_id
-             WHERE 1=1 $w
-             GROUP BY pr.purok_name ORDER BY value DESC LIMIT 20"
-        )->fetchAll();
-    }
-
-    /* ============ FAMILY / FINANCIAL ============ */
-    public static function applicantsByIncomeRange(?int $programId = null): array
-    {
-        $w = $programId ? " AND a.program_id = " . (int)$programId : "";
-        $rows = Database::conn()->query(
-            "SELECT f.total_family_income AS income
-             FROM applications a
-             JOIN applicants ap ON ap.id = a.applicant_id
-             LEFT JOIN family_background f ON f.applicant_id = ap.id
-             WHERE 1=1 $w AND f.total_family_income IS NOT NULL"
-        )->fetchAll();
-
-        $buckets = [
-            'Below ₱5,000'    => 0,
-            '₱5,000–₱10,000'  => 0,
-            '₱10,001–₱15,000' => 0,
-            '₱15,001–₱20,000' => 0,
-            '₱20,001–₱30,000' => 0,
-            'Above ₱30,000'   => 0,
-        ];
-        foreach ($rows as $r) {
-            $i = (float)$r['income'];
-            if      ($i < 5000)  $buckets['Below ₱5,000']++;
-            elseif  ($i <= 10000) $buckets['₱5,000–₱10,000']++;
-            elseif  ($i <= 15000) $buckets['₱10,001–₱15,000']++;
-            elseif  ($i <= 20000) $buckets['₱15,001–₱20,000']++;
-            elseif  ($i <= 30000) $buckets['₱20,001–₱30,000']++;
-            else                  $buckets['Above ₱30,000']++;
-        }
+        $stmt = Database::conn()->prepare("SELECT status, COUNT(*) FROM applications WHERE program_id = ? GROUP BY status");
+        $stmt->execute([$programId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
         $out = [];
-        foreach ($buckets as $label => $value) $out[] = ['label' => $label, 'value' => $value];
+        foreach (self::STAGES as $s) $out[$s] = (int)($rows[$s] ?? 0);
         return $out;
     }
 
-    public static function avgParentalIncome(): array
+    /** Programs that are closed (admin closed them) and whose application period has ended — excluding $exceptId. */
+    public static function closedProgramIds(int $exceptId): array
     {
-        return Database::conn()->query(
-            "SELECT
-                AVG(father_income) AS avg_father,
-                AVG(mother_income) AS avg_mother,
-                AVG(combined_income) AS avg_combined
-             FROM family_background"
-        )->fetch() ?: [];
+        $stmt = Database::conn()->prepare(
+            "SELECT id FROM scholarship_programs WHERE is_active = 0 AND application_end < CURDATE() AND id <> ?"
+        );
+        $stmt->execute([$exceptId]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
     }
 
-    /* ============ INTERVIEW ANALYTICS ============ */
-    public static function interviewResults(): array
+    /**
+     * Conversion rate of each open stage to Approved:
+     *   rate(S) = applications that reached S and ended Approved ÷ applications that reached S.
+     * Base = applications of CLOSED past programs; with no history, this program's applications that
+     * already have a final result (Approved or Rejected) — labelled "based on current data only".
+     * Returns ['basis' => text, 'current_only' => bool, 'rates' => [stage => ['rate'=>float|null,'reached'=>n,'approved'=>n]]].
+     */
+    public static function conversionRates(int $programId): array
     {
-        return Database::conn()->query(
-            "SELECT COALESCE(result, 'Not Evaluated') AS label, COUNT(*) AS value
-             FROM interview_assignments ia
-             LEFT JOIN interview_evaluations e ON e.assignment_id = ia.id
-             GROUP BY e.result ORDER BY value DESC"
-        )->fetchAll();
-    }
-
-    public static function interviewAttendanceByMonth(): array
-    {
-        return Database::conn()->query(
-            "SELECT DATE_FORMAT(s.interview_date, '%Y-%m') AS label,
-                    SUM(ia.assignment_status = 'Completed') AS completed,
-                    SUM(ia.assignment_status = 'No Show')   AS no_shows
-             FROM interview_assignments ia
-             JOIN interview_schedules s ON s.id = ia.schedule_id
-             WHERE s.interview_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
-             GROUP BY label ORDER BY label"
-        )->fetchAll();
-    }
-
-    public static function interviewScoresByCriteria(): array
-    {
-        return Database::conn()->query(
-            "SELECT
-                AVG(financial_need_score) AS financial_need,
-                AVG(academic_score)       AS academic,
-                AVG(motivation_score)     AS motivation,
-                AVG(community_score)      AS community,
-                AVG(purpose_score)        AS purpose,
-                AVG(total_score)          AS total
-             FROM interview_evaluations"
-        )->fetch() ?: [];
-    }
-
-    /* ============ ACADEMIC ANALYTICS ============ */
-    public static function gpaDistribution(): array
-    {
-        $buckets = [
-            '1.00–1.25' => 0, '1.26–1.50' => 0, '1.51–1.75' => 0,
-            '1.76–2.00' => 0, '2.01–2.25' => 0, '2.26–2.50' => 0,
-            '2.51–2.75' => 0, '2.76–3.00' => 0, '3.01–4.00' => 0, '4.01–5.00' => 0,
-        ];
-        $rows = Database::conn()->query("SELECT gpa FROM academic_records WHERE gpa IS NOT NULL")->fetchAll();
-        foreach ($rows as $r) {
-            $g = (float)$r['gpa'];
-            if      ($g <= 1.25) $buckets['1.00–1.25']++;
-            elseif  ($g <= 1.50) $buckets['1.26–1.50']++;
-            elseif  ($g <= 1.75) $buckets['1.51–1.75']++;
-            elseif  ($g <= 2.00) $buckets['1.76–2.00']++;
-            elseif  ($g <= 2.25) $buckets['2.01–2.25']++;
-            elseif  ($g <= 2.50) $buckets['2.26–2.50']++;
-            elseif  ($g <= 2.75) $buckets['2.51–2.75']++;
-            elseif  ($g <= 3.00) $buckets['2.76–3.00']++;
-            elseif  ($g <= 4.00) $buckets['3.01–4.00']++;
-            else                  $buckets['4.01–5.00']++;
+        $closed = self::closedProgramIds($programId);
+        if ($closed) {
+            $scope = 'a.program_id IN (' . implode(',', array_fill(0, count($closed), '?')) . ')';
+            $params = $closed;
+            $basis = count($closed) . ' closed past program(s)';
+            $currentOnly = false;
+        } else {
+            $scope = "a.program_id = ? AND a.status IN ('Approved','Rejected')";
+            $params = [$programId];
+            $basis = 'this program’s decided applications (no closed past program yet)';
+            $currentOnly = true;
         }
-        $out = [];
-        foreach ($buckets as $l => $v) $out[] = ['label' => $l, 'value' => $v];
-        return $out;
+        $rates = [];
+        foreach (self::OPEN_STAGES as $stage) {
+            $cond = self::reachedCondition($stage);
+            $stmt = Database::conn()->prepare(
+                "SELECT COUNT(*) AS reached, SUM(a.status = 'Approved') AS approved
+                 FROM applications a WHERE $scope AND $cond"
+            );
+            $stmt->execute($params);
+            $row = $stmt->fetch();
+            $reached = (int)$row['reached'];
+            $approved = (int)$row['approved'];
+            $rates[$stage] = ['reached' => $reached, 'approved' => $approved, 'rate' => $reached > 0 ? $approved / $reached : null];
+        }
+        return ['basis' => $basis, 'current_only' => $currentOnly, 'rates' => $rates];
     }
 
-    public static function gpaTrendByYear(): array
+    /**
+     * Projected scholars = slots used + Σ over open stages (count in stage × conversion rate), capped at the slots.
+     * A stage with no data (rate null) adds 0. Returns ['value','uncapped','expected_new','terms' => [stage => contribution]].
+     */
+    public static function projectedScholars(int $programId): array
     {
-        return Database::conn()->query(
-            "SELECT academic_year AS label, AVG(gpa) AS value, COUNT(*) AS c
-             FROM academic_records
-             WHERE gpa IS NOT NULL
-             GROUP BY academic_year ORDER BY academic_year"
-        )->fetchAll();
+        $program = Program::find($programId);
+        $counts = self::stageCounts($programId);
+        $rates = self::conversionRates($programId)['rates'];
+        $used = Program::slotsUsed($programId);
+        $terms = [];
+        foreach (self::OPEN_STAGES as $s) $terms[$s] = $counts[$s] * (float)($rates[$s]['rate'] ?? 0);
+        $uncapped = $used + array_sum($terms);
+        $value = min((float)$program['slots_available'], $uncapped);
+        return ['value' => $value, 'uncapped' => $uncapped, 'expected_new' => max(0.0, $value - $used), 'terms' => $terms, 'slots_used' => $used];
     }
 
-    public static function gpaBySchool(): array
+    /** Slots remaining = slots − slots used. */
+    public static function slotsRemaining(int $programId): int
     {
-        return Database::conn()->query(
-            "SELECT COALESCE(school, 'Unknown') AS label, AVG(gpa) AS value
-             FROM academic_records
-             WHERE gpa IS NOT NULL
-             GROUP BY school ORDER BY value ASC LIMIT 15"
-        )->fetchAll();
+        $program = Program::find($programId);
+        return max(0, (int)$program['slots_available'] - Program::slotsUsed($programId));
     }
 
-    public static function atRiskCount(): int
+    /** Waitlisted applicants available to fill open slots. */
+    public static function waitlistedAvailable(int $programId): int
     {
-        return (int)Database::conn()->query(
-            "SELECT COUNT(DISTINCT ar.scholar_id)
-             FROM academic_records ar
-             JOIN scholars s ON s.id = ar.scholar_id
-             WHERE s.status IN ('Active','On Probation') AND ar.gpa > 2.50
-               AND ar.id = (SELECT MAX(id) FROM academic_records WHERE scholar_id = s.id)"
-        )->fetchColumn();
+        return self::stageCounts($programId)['Waitlisted'];
     }
 
-    /* ============ SCHOLARSHIP / BUDGET ANALYTICS ============ */
-    public static function releaseByYear(): array
+    /* ---------------- (2) Possible budget ---------------- */
+
+    /** Committed — see Budget::committed(). */
+    public static function committed(int $programId, string $academicYear): float
     {
-        return Database::conn()->query(
-            "SELECT academic_year AS label, SUM(amount) AS value, COUNT(*) AS c
-             FROM scholarship_releases
-             GROUP BY academic_year ORDER BY academic_year"
-        )->fetchAll();
+        return Budget::committed($programId, $academicYear);
     }
 
-    public static function releaseByMonth(): array
+    /** Projected need = Committed + (projected scholars − current scholars) × amount per semester × 2. */
+    public static function projectedNeed(int $programId, string $academicYear): float
     {
-        return Database::conn()->query(
-            "SELECT DATE_FORMAT(release_date, '%Y-%m') AS label, SUM(amount) AS value
-             FROM scholarship_releases
-             WHERE release_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
-             GROUP BY label ORDER BY label"
-        )->fetchAll();
+        $program = Program::find($programId);
+        $newScholars = self::projectedScholars($programId)['expected_new'];
+        return self::committed($programId, $academicYear) + $newScholars * (float)$program['amount_per_semester'] * 2;
     }
 
-    public static function scholarsByStatus(): array
+    /** Remaining = total budget − released (null when there is no budget for the program + A.Y.). */
+    public static function remaining(int $programId, string $academicYear): ?float
     {
-        return Database::conn()->query(
-            "SELECT status AS label, COUNT(*) AS value FROM scholars GROUP BY status ORDER BY value DESC"
-        )->fetchAll();
+        $b = Budget::forProgramYear($programId, $academicYear);
+        return $b ? (float)$b['total_budget'] - Budget::actualReleased($programId, $academicYear) : null;
     }
 
-    public static function renewalRate(): array
+    /** Surplus (+) or shortfall (−) = remaining − projected need. */
+    public static function surplus(int $programId, string $academicYear): ?float
     {
-        return Database::conn()->query(
-            "SELECT status AS label, COUNT(*) AS value
-             FROM scholarship_renewals GROUP BY status ORDER BY value DESC"
-        )->fetchAll();
+        $remaining = self::remaining($programId, $academicYear);
+        return $remaining === null ? null : $remaining - self::projectedNeed($programId, $academicYear);
     }
 
-    public static function budgetUtilization(): array
+    /** Extra scholars fundable = floor(surplus ÷ (amount per semester × 2)); 0 when there is a shortfall. */
+    public static function extraFundable(int $programId, string $academicYear): int
     {
-        return Database::conn()->query(
-            "SELECT sp.program_name AS label,
-                    COALESCE(b.total_budget, 0) AS budget,
-                    COALESCE((SELECT SUM(amount) FROM scholarship_releases r
-                              JOIN scholars s ON s.id = r.scholar_id
-                              WHERE s.program_id = sp.id), 0) AS released
-             FROM scholarship_programs sp
-             LEFT JOIN budgets b ON b.program_id = sp.id
-             ORDER BY sp.id DESC"
-        )->fetchAll();
-    }
-
-    /* ============ DASHBOARD TREND (used on admin home) ============ */
-    public static function applicationsTrend(int $months = 12): array
-    {
-        return Database::conn()->query(
-            "SELECT DATE_FORMAT(created_at, '%Y-%m') AS label, COUNT(*) AS value
-             FROM applications
-             WHERE created_at >= DATE_SUB(NOW(), INTERVAL $months MONTH)
-             GROUP BY label ORDER BY label"
-        )->fetchAll();
+        $program = Program::find($programId);
+        $surplus = self::surplus($programId, $academicYear);
+        $perScholar = (float)$program['amount_per_semester'] * 2;
+        if ($surplus === null || $surplus <= 0 || $perScholar <= 0) return 0;
+        return (int)floor($surplus / $perScholar);
     }
 }

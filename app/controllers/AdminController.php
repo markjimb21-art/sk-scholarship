@@ -67,6 +67,10 @@ final class AdminController
         'scholars'                  => ['FundsController', 'scholars'],
         'scholar'                   => ['FundsController', 'scholar'],
         'scholar-end'               => ['FundsController', 'scholarEnd'],
+        // Reports and analytics
+        'reports'                   => ['ReportController', 'reports'],
+        'reports/generate'          => ['ReportController', 'generate'],
+        'analytics'                 => ['ReportController', 'analytics'],
         // Accounts, settings, audit
         'users'                     => ['AdminController', 'users'],
         'user-save'                 => ['AdminController', 'userSave'],
