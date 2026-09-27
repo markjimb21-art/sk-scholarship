@@ -1,6 +1,19 @@
 # Change Plan — restructure around docs/PROCESS.md
 
-Status: **Stage 0 (audit & plan) — waiting for approval.** No code or schema has been changed.
+Status: **Implemented (Stages 1–7).** Approved with the default for every decision in §0.
+
+### Changes made during implementation (beyond the plan below)
+- `interview_assignments.application_id` is **no longer unique**: one row per scheduling attempt, so a missed
+  interview stays on record after the reschedule (the application's latest row is its current one).
+- `renewal_requests`, `scholar_terms` and `term_documents` gained a `submitted_at` (queue order + reports).
+- Staff/official accounts (D1) were deactivated **and moved to the admin role** (required to delete the two
+  roles); an admin must explicitly re-activate them.
+- Admin account **deletion** (`user-delete`) was removed — deactivation covers it and deleting accounts with
+  records attached always failed.
+- The **renewal reminder** e-mail in `bin/send_reminders.php` was removed (not in the process; its table is gone).
+- An **Active scholar can't start another application**; after the scholarship Ended they can apply again.
+- Release rules: a reference number is required for GCash, Bank and Check; a budget can only be deleted while
+  nothing has been released against it.
 
 Audit basis: every file under `app/`, `core/`, `config/`, `public/`, `bin/`, both SQL files and the
 migrations, plus read-only queries against the local `sk_scholarship` database (27 Sep 2026).
