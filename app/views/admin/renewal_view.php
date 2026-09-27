@@ -1,71 +1,62 @@
+<?php $canDecide = Renewal::can('approve', $req['status']); ?>
 <div class="mb-3">
-  <a href="<?= url('admin/renewals') ?>" class="text-decoration-none small text-muted"><i class="bi bi-arrow-left"></i> Back</a>
-  <h4 class="fw-bold mt-1 mb-0">Renewal · <?= e($scholar['full_name'] ?? '') ?></h4>
-  <p class="text-muted small mb-0"><?= e($renewal['academic_year']) ?> · <?= e($renewal['semester'] ?? '—') ?></p>
+  <a href="<?= url('admin/renewals') ?>" class="small text-muted text-decoration-none"><i class="bi bi-arrow-left"></i> Renewals</a>
+  <h4 class="fw-bold mb-0 mt-1"><?= e($req['full_name']) ?> — renewal for <?= e($req['academic_year'] . ' ' . $req['semester']) ?></h4>
+  <p class="text-muted small mb-0"><a href="<?= url('admin/scholar&id=' . (int)$req['scholar_id']) ?>"><?= e($req['scholar_code']) ?></a> · <?= e($req['program_name']) ?>
+    · <span class="badge bg-info"><?= e(RENEWAL_STATUS_LABELS[$req['status']]) ?></span>
+    <?= $req['scholar_status'] !== 'Active' ? '<span class="badge bg-secondary">Scholarship ended</span>' : '' ?></p>
 </div>
 
-<div class="card border-0 shadow-sm mb-3">
-  <div class="card-body">
-    <form method="POST" action="<?= url('admin/renewal-update') ?>">
-      <?= csrf_field() ?>
-      <input type="hidden" name="id" value="<?= (int)$renewal['id'] ?>">
+<?php $types = TERM_DOCUMENT_TYPES['renewal']; require VIEW_PATH . '/admin/_term_documents.php'; ?>
 
-      <div class="row g-3">
-        <div class="col-md-3">
-          <label class="form-label">GPA</label>
-          <input type="number" step="0.01" min="1" max="5" name="gpa" class="form-control" value="<?= e((string)$renewal['gpa']) ?>">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Status</label>
-          <select name="status" class="form-select">
-            <?php foreach (['For Review','Eligible for Renewal','Not Eligible','Renewed','Renewal Denied'] as $s): ?>
-              <option <?= $renewal['status']===$s?'selected':'' ?>><?= e($s) ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
-        <div class="col-md-6 d-flex align-items-end">
-          <div class="form-check me-3"><input type="checkbox" class="form-check-input" name="residency_verified" value="1" id="r1" <?= $renewal['residency_verified']?'checked':'' ?>><label class="form-check-label" for="r1">Residency verified</label></div>
-          <div class="form-check me-3"><input type="checkbox" class="form-check-input" name="enrollment_verified" value="1" id="r2" <?= $renewal['enrollment_verified']?'checked':'' ?>><label class="form-check-label" for="r2">Enrollment verified</label></div>
-          <div class="form-check"><input type="checkbox" class="form-check-input" name="documents_complete" value="1" id="r3" <?= $renewal['documents_complete']?'checked':'' ?>><label class="form-check-label" for="r3">Documents complete</label></div>
-        </div>
-        <div class="col-12">
-          <label class="form-label">Remarks</label>
-          <textarea name="remarks" class="form-control" rows="3"><?= e($renewal['remarks'] ?? '') ?></textarea>
-        </div>
-      </div>
-
-      <div class="d-flex justify-content-between mt-4">
-        <button class="btn btn-primary"><i class="bi bi-save"></i> Save Renewal</button>
-        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#delRenewalModal">
-          <i class="bi bi-trash"></i> Delete
-        </button>
-      </div>
-    </form>
+<div class="row g-3 mt-1">
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <h6 class="fw-semibold">Decision</h6>
+      <?php if ($canDecide && $req['scholar_status'] === 'Active'): ?>
+        <form method="POST" action="<?= url('admin/renewals/decide') ?>" class="d-inline" onsubmit="return confirm('Approve? This opens <?= e($req['academic_year'] . ' ' . $req['semester']) ?> for the scholar.');">
+          <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="decision" value="approve">
+          <button class="btn btn-success"><i class="bi bi-check-circle"></i> Approved — open <?= e($req['academic_year'] . ' ' . $req['semester']) ?></button>
+        </form>
+        <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#resubmitModal"><i class="bi bi-arrow-return-left"></i> Resubmit</button>
+      <?php else: ?>
+        <p class="text-muted small mb-0">Nothing to decide right now.</p>
+      <?php endif; ?>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <h6 class="fw-semibold">Semesters of this scholar</h6>
+      <table class="table table-sm small mb-0">
+        <thead><tr><th>Semester</th><th>Claim</th><th>GWA</th><th>Released</th></tr></thead>
+        <tbody>
+          <?php foreach ($history as $h): ?>
+            <tr><td><?= e($h['academic_year'] . ' ' . $h['semester']) ?></td><td><?= e($h['claim_status']) ?></td>
+              <td><?= $h['gwa'] !== null ? e(number_format((float)$h['gwa'], 2)) : '—' ?></td>
+              <td><?= $h['released_amount'] !== null ? '₱' . e(number_format((float)$h['released_amount'], 2)) : '—' ?></td></tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div></div>
   </div>
 </div>
 
-<div class="card border-0 shadow-sm">
-  <div class="card-header bg-white"><h6 class="mb-0">Recent Academic Records</h6></div>
-  <div class="table-responsive">
-    <table class="table mb-0 small align-middle">
-      <thead class="table-light"><tr><th>A.Y.</th><th>Sem</th><th>GPA</th><th>Standing</th></tr></thead>
-      <tbody>
-        <?php foreach (array_slice($academics, 0, 6) as $a): ?>
-          <tr><td><?= e($a['academic_year']) ?></td><td><?= e($a['semester']) ?></td><td><?= e((string)$a['gpa']) ?></td><td><?= e($a['academic_standing'] ?? '') ?></td></tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="modal fade" id="delRenewalModal" tabindex="-1">
+<?php if ($canDecide): ?>
+<div class="modal fade" id="resubmitModal" tabindex="-1">
   <div class="modal-dialog">
-    <form method="POST" action="<?= url('admin/renewal-delete') ?>" class="modal-content">
-      <?= csrf_field() ?>
-      <input type="hidden" name="id" value="<?= (int)$renewal['id'] ?>">
-      <div class="modal-header"><h5 class="modal-title">Delete Renewal?</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-      <div class="modal-body">This cannot be undone.</div>
-      <div class="modal-footer"><button class="btn btn-danger">Delete</button></div>
+    <form method="POST" action="<?= url('admin/renewals/decide') ?>" class="modal-content">
+      <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="decision" value="resubmit">
+      <div class="modal-header"><h5 class="modal-title">Ask for a re-upload</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <p class="small mb-1">Documents to re-upload:</p>
+        <?php foreach (TERM_DOCUMENT_TYPES['renewal'] as $t): ?>
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="types[]" value="<?= e($t) ?>" id="rn<?= md5($t) ?>" checked><label class="form-check-label" for="rn<?= md5($t) ?>"><?= e($t) ?></label></div>
+        <?php endforeach; ?>
+        <label class="form-label mt-2">Remarks <span class="text-danger">*</span></label>
+        <textarea name="remarks" class="form-control" rows="3" required placeholder="The Enrollment Form is for the wrong semester."></textarea>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-warning">Send back</button></div>
     </form>
   </div>
 </div>
+<?php endif; ?>

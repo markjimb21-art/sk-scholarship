@@ -47,6 +47,26 @@ final class AdminController
         // B5 decisions
         'decisions'                 => ['InterviewController', 'decisions'],
         'decisions/decide'          => ['InterviewController', 'decide'],
+        // B6 budget
+        'budget'                    => ['FundsController', 'budget'],
+        'budget-save'               => ['FundsController', 'budgetSave'],
+        'budget-delete'             => ['FundsController', 'budgetDelete'],
+        // B7 claims
+        'claims'                    => ['FundsController', 'claims'],
+        'claims/view'               => ['FundsController', 'claimView'],
+        'claims/decide'             => ['FundsController', 'claimDecide'],
+        'term-documents/view'       => ['FundsController', 'termDocument'],
+        // B8 releases
+        'releases'                  => ['FundsController', 'releases'],
+        'release-save'              => ['FundsController', 'releaseSave'],
+        // B9 renewals
+        'renewals'                  => ['FundsController', 'renewals'],
+        'renewals/view'             => ['FundsController', 'renewalView'],
+        'renewals/decide'           => ['FundsController', 'renewalDecide'],
+        // B10 scholars
+        'scholars'                  => ['FundsController', 'scholars'],
+        'scholar'                   => ['FundsController', 'scholar'],
+        'scholar-end'               => ['FundsController', 'scholarEnd'],
         // Accounts, settings, audit
         'users'                     => ['AdminController', 'users'],
         'user-save'                 => ['AdminController', 'userSave'],

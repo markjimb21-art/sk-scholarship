@@ -47,6 +47,54 @@ final class Scholar
         return (bool)$stmt->fetchColumn();
     }
 
+    /** Scholars list (filters: q, status, program_id) with their current semester and total released. */
+    public static function search(array $filters): array
+    {
+        $sql = "SELECT s.id, s.scholar_code, s.status, s.end_reason, s.approval_date, sp.program_name, u.full_name, u.email,
+                       (SELECT CONCAT(t.academic_year, ' ', t.semester, '|', t.claim_status) FROM scholar_terms t
+                         WHERE t.scholar_id = s.id ORDER BY t.academic_year DESC, t.semester DESC LIMIT 1) AS current_term,
+                       (SELECT COALESCE(SUM(r.amount), 0) FROM scholarship_releases r WHERE r.scholar_id = s.id) AS total_released
+                FROM scholars s
+                JOIN scholarship_programs sp ON sp.id = s.program_id
+                JOIN applicants ap ON ap.id = s.applicant_id
+                JOIN users u ON u.id = ap.user_id
+                WHERE 1=1";
+        $params = [];
+        if (in_array($filters['status'] ?? '', ['Active', 'Ended'], true)) { $sql .= " AND s.status = :st"; $params['st'] = $filters['status']; }
+        if (!empty($filters['program_id'])) { $sql .= " AND s.program_id = :pid"; $params['pid'] = (int)$filters['program_id']; }
+        if (($filters['q'] ?? '') !== '') {
+            $sql .= " AND (u.full_name LIKE :q1 OR s.scholar_code LIKE :q2 OR u.email LIKE :q3)";
+            $params['q1'] = $params['q2'] = $params['q3'] = '%' . $filters['q'] . '%';
+        }
+        $stmt = Database::conn()->prepare($sql . " ORDER BY s.status, u.full_name LIMIT 500");
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * B10 End the scholarship (Active -> Ended with a reason). An ended scholar can't claim or renew.
+     * Returns ['ok'=>true,'slot_freed'=>bool] — a slot is freed when it ended in the first semester.
+     */
+    public static function end(int $id, string $reason, int $adminId): array
+    {
+        if (!in_array($reason, SCHOLAR_END_REASONS, true)) return ['ok' => false, 'error' => 'Choose a reason.'];
+        $scholar = self::find($id);
+        if (!$scholar) return ['ok' => false, 'error' => 'Scholar not found.'];
+        $stmt = Database::conn()->prepare(
+            "UPDATE scholars SET status = 'Ended', end_reason = ?, ended_at = NOW() WHERE id = ? AND status = 'Active'"
+        );
+        $stmt->execute([$reason, $id]);
+        if ($stmt->rowCount() !== 1) return ['ok' => false, 'error' => 'This scholarship has already ended.'];
+        AuditLog::write('scholarship_ended', 'scholars', $id, "Scholarship ended: $reason", ['status' => 'Active'], ['status' => 'Ended', 'end_reason' => $reason, 'by' => $adminId]);
+
+        $terms = Database::conn()->prepare("SELECT COUNT(*) FROM scholar_terms WHERE scholar_id = ?");
+        $terms->execute([$id]);
+        Notification::send((int)$scholar['user_id'], 'Scholarship ended',
+            "Your SK scholarship ({$scholar['program_name']}) has ended. Reason: $reason. Thank you for being an SK scholar.",
+            'info', url('applicant/scholarship'), sendEmail: true);
+        return ['ok' => true, 'slot_freed' => (int)$terms->fetchColumn() <= 1, 'program_id' => (int)$scholar['program_id']];
+    }
+
     /**
      * A7: create the scholar for an approved application and open Semester 1 (1st Semester of the program's
      * academic year, decision D3). Call inside the approval transaction. Returns the new scholar id.

@@ -162,6 +162,133 @@ final class Term
         return ['ok' => true];
     }
 
+    /* ---------------- admin side: B7 verify, B8 release ---------------- */
+
+    /** Semesters with a given claim status (queues), oldest submission first. */
+    public static function byClaimStatus(string $status, ?int $programId = null): array
+    {
+        $sql = "SELECT t.*, s.scholar_code, s.status AS scholar_status, s.program_id, sp.program_name, sp.amount_per_semester, sp.min_gpa,
+                       u.full_name, u.email,
+                       (SELECT b.total_budget - b.released FROM budgets b WHERE b.program_id = s.program_id AND b.academic_year = t.academic_year) AS budget_remaining
+                FROM scholar_terms t
+                JOIN scholars s ON s.id = t.scholar_id
+                JOIN scholarship_programs sp ON sp.id = s.program_id
+                JOIN applicants ap ON ap.id = s.applicant_id
+                JOIN users u ON u.id = ap.user_id
+                WHERE t.claim_status = ?";
+        $params = [$status];
+        if ($programId) { $sql .= " AND s.program_id = ?"; $params[] = $programId; }
+        $stmt = Database::conn()->prepare($sql . " ORDER BY COALESCE(t.submitted_at, t.reviewed_at, t.created_at), t.id");
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
+    private static function notifyScholar(array $term, string $title, string $message, string $type): void
+    {
+        Notification::send((int)$term['user_id'], $title, $message, $type, url('applicant/scholarship'), sendEmail: true);
+    }
+
+    /** B7 Verified: the GWA read from the Grades is stored on the semester (the academic record). */
+    public static function verifyClaim(int $termId, string $gwa, int $adminId): array
+    {
+        $term = self::find($termId);
+        if (!$term) return ['ok' => false, 'error' => 'Semester not found.'];
+        $gwa = trim($gwa);
+        if (!is_numeric($gwa) || (float)$gwa < 1 || (float)$gwa > 5) {
+            return ['ok' => false, 'error' => 'Enter the GWA from the Grades (1.00 to 5.00).'];
+        }
+        $pdo = Database::conn();
+        try {
+            $pdo->beginTransaction();
+            self::changeClaimStatus($term, 'verify', $adminId, [
+                'gwa' => round((float)$gwa, 2), 'remarks' => null,
+                'reviewed_by' => $adminId, 'reviewed_at' => date('Y-m-d H:i:s'),
+            ], 'GWA ' . number_format((float)$gwa, 2));
+            $pdo->prepare("UPDATE term_documents SET status = 'Verified', remarks = NULL WHERE term_id = ? AND purpose = 'claim'")->execute([$termId]);
+            $pdo->commit();
+        } catch (DomainException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+        self::notifyScholar($term, 'Claim verified',
+            "Your School ID and Grades for {$term['academic_year']} {$term['semester']} were verified. We will e-mail you when your cash is released.", 'success');
+        return ['ok' => true];
+    }
+
+    /** B7 Resubmit (remarks required): the chosen documents (default: both) must be uploaded again. */
+    public static function resubmitClaim(int $termId, string $remarks, array $types, int $adminId): array
+    {
+        $term = self::find($termId);
+        if (!$term) return ['ok' => false, 'error' => 'Semester not found.'];
+        $remarks = trim($remarks);
+        if ($remarks === '') return ['ok' => false, 'error' => 'Write what the scholar must re-upload.'];
+        $types = array_values(array_intersect($types, TERM_DOCUMENT_TYPES['claim'])) ?: TERM_DOCUMENT_TYPES['claim'];
+        $pdo = Database::conn();
+        try {
+            $pdo->beginTransaction();
+            self::changeClaimStatus($term, 'resubmit', $adminId, [
+                'remarks' => $remarks, 'reviewed_by' => $adminId, 'reviewed_at' => date('Y-m-d H:i:s'),
+            ], $remarks);
+            $mark = $pdo->prepare("UPDATE term_documents SET status = 'Resubmit', remarks = ? WHERE term_id = ? AND purpose = 'claim' AND type = ?");
+            foreach ($types as $t) $mark->execute([$remarks, $termId, $t]);
+            $pdo->commit();
+        } catch (DomainException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+        self::notifyScholar($term, 'Claim: please re-upload',
+            "Please re-upload your " . implode(' and ', $types) . " for {$term['academic_year']} {$term['semester']}.\nRemarks: $remarks", 'warning');
+        return ['ok' => true];
+    }
+
+    /**
+     * B8 Release cash for a Verified semester. Blocked when there is no budget for the program + A.Y. or the
+     * amount exceeds its remaining balance. One release per semester (unique term_id).
+     */
+    public static function release(int $termId, array $data, int $adminId): array
+    {
+        $term = self::find($termId);
+        if (!$term) return ['ok' => false, 'error' => 'Semester not found.'];
+        $amount = trim((string)($data['amount'] ?? ''));
+        $date = trim((string)($data['release_date'] ?? ''));
+        $method = (string)($data['payment_method'] ?? '');
+        $reference = trim((string)($data['reference_number'] ?? ''));
+        if (!is_numeric($amount) || (float)$amount <= 0) return ['ok' => false, 'error' => 'Amount must be more than 0.'];
+        $d = DateTime::createFromFormat('Y-m-d', $date);
+        if (!$d || $d->format('Y-m-d') !== $date || $date > date('Y-m-d')) return ['ok' => false, 'error' => 'Choose a valid release date (today or earlier).'];
+        if (!in_array($method, PAYMENT_METHODS, true)) return ['ok' => false, 'error' => 'Choose a payment method.'];
+        if ($method !== 'Cash' && $reference === '') return ['ok' => false, 'error' => "A reference number is required for $method."];
+
+        $pdo = Database::conn();
+        try {
+            $pdo->beginTransaction();
+            $blocker = Budget::releaseBlocker((int)$term['program_id'], $term['program_name'], $term['academic_year'], (float)$amount);
+            if ($blocker) throw new DomainException($blocker);
+            self::changeClaimStatus($term, 'release', $adminId, [], '₱' . number_format((float)$amount, 2) . " via $method");
+            $pdo->prepare(
+                "INSERT INTO scholarship_releases (release_code, scholar_id, term_id, amount, release_date, payment_method, reference_number, staff_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            )->execute([generate_code('REL'), (int)$term['scholar_id'], $termId, round((float)$amount, 2), $date, $method, $reference ?: null, $adminId]);
+            $releaseId = (int)$pdo->lastInsertId();
+            Budget::syncReleased((int)$term['program_id'], $term['academic_year']);
+            AuditLog::write('scholarship_released', 'scholarship_releases', $releaseId,
+                "Released ₱" . number_format((float)$amount, 2) . " to {$term['scholar_code']} for {$term['academic_year']} {$term['semester']}");
+            $pdo->commit();
+        } catch (DomainException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            return ['ok' => false, 'error' => $e->getMessage()];
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            if ((int)($e->errorInfo[1] ?? 0) === 1062) return ['ok' => false, 'error' => 'This semester was already released.'];
+            throw $e;
+        }
+        self::notifyScholar($term, 'Cash released',
+            '₱' . number_format((float)$amount, 2) . " for {$term['academic_year']} {$term['semester']} was released on "
+            . date('F j, Y', strtotime($date)) . " via $method" . ($reference ? " (reference no. $reference)" : '') . '.'
+            . "\nYou can now renew for the next semester on My Scholarship.", 'success');
+        return ['ok' => true];
+    }
+
     /**
      * Apply a claim transition (guarded by CLAIM_TRANSITIONS, conditional on the status the caller saw).
      * Throws DomainException with a plain message. Audit-logged.

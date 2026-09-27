@@ -1,63 +1,74 @@
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h4 class="fw-bold mb-0">Scholarship Releases</h4>
-    <p class="text-muted small mb-0"><?= number_format($total) ?> release(s)</p>
-  </div>
+<?php $peso = static fn($v) => '₱' . number_format((float)$v, 2); ?>
+<div class="mb-3">
+  <h4 class="fw-bold mb-0">Releases</h4>
+  <p class="text-muted small mb-0">Release cash for verified claims. Each semester can be released once, only against a budget for its program and academic year, and never above the remaining balance.</p>
 </div>
 
-<div class="row g-3 mb-3">
-  <div class="col-md-4"><div class="kpi-card"><div class="kpi-icon kpi-success"><i class="bi bi-cash-stack"></i></div><div><div class="kpi-value" style="font-size:1.3rem;">₱<?= number_format($totalAllTime, 2) ?></div><div class="kpi-label">Total Released</div></div></div></div>
-  <div class="col-md-4"><div class="kpi-card"><div class="kpi-icon kpi-info"><i class="bi bi-wallet2"></i></div><div><div class="kpi-value" style="font-size:1.3rem;">₱<?= number_format($budget, 2) ?></div><div class="kpi-label">Total Budget</div></div></div></div>
-  <div class="col-md-4"><div class="kpi-card"><div class="kpi-icon kpi-<?= $remaining < 0 ? 'danger' : 'primary' ?>"><i class="bi bi-piggy-bank"></i></div><div><div class="kpi-value" style="font-size:1.3rem;">₱<?= number_format($remaining, 2) ?></div><div class="kpi-label">Remaining Budget</div></div></div></div>
-</div>
-
-<form method="GET" action="<?= url('admin/releases') ?>" class="card border-0 shadow-sm mb-3">
-  <div class="card-body">
-    <div class="row g-2">
-      <div class="col-md-5"><input name="q" class="form-control" placeholder="Search scholar, code, reference…" value="<?= e($filters['q']) ?>"></div>
-      <div class="col-md-3">
-        <select name="year" class="form-select">
-          <option value="">All academic years</option>
-          <?php foreach ($years as $y): ?>
-            <option value="<?= e($y) ?>" <?= $filters['year'] === $y ? 'selected' : '' ?>><?= e($y) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div class="col-md-2 d-flex gap-2">
-        <button class="btn btn-primary flex-grow-1"><i class="bi bi-search"></i></button>
-        <a href="<?= url('admin/releases') ?>" class="btn btn-outline-secondary"><i class="bi bi-x"></i></a>
-      </div>
-    </div>
-  </div>
-</form>
-
-<div class="card border-0 shadow-sm">
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white d-flex justify-content-between"><h6 class="mb-0">Ready to release</h6><span class="badge bg-primary"><?= count($ready) ?></span></div>
   <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <thead class="table-light">
-        <tr><th>Release ID</th><th>Scholar</th><th>A.Y. / Sem</th><th>Amount</th><th>Date</th><th>Method</th><th>Staff</th></tr>
-      </thead>
+    <table class="table mb-0 align-middle">
+      <thead class="table-light"><tr><th>Scholar</th><th>Semester</th><th>Budget remaining</th><th style="min-width:560px">Release</th></tr></thead>
       <tbody>
-        <?php if (!$releases): ?><tr><td colspan="7" class="text-center text-muted py-4">No releases.</td></tr><?php endif; ?>
-        <?php foreach ($releases as $r): ?>
+        <?php if (!$ready): ?><tr><td colspan="4" class="text-center text-muted py-4">No verified claims waiting.</td></tr><?php endif; ?>
+        <?php foreach ($ready as $t): ?>
           <tr>
-            <td><code><?= e($r['release_code']) ?></code></td>
-            <td><div class="fw-semibold"><?= e($r['scholar_name']) ?></div><small class="text-muted"><code><?= e($r['scholar_code']) ?></code></small></td>
-            <td><?= e($r['academic_year']) ?><br><small class="text-muted"><?= e($r['semester']) ?></small></td>
-            <td class="fw-bold text-success">₱<?= number_format((float)$r['amount'], 2) ?></td>
-            <td><?= e(date('M d, Y', strtotime($r['release_date']))) ?></td>
-            <td><?= e($r['payment_method']) ?></td>
-            <td><small><?= e($r['staff_name'] ?? '—') ?></small></td>
+            <td><div class="fw-semibold"><?= e($t['full_name']) ?></div><code class="small"><?= e($t['scholar_code']) ?></code> · <small><?= e($t['program_name']) ?></small></td>
+            <td><?= e($t['academic_year'] . ' ' . $t['semester']) ?><br><small class="text-muted">GWA <?= $t['gwa'] !== null ? e(number_format((float)$t['gwa'], 2)) : '—' ?></small></td>
+            <td><?= $t['budget_remaining'] !== null ? e($peso($t['budget_remaining'])) : '<span class="text-danger">No budget for ' . e($t['academic_year']) . '</span>' ?></td>
+            <td>
+              <form method="POST" action="<?= url('admin/release-save') ?>" class="row g-1 align-items-center"
+                    onsubmit="return confirm('Record this release? The scholar will be notified.');">
+                <?= csrf_field() ?><input type="hidden" name="term_id" value="<?= (int)$t['id'] ?>">
+                <div class="col-3"><input type="number" name="amount" class="form-control form-control-sm" min="0.01" step="0.01" value="<?= e((string)$t['amount_per_semester']) ?>" required title="Amount (₱) — pre-filled with the program's amount per semester"></div>
+                <div class="col-3"><input type="date" name="release_date" class="form-control form-control-sm" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>" required></div>
+                <div class="col-2">
+                  <select name="payment_method" class="form-select form-select-sm"><?php foreach (PAYMENT_METHODS as $m): ?><option><?= e($m) ?></option><?php endforeach; ?></select>
+                </div>
+                <div class="col-2"><input name="reference_number" class="form-control form-control-sm" placeholder="Ref. no." maxlength="100"></div>
+                <div class="col-2"><button class="btn btn-sm btn-success w-100" <?= $t['budget_remaining'] === null ? 'disabled title="Create a budget first"' : '' ?>>Release</button></div>
+              </form>
+            </td>
           </tr>
         <?php endforeach; ?>
       </tbody>
     </table>
   </div>
-  <?php if ($pages > 1): ?>
-    <div class="card-footer bg-white"><ul class="pagination mb-0 justify-content-center">
-      <?php for ($i=1;$i<=$pages;$i++): $qs = http_build_query(array_merge($filters,['page'=>$i])); ?>
-        <li class="page-item <?= $i===$page?'active':'' ?>"><a class="page-link" href="<?= url('admin/releases&' . $qs) ?>"><?= $i ?></a></li>
-      <?php endfor; ?>
-    </ul></div>
-  <?php endif; ?>
+  <div class="card-footer bg-white small text-muted">A reference number is required for GCash, Bank and Check.</div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+  <h5 class="fw-semibold mb-0">Released</h5>
+  <form method="GET" action="<?= url('admin/releases') ?>" class="d-flex gap-2">
+    <select name="program_id" class="form-select form-select-sm">
+      <option value="">All programs</option>
+      <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>" <?= $filters['program_id'] === (string)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?></option><?php endforeach; ?>
+    </select>
+    <select name="academic_year" class="form-select form-select-sm">
+      <option value="">All years</option>
+      <?php foreach ($years as $y): ?><option value="<?= e($y) ?>" <?= $filters['academic_year'] === $y ? 'selected' : '' ?>><?= e($y) ?></option><?php endforeach; ?>
+    </select>
+    <button class="btn btn-sm btn-outline-primary">Filter</button>
+  </form>
+</div>
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle">
+      <thead class="table-light"><tr><th>Date</th><th>Code</th><th>Scholar</th><th>Semester</th><th>Amount</th><th>Method / reference</th><th>By</th></tr></thead>
+      <tbody>
+        <?php if (!$history): ?><tr><td colspan="7" class="text-center text-muted py-3">No releases.</td></tr><?php endif; ?>
+        <?php foreach ($history as $r): ?>
+          <tr>
+            <td><?= e(date('M d, Y', strtotime($r['release_date']))) ?></td><td><code><?= e($r['release_code']) ?></code></td>
+            <td><?= e($r['full_name']) ?> <small class="text-muted"><?= e($r['program_name']) ?></small></td>
+            <td><?= e($r['academic_year'] . ' ' . $r['semester']) ?></td>
+            <td><?= e($peso($r['amount'])) ?></td>
+            <td><?= e($r['payment_method']) ?><?= $r['reference_number'] ? ' · ' . e($r['reference_number']) : '' ?></td>
+            <td><small><?= e($r['released_by'] ?? '—') ?></small></td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+      <tfoot><tr class="table-light"><th colspan="4">Total shown (sum of the rows above)</th><th><?= e($peso($historyTotal)) ?></th><th colspan="2"></th></tr></tfoot>
+    </table>
+  </div>
 </div>
