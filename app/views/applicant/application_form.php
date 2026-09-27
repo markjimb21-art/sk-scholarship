@@ -1,40 +1,45 @@
 <?php
 $app = $app ?? null;
-$editable = $editable ?? true;
+$editable = $editable ?? false;
 $documents = $documents ?? [];
 $docByType = [];
 foreach ($documents as $d) { $docByType[$d['document_type']] = $d; }
 $docsUploaded = 0;
 foreach (DOCUMENT_TYPES as $dt) { if (!empty($docByType[$dt]['file_path'])) $docsUploaded++; }
 $updatedAt = $app['updated_at'] ?? null;
+$docLabels = ['Not Submitted' => 'Missing', 'Submitted' => 'Uploaded', 'Verified' => 'Verified'];
+$program = $app ?: $openProgram;
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <div>
     <h4 class="fw-bold mb-1">Scholarship Application</h4>
-    <?php if (!empty($app['program_name'])): ?>
-      <p class="small mb-1"><strong><?= e($app['program_name']) ?></strong> · applications accepted
-        <?= e(date('M d, Y', strtotime($app['application_start']))) ?> – <?= e(date('M d, Y', strtotime($app['application_end']))) ?></p>
+    <?php if ($program): ?>
+      <p class="small mb-1"><strong><?= e($program['program_name']) ?></strong> · applications accepted
+        <?= e(date('M d, Y', strtotime($program['application_start']))) ?> – <?= e(date('M d, Y', strtotime($program['application_end']))) ?></p>
     <?php endif; ?>
-    <p class="text-muted small mb-1">Your information is saved automatically as you complete the form.</p>
+    <?php if ($editable): ?>
+      <p class="text-muted small mb-1">Your information is saved automatically as you fill in the form.</p>
+    <?php endif; ?>
     <span id="autosaveIndicator" class="autosave-indicator d-none"></span>
   </div>
   <?php if ($app): ?>
-    <span class="badge bg-secondary px-3 py-2"><?= e($app['status']) ?></span>
+    <span class="badge bg-<?= e(APP_STATUS_COLORS[$app['status']] ?? 'secondary') ?> px-3 py-2"><?= e(Application::label($app['status'])) ?></span>
   <?php endif; ?>
 </div>
 
-<?php if ($app && $app['status'] === 'Incomplete'): ?>
+<?php if ($app && $app['status'] === 'Returned'): ?>
   <div class="alert alert-warning">
-    <h6 class="fw-semibold mb-2"><i class="bi bi-exclamation-triangle"></i> Application Status: INCOMPLETE</h6>
-    <p class="mb-1"><strong>SK Office Remarks:</strong></p>
-    <p class="mb-0"><?= nl2br(e($app['review_remarks'] ?? 'Please review and correct your application.')) ?></p>
+    <h6 class="fw-semibold mb-2"><i class="bi bi-exclamation-triangle"></i> Returned for correction</h6>
+    <p class="mb-1">The SK office asked you to fix these items, then submit again:</p>
+    <p class="mb-0 fw-semibold"><?= nl2br(e($app['review_remarks'] ?? '')) ?></p>
   </div>
-  <div class="alert alert-info small">
-    Your application was marked incomplete by the SK office. Please review the remarks above and update the required information, then resubmit.
+<?php elseif (!$app && !$editable): ?>
+  <div class="alert alert-secondary">
+    <i class="bi bi-info-circle"></i> No scholarship program is accepting applications right now, so the form is read-only.
   </div>
-<?php elseif (!$editable && $app): ?>
+<?php elseif ($app && !$editable): ?>
   <div class="alert alert-info">
-    <i class="bi bi-info-circle"></i> Your application has been submitted and is currently read-only.
+    <i class="bi bi-info-circle"></i> This application was submitted and is read-only. See your <a href="<?= url('applicant/dashboard') ?>">dashboard</a> for what happens next.
   </div>
 <?php endif; ?>
 
@@ -70,7 +75,7 @@ $updatedAt = $app['updated_at'] ?? null;
          data-csrf="<?= e(csrf_token()) ?>">
 
       <!-- STEP 1: PERSONAL -->
-      <form method="POST" action="<?= url('applicant/application/save') ?>" class="form-step" data-step="personal">
+      <form class="form-step" onsubmit="return false;" data-step="personal">
         <?= csrf_field() ?>
         <input type="hidden" name="step" value="personal">
         <h5 class="fw-semibold mb-3">I. Personal Information</h5>
@@ -101,16 +106,8 @@ $updatedAt = $app['updated_at'] ?? null;
           </div>
           <div class="col-md-2">
             <label class="form-label">Age</label>
-            <input name="age" class="form-control bg-light" readonly data-target="age"
-                   value="<?= e((string)($personal['age'] ?? '')) ?>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Civil Status *</label>
-            <select name="civil_status" class="form-select" required>
-              <?php foreach (['Single','Married','Widowed','Separated','Annulled'] as $cs): ?>
-                <option <?= ($personal['civil_status'] ?? '') === $cs ? 'selected' : '' ?>><?= $cs ?></option>
-              <?php endforeach; ?>
-            </select>
+            <input class="form-control bg-light" readonly data-target="age" tabindex="-1"
+                   value="<?= !empty($personal['date_of_birth']) ? (int)calculate_age($personal['date_of_birth']) : '' ?>">
           </div>
 
           <div class="col-12">
@@ -151,27 +148,6 @@ $updatedAt = $app['updated_at'] ?? null;
             <input class="form-control bg-light" readonly value="<?= e(Auth::user()['email']) ?>">
             <div class="form-text">Automatically linked to your registered email.</div>
           </div>
-
-          <div class="col-md-2">
-            <label class="form-label">Height (cm)</label>
-            <input type="number" step="0.1" name="height_cm" class="form-control" value="<?= e((string)($personal['height_cm'] ?? '')) ?>">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">Weight (kg)</label>
-            <input type="number" step="0.1" name="weight_kg" class="form-control" value="<?= e((string)($personal['weight_kg'] ?? '')) ?>">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">Blood Type</label>
-            <input name="blood_type" class="form-control" value="<?= e($personal['blood_type'] ?? '') ?>">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Religion</label>
-            <input name="religion" class="form-control" data-uppercase value="<?= e($personal['religion'] ?? '') ?>">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Citizenship</label>
-            <input name="citizenship" class="form-control" data-uppercase value="<?= e($personal['citizenship'] ?? 'Filipino') ?>">
-          </div>
         </div>
         </fieldset>
 
@@ -181,7 +157,7 @@ $updatedAt = $app['updated_at'] ?? null;
       </form>
 
       <!-- STEP 2: EDUCATION -->
-      <form method="POST" action="<?= url('applicant/application/save') ?>" class="form-step" data-step="education">
+      <form class="form-step" onsubmit="return false;" data-step="education">
         <?= csrf_field() ?>
         <input type="hidden" name="step" value="education">
         <h5 class="fw-semibold mb-3">II. Education</h5>
@@ -257,7 +233,7 @@ $updatedAt = $app['updated_at'] ?? null;
       </form>
 
       <!-- STEP 3: FAMILY -->
-      <form method="POST" action="<?= url('applicant/application/save') ?>" class="form-step" data-step="family">
+      <form class="form-step" onsubmit="return false;" data-step="family">
         <?= csrf_field() ?>
         <input type="hidden" name="step" value="family">
         <h5 class="fw-semibold mb-3">III. Family Background</h5>
@@ -343,12 +319,7 @@ $updatedAt = $app['updated_at'] ?? null;
 
         <div class="row g-3">
           <div class="col-md-4">
-            <label class="form-label">Combined Parental Income (auto)</label>
-            <input class="form-control bg-light" readonly data-target="combined_income"
-                   value="<?= e(number_format((float)($family['combined_income'] ?? 0), 2)) ?>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Total Family Income (auto)</label>
+            <label class="form-label">Total Family Income (father + mother, auto)</label>
             <input class="form-control bg-light" readonly data-target="total_family_income"
                    value="<?= e(number_format((float)($family['total_family_income'] ?? 0), 2)) ?>">
           </div>
@@ -385,7 +356,7 @@ $updatedAt = $app['updated_at'] ?? null;
               <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-2">
                   <h6 class="fw-semibold mb-0"><i class="bi bi-file-earmark-text me-1 text-primary"></i><?= e($dt) ?> <span class="text-danger">*</span></h6>
-                  <span class="doc-pill doc-<?= e(str_replace(' ','-',$status)) ?>" data-doc-status-pill><?= e($status) ?></span>
+                  <span class="doc-pill doc-<?= e(str_replace(' ','-',$status)) ?>" data-doc-status-pill><?= e($docLabels[$status] ?? $status) ?></span>
                 </div>
 
                 <?php if ($editable): ?>
@@ -452,16 +423,16 @@ $updatedAt = $app['updated_at'] ?? null;
         </div>
         <?php endif; ?>
 
-        <?php if ($app && $app['status'] === 'Incomplete' && !empty($app['review_remarks'])): ?>
+        <?php if ($app && $app['status'] === 'Returned' && !empty($app['review_remarks'])): ?>
         <div class="alert alert-warning">
-          <strong>SK Office Remarks:</strong> <?= nl2br(e($app['review_remarks'])) ?>
+          <strong>Items to correct:</strong> <?= nl2br(e($app['review_remarks'])) ?>
         </div>
         <?php endif; ?>
 
         <div class="mb-3">
           <p class="mb-1"><strong>Applicant:</strong> <?= e(Auth::user()['full_name']) ?></p>
           <p class="mb-1"><strong>Email:</strong> <?= e(Auth::user()['email']) ?></p>
-          <p class="mb-1"><strong>Application Code:</strong> <?= e($applicant['application_code']) ?></p>
+          <p class="mb-1"><strong>Application Code:</strong> <?= e($app['application_code'] ?? 'Assigned when you start') ?></p>
         </div>
 
         <div class="row g-3 mb-3">
@@ -491,6 +462,14 @@ $updatedAt = $app['updated_at'] ?? null;
           </div>
         </div>
 
+        <?php if ($editable && $completeness && !$completeness['complete']): ?>
+        <div class="alert alert-light border small">
+          <strong>Still missing when this page was loaded:</strong>
+          <ul class="mb-1"><?php foreach ($completeness['missing'] as $m): ?><li><?= e($m) ?></li><?php endforeach; ?></ul>
+          The same check runs again when you press Submit.
+        </div>
+        <?php endif; ?>
+
         <?php if ($editable): ?>
         <form method="POST" action="<?= url('applicant/application/submit') ?>">
           <?= csrf_field() ?>
@@ -504,14 +483,14 @@ $updatedAt = $app['updated_at'] ?? null;
           <div class="d-flex justify-content-between">
             <button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Back</button>
             <button class="btn btn-success px-4">
-              <i class="bi bi-send-check"></i> <?= ($app && $app['status'] === 'Incomplete') ? 'Resubmit Application' : 'Submit Application' ?>
+              <i class="bi bi-send-check"></i> <?= ($app && $app['status'] === 'Returned') ? 'Resubmit Application' : 'Submit Application' ?>
             </button>
           </div>
         </form>
         <?php else: ?>
         <div class="d-flex justify-content-between">
           <button type="button" class="btn btn-outline-secondary" data-prev><i class="bi bi-arrow-left"></i> Back</button>
-          <span class="badge bg-secondary px-3 py-2 align-self-center"><?= e($app['status'] ?? '') ?></span>
+          <span class="badge bg-secondary px-3 py-2 align-self-center"><?= e($app ? Application::label($app['status']) : 'Closed') ?></span>
         </div>
         <?php endif; ?>
       </div>

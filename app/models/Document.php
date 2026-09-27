@@ -1,17 +1,17 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * Application documents (A2) plus the private file storage shared with semester documents (A8/A9):
+ * validated uploads with random names, path resolution restricted to the private stores, and streaming.
+ */
 final class Document
 {
     public static function byApplication(int $applicationId): array
     {
         $stmt = Database::conn()->prepare(
-            "SELECT d.*, u.full_name AS reviewer_name
-             FROM documents d
-             LEFT JOIN users u ON u.id = d.reviewed_by
-             WHERE d.application_id = ?
-             ORDER BY FIELD(d.document_type,
-                'Profile Picture','Certificate of Residency','Form 138','Enrollment Form','School ID')"
+            "SELECT * FROM documents WHERE application_id = ?
+             ORDER BY FIELD(document_type, 'Certificate of Residency','Form 138 / Grades','Enrollment Form','School ID','2x2 Photo')"
         );
         $stmt->execute([$applicationId]);
         return $stmt->fetchAll();
@@ -24,41 +24,77 @@ final class Document
         return $stmt->fetch() ?: null;
     }
 
-    public static function verifiedCount(int $applicationId): int
+    /** Names of the required document types that have no uploaded file yet. */
+    public static function missingTypes(int $applicationId): array
     {
-        $stmt = Database::conn()->prepare(
-            "SELECT COUNT(*) FROM documents WHERE application_id = ? AND status = 'Verified'"
-        );
-        $stmt->execute([$applicationId]);
-        return (int)$stmt->fetchColumn();
+        $uploaded = [];
+        foreach (self::byApplication($applicationId) as $d) {
+            if ($d['file_path'] !== '') $uploaded[] = $d['document_type'];
+        }
+        return array_values(array_diff(DOCUMENT_TYPES, $uploaded));
     }
 
-    public static function allVerified(int $applicationId): bool
+    /** Screening qualified the application: every uploaded document counts as verified. */
+    public static function markAllVerified(int $applicationId): void
     {
-        return self::verifiedCount($applicationId) >= count(DOCUMENT_TYPES);
-    }
-
-    public static function updateStatus(int $docId, string $status, int $reviewerId, ?string $remarks = null): void
-    {
-        $old = self::find($docId);
-        Database::conn()->prepare(
-            "UPDATE documents
-             SET status = ?, reviewed_at = NOW(), reviewed_by = ?, remarks = ?
-             WHERE id = ?"
-        )->execute([$status, $reviewerId, $remarks, $docId]);
-
-        AuditLog::write('document_' . strtolower(str_replace(' ', '_', $status)),
-            'documents', $docId,
-            "Document {$old['document_type']} set to $status",
-            ['status' => $old['status'] ?? null],
-            ['status' => $status, 'remarks' => $remarks]
-        );
+        Database::conn()->prepare("UPDATE documents SET status = 'Verified' WHERE application_id = ? AND file_path <> ''")
+            ->execute([$applicationId]);
     }
 
     /**
-     * Resolve a stored relative path to a real file, ONLY if it lies inside an approved document root:
-     *   storage/documents/...  -> DOCUMENT_PATH   (private store, outside the web root)
-     *   uploads/documents/...  -> UPLOAD_PATH/documents   (legacy files uploaded before the private store existed)
+     * Validate and store one uploaded file ($_FILES entry) under $baseDir/$subDir with a random name.
+     * Type is detected from the file CONTENT; the client-supplied name/extension/type are never trusted.
+     * Returns ['ok'=>true,'rel'=>stored path,'original'=>clean name,'size'=>int,'mime'=>string] or ['ok'=>false,'error'=>string].
+     */
+    public static function storeUpload(array $file, string $baseDir, string $relPrefix, string $subDir): array
+    {
+        $fail = static fn(string $m): array => ['ok' => false, 'error' => $m];
+        if (empty($file['name']) || is_array($file['name'])) return $fail('Please choose a file.');
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) return $fail('Upload error.');
+
+        $size = filesize($file['tmp_name']);
+        if ($size === false || $size <= 0) return $fail('The uploaded file is empty.');
+        if ($size > MAX_FILE_SIZE) return $fail('File too large (max 5MB).');
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+        if (!in_array($mime, ALLOWED_MIME, true)) return $fail('Only PDF, JPG, or PNG allowed.');
+
+        // Structural sanity check so the bytes really are the claimed format.
+        if ($mime === 'application/pdf') {
+            $valid = file_get_contents($file['tmp_name'], false, null, 0, 5) === '%PDF-';
+        } else {
+            $info = getimagesize($file['tmp_name']);
+            $valid = $info !== false && in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true);
+        }
+        if (!$valid) return $fail('The file is not a valid PDF, JPG, or PNG.');
+
+        $ext = match ($mime) { 'application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png' };
+        $dir = $baseDir . '/' . $subDir;
+        if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
+            error_log('Cannot create document directory: ' . $dir);
+            return $fail('Cannot save file.');
+        }
+        $filename = bin2hex(random_bytes(16)) . '.' . $ext;
+        if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $filename)) return $fail('Cannot save file.');
+        chmod($dir . '/' . $filename, 0640);
+
+        $original = mb_substr((string)preg_replace('/[\x00-\x1F\x7F]/u', '', basename(str_replace('\\', '/', (string)$file['name']))), 0, 200);
+        return ['ok' => true, 'rel' => $relPrefix . $subDir . '/' . $filename, 'original' => $original, 'size' => $size, 'mime' => $mime];
+    }
+
+    /** Delete a stored file (after it was replaced). Silently ignores anything outside the private stores. */
+    public static function deleteFile(?string $rel): void
+    {
+        $path = self::absolutePath($rel);
+        if ($path !== null && !unlink($path)) error_log('Could not delete replaced document: ' . $rel);
+    }
+
+    /**
+     * Resolve a stored relative path to an absolute path inside one of the private stores:
+     *   storage/documents/...       -> DOCUMENT_PATH       (application documents)
+     *   storage/term-documents/...  -> TERM_DOCUMENT_PATH  (claim and renewal documents)
      * Returns null for anything else (traversal, symlink escape, missing file, unknown prefix).
      */
     public static function absolutePath(?string $rel): ?string
@@ -67,15 +103,13 @@ final class Document
         $rel = str_replace('\\', '/', $rel);
         if (str_contains($rel, "\0") || preg_match('#(^|/)\.\.(/|$)#', $rel)) return null;
 
-        if (str_starts_with($rel, 'storage/documents/')) {
-            $base = DOCUMENT_PATH;
-            $sub  = substr($rel, strlen('storage/documents/'));
-        } elseif (str_starts_with($rel, 'uploads/documents/')) {
-            $base = UPLOAD_PATH . '/documents';
-            $sub  = substr($rel, strlen('uploads/documents/'));
-        } else {
-            return null;
+        $stores = ['storage/documents/' => DOCUMENT_PATH, 'storage/term-documents/' => TERM_DOCUMENT_PATH];
+        $base = null;
+        $sub = '';
+        foreach ($stores as $prefix => $dir) {
+            if (str_starts_with($rel, $prefix)) { $base = $dir; $sub = substr($rel, strlen($prefix)); break; }
         }
+        if ($base === null) return null;
 
         $baseReal = realpath($base);
         if ($baseReal === false) return null;
@@ -85,10 +119,13 @@ final class Document
         return $real;
     }
 
-    /** Stream a document to the browser. The caller MUST have authorized access to $doc already. */
-    public static function send(array $doc, bool $download = false): void
+    /**
+     * Stream a stored file to the browser. The caller MUST have authorized access already.
+     * $label is used for the audit entry (e.g. "School ID"), $entityType/$entityId identify the row.
+     */
+    public static function send(string $filePath, ?string $originalName, string $label, string $entityType, int $entityId, bool $download = false): void
     {
-        $path = self::absolutePath($doc['file_path'] ?? '');
+        $path = self::absolutePath($filePath);
         if ($path === null) { http_response_code(404); die('Document not found.'); }
 
         // Trust the bytes on disk, not the DB value or the client-supplied name.
@@ -101,13 +138,13 @@ final class Document
             die('Unsupported document type.');
         }
 
-        $name = preg_replace('/[^A-Za-z0-9._ -]+/', '_', basename(str_replace('\\', '/', (string)($doc['original_filename'] ?? ''))));
+        $name = preg_replace('/[^A-Za-z0-9._ -]+/', '_', basename(str_replace('\\', '/', (string)$originalName)));
         $name = trim((string)$name, '._ ');
         if ($name === '') $name = 'document';
         if (strtolower(pathinfo($name, PATHINFO_EXTENSION)) !== $ext) $name .= '.' . $ext;
 
-        AuditLog::write($download ? 'document_downloaded' : 'document_viewed', 'documents', (int)$doc['id'],
-            ($download ? 'Downloaded ' : 'Viewed ') . ($doc['document_type'] ?? 'document'));
+        AuditLog::write($download ? 'document_downloaded' : 'document_viewed', $entityType, $entityId,
+            ($download ? 'Downloaded ' : 'Viewed ') . $label);
 
         while (ob_get_level() > 0) ob_end_clean();
         header('Content-Type: ' . $mime);
@@ -119,10 +156,10 @@ final class Document
         exit;
     }
 
-    public static function pendingCount(): int
+    /** Stream an application document (row from `documents`). */
+    public static function sendApplicationDocument(array $doc, bool $download = false): void
     {
-        return (int)Database::conn()
-            ->query("SELECT COUNT(*) FROM documents WHERE status IN ('Submitted','Under Review')")
-            ->fetchColumn();
+        self::send((string)$doc['file_path'], $doc['original_filename'] ?? null, (string)$doc['document_type'],
+            'documents', (int)$doc['id'], $download);
     }
 }

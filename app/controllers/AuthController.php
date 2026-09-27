@@ -249,16 +249,7 @@ final class AuthController
     }
 
     public function resetPassword(): void {
-        $token = $_GET['token'] ?? '';
-
-        // Legacy path: a previously-emailed reset LINK (kept working for any link already sent;
-        // new "forgot password" requests no longer generate one — see forgotPassword() above).
-        if (is_string($token) && $token !== '') {
-            $this->resetPasswordViaToken($token);
-            return;
-        }
-
-        // Current path: OTP-verified in this session.
+        // Only path: the OTP (verify-reset-otp) must have been verified in this session.
         $userId = (int)($_SESSION['otp_reset_verified_for'] ?? 0);
         if ($userId === 0) {
             flash('danger', 'Please verify your reset code first.');
@@ -281,7 +272,7 @@ final class AuthController
 
             $pdo = Database::conn();
             $pdo->prepare(
-                "UPDATE users SET password_hash = ?, reset_token = NULL, reset_expires = NULL,
+                "UPDATE users SET password_hash = ?,
                  failed_attempts = 0, locked_until = NULL WHERE id = ?"
             )->execute([password_hash($pw, PASSWORD_DEFAULT), $userId]);
 
@@ -304,49 +295,6 @@ final class AuthController
                 );
             }
 
-            flash('success', 'Password reset successful. Please log in.');
-            redirect('login');
-        }
-
-        require VIEW_PATH . '/auth/reset_password.php';
-    }
-
-    /** Legacy reset-link flow (SHA-256-hashed token), preserved for any link already sent before OTP existed. */
-    private function resetPasswordViaToken(string $token): void {
-        $pdo = Database::conn();
-        $user = null;
-        if (preg_match('/^[0-9a-f]{64}$/', $token) === 1) {
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE reset_token = ? AND reset_expires > NOW() AND is_active = 1 LIMIT 1");
-            $stmt->execute([hash('sha256', $token)]);
-            $user = $stmt->fetch();
-        }
-        if (!$user) {
-            flash('danger', 'Reset link is invalid or expired.');
-            redirect('login');
-        }
-
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            verify_csrf();
-            $pw = (string)($_POST['password'] ?? '');
-            $cpw = (string)($_POST['confirm_password'] ?? '');
-            if (mb_strlen($pw) < PASSWORD_MIN_LENGTH) {
-                flash('danger', 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.');
-                redirect('reset-password?token=' . urlencode($token));
-            }
-            if ($pw !== $cpw) {
-                flash('danger', 'Passwords do not match.');
-                redirect('reset-password?token=' . urlencode($token));
-            }
-            $upd = $pdo->prepare(
-                "UPDATE users SET password_hash = ?, reset_token = NULL, reset_expires = NULL, failed_attempts = 0, locked_until = NULL
-                 WHERE id = ? AND reset_token = ? AND reset_expires > NOW()"
-            );
-            $upd->execute([password_hash($pw, PASSWORD_DEFAULT), $user['id'], hash('sha256', $token)]);
-            if ($upd->rowCount() !== 1) {
-                flash('danger', 'Reset link is invalid or expired.');
-                redirect('login');
-            }
-            AuditLog::write('password_reset_completed', 'users', (int)$user['id'], 'Password reset via legacy link');
             flash('success', 'Password reset successful. Please log in.');
             redirect('login');
         }

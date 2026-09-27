@@ -4,9 +4,9 @@ declare(strict_types=1);
 // Paths
 define('BASE_PATH', dirname(__DIR__));
 define('PUBLIC_PATH', BASE_PATH . '/public');
-define('UPLOAD_PATH', PUBLIC_PATH . '/uploads');        // LEGACY location of old documents (read-only fallback)
 define('STORAGE_PATH', BASE_PATH . '/storage');
-define('DOCUMENT_PATH', STORAGE_PATH . '/documents');   // PRIVATE document store, outside the web root
+define('DOCUMENT_PATH', STORAGE_PATH . '/documents');            // PRIVATE application documents, outside the web root
+define('TERM_DOCUMENT_PATH', STORAGE_PATH . '/term-documents');  // PRIVATE claim/renewal documents, outside the web root
 define('VIEW_PATH', BASE_PATH . '/app/views');
 
 // Optional .env file (KEY=VALUE). Real environment variables always win.
@@ -41,7 +41,6 @@ define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_MINUTES', 15);
 define('CSRF_TOKEN_NAME', '_csrf');
 define('PASSWORD_MIN_LENGTH', 8);
-define('RESET_TOKEN_TTL_MINUTES', 60);
 
 // File uploads
 define('MAX_FILE_SIZE', 5 * 1024 * 1024);

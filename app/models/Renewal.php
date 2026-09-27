@@ -1,0 +1,95 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * Renewal requests (A9 / B9): made from the current semester once its cash was Released; approving one
+ * opens the next semester. Documents are stored as term_documents (purpose 'renewal') of the FROM semester.
+ */
+final class Renewal
+{
+    /** Renewal status map. 'submit' from null = a brand-new request. */
+    public const TRANSITIONS = [
+        'submit'   => ['from' => [null, 'Resubmit'], 'to' => 'Submitted'],
+        'approve'  => ['from' => ['Submitted'],      'to' => 'Approved'],
+        'resubmit' => ['from' => ['Submitted'],      'to' => 'Resubmit'],
+    ];
+
+    public static function can(string $action, ?string $status): bool
+    {
+        return in_array($status, self::TRANSITIONS[$action]['from'] ?? [], true);
+    }
+
+    public static function find(int $id): ?array
+    {
+        $stmt = Database::conn()->prepare(
+            "SELECT rr.*, s.scholar_code, s.status AS scholar_status, s.program_id,
+                    sp.program_name, u.id AS user_id, u.full_name, u.email,
+                    ft.academic_year AS from_academic_year, ft.semester AS from_semester, ft.gwa AS from_gwa
+             FROM renewal_requests rr
+             JOIN scholars s ON s.id = rr.scholar_id
+             JOIN scholarship_programs sp ON sp.id = s.program_id
+             JOIN applicants ap ON ap.id = s.applicant_id
+             JOIN users u ON u.id = ap.user_id
+             LEFT JOIN scholar_terms ft ON ft.id = rr.from_term_id
+             WHERE rr.id = ? LIMIT 1"
+        );
+        $stmt->execute([$id]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /** The renewal request made from a semester, if any. */
+    public static function forTerm(int $termId): ?array
+    {
+        $stmt = Database::conn()->prepare("SELECT id FROM renewal_requests WHERE from_term_id = ? LIMIT 1");
+        $stmt->execute([$termId]);
+        $id = $stmt->fetchColumn();
+        return $id ? self::find((int)$id) : null;
+    }
+
+    /**
+     * May the scholar upload renewal documents / submit a renewal from this semester?
+     * Active scholar, this is the current semester, its cash was Released, and no request is pending/approved.
+     */
+    public static function editable(array $term): bool
+    {
+        if ($term['scholar_status'] !== 'Active' || $term['claim_status'] !== 'Released' || !Term::isCurrent($term)) return false;
+        $req = self::forTerm((int)$term['id']);
+        return self::can('submit', $req['status'] ?? null);
+    }
+
+    /** A9: submit (or resubmit) the renewal for the next semester. */
+    public static function submit(array $term, int $userId): array
+    {
+        if (!self::editable($term)) return ['ok' => false, 'error' => 'A renewal can’t be submitted right now.'];
+        if (!Term::documentsReady((int)$term['id'], 'renewal')) {
+            return ['ok' => false, 'error' => 'Upload both your Enrollment Form and School ID first.'];
+        }
+
+        $pdo = Database::conn();
+        $req = self::forTerm((int)$term['id']);
+        $now = date('Y-m-d H:i:s');
+        if ($req) {
+            $stmt = $pdo->prepare("UPDATE renewal_requests SET status = 'Submitted', submitted_at = ? WHERE id = ? AND status = 'Resubmit'");
+            $stmt->execute([$now, $req['id']]);
+            if ($stmt->rowCount() !== 1) return ['ok' => false, 'error' => 'This renewal was changed by someone else. Please reload the page.'];
+            $id = (int)$req['id'];
+            $target = ['academic_year' => $req['academic_year'], 'semester' => $req['semester']];
+        } else {
+            $target = Term::nextSemester($term['academic_year'], $term['semester']);
+            try {
+                $pdo->prepare(
+                    "INSERT INTO renewal_requests (scholar_id, from_term_id, academic_year, semester, status, submitted_at)
+                     VALUES (?, ?, ?, ?, 'Submitted', ?)"
+                )->execute([(int)$term['scholar_id'], (int)$term['id'], $target['academic_year'], $target['semester'], $now]);
+            } catch (PDOException $e) {
+                if ((int)($e->errorInfo[1] ?? 0) === 1062) return ['ok' => false, 'error' => 'A renewal for that semester already exists.'];
+                throw $e;
+            }
+            $id = (int)$pdo->lastInsertId();
+        }
+        AuditLog::write('renewal_submit', 'renewal_requests', $id,
+            "Renewal requested for {$target['academic_year']} {$target['semester']}",
+            ['status' => $req['status'] ?? null], ['status' => 'Submitted', 'by' => $userId]);
+        return ['ok' => true];
+    }
+}

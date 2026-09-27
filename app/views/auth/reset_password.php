@@ -10,7 +10,7 @@
         <?php foreach (get_flashes() as $f): ?>
           <div class="alert alert-<?= e($f['type']) ?> py-2 small"><?= e($f['message']) ?></div>
         <?php endforeach; ?>
-        <form method="POST" action="<?= e(url('reset-password' . (isset($_GET['token']) ? '?token=' . urlencode((string)$_GET['token']) : ''))) ?>">
+        <form method="POST" action="<?= e(url('reset-password')) ?>">
           <?= csrf_field() ?>
           <div class="mb-3">
             <label class="form-label">New Password</label>

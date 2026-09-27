@@ -22,8 +22,6 @@ $item = function (string $route, string $icon, string $label) use ($current) {
       <?php
         $item('applicant/dashboard', 'bi-speedometer2', 'Dashboard');
         $item('applicant/application', 'bi-file-earmark-text', 'My Application');
-        $item('applicant/documents', 'bi-folder2-open', 'My Documents');
-        $item('applicant/interview', 'bi-calendar-event', 'My Interview');
         $item('applicant/scholarship', 'bi-award', 'My Scholarship');
         $item('applicant/notifications', 'bi-bell', 'Notifications');
         $item('applicant/profile', 'bi-person-circle', 'My Profile');

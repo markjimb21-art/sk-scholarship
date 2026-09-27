@@ -4,135 +4,65 @@ declare(strict_types=1);
 final class Application
 {
     /**
-     * Staff decision workflow: action => statuses the application must currently be in.
-     * Single source of truth for BOTH the server-side guard in AdminController::updateApplication()
-     * and the action buttons in admin/application_view.php, so the UI and the server always agree.
-     * The only bypass is an admin acting on an application where admin_override is enabled
-     * (see canBypassTransitions()); every bypass is written to the audit log.
+     * The one allowed-transition map (docs/PROCESS.md §1). Every status change goes through
+     * changeStatus(), which refuses anything not listed here; views call can() to decide which
+     * buttons to show, so the UI and the server always agree.
      */
     public const TRANSITIONS = [
-        'start_review'     => ['Submitted'],
-        'mark_incomplete'  => ['Submitted', 'Under Initial Review', 'Documents Under Review'],
-        'verify_documents' => ['Under Initial Review', 'Documents Under Review'],
-        'for_interview'    => ['Submitted', 'Under Initial Review', 'Documents Verified'],
-        'for_final'        => ['Interview Completed', 'Waitlisted'],
-        'approve'          => ['For Final Evaluation', 'Waitlisted'],
-        'waitlist'         => ['For Final Evaluation', 'Waitlisted'],
-        'reject'           => ['Draft', 'Submitted', 'Under Initial Review', 'Incomplete', 'Documents Under Review',
-                               'Documents Verified', 'For Interview', 'Interview Scheduled', 'Interview Completed',
-                               'For Final Evaluation', 'Waitlisted'],
+        'submit'        => ['from' => ['Draft', 'Returned'],                     'to' => 'Submitted'],
+        'qualify'       => ['from' => ['Submitted'],                             'to' => 'Qualified'],
+        'return'        => ['from' => ['Submitted'],                             'to' => 'Returned'],
+        'reject'        => ['from' => ['Submitted', 'Interviewed', 'Waitlisted'], 'to' => 'Rejected'],
+        'assign'        => ['from' => ['Qualified'],                             'to' => 'Interview Scheduled'],
+        'unassign'      => ['from' => ['Interview Scheduled'],                   'to' => 'Qualified'],
+        'score'         => ['from' => ['Interview Scheduled'],                   'to' => 'Interviewed'],
+        'no_show'       => ['from' => ['Interview Scheduled'],                   'to' => 'Qualified'],
+        'no_show_final' => ['from' => ['Interview Scheduled'],                   'to' => 'Rejected'],
+        'approve'       => ['from' => ['Interviewed', 'Waitlisted'],             'to' => 'Approved'],
+        'waitlist'      => ['from' => ['Interviewed'],                           'to' => 'Waitlisted'],
     ];
 
-    /** Final decisions: nothing (not even an override) moves an application out of these. */
-    public const FINAL_STATUSES = ['Approved', 'Rejected'];
-
-    /** Does the transition map allow $action from $status (no override considered)? */
-    public static function transitionAllowed(string $action, string $status): bool
+    public static function can(string $action, string $status): bool
     {
-        return in_array($status, self::TRANSITIONS[$action] ?? [], true);
+        return in_array($status, self::TRANSITIONS[$action]['from'] ?? [], true);
     }
 
-    /** Admin override: only an admin, only on an application flagged admin_override, never on a final decision. */
-    public static function canBypassTransitions(array $app): bool
+    public static function label(string $status): string
     {
-        return !empty($app['admin_override'])
-            && Auth::hasRole('admin')
-            && !in_array($app['status'], self::FINAL_STATUSES, true);
-    }
-
-    /** What the UI should offer: allowed by the map, or bypassable via admin override. */
-    public static function actionAllowed(string $action, array $app): bool
-    {
-        if (!isset(self::TRANSITIONS[$action])) return false;
-        return self::transitionAllowed($action, $app['status']) || self::canBypassTransitions($app);
+        return APP_STATUS_LABELS[$status] ?? $status;
     }
 
     /**
-     * Checks an applicant against the program's eligibility rules (max_age, max_family_income,
-     * citizenship_required, min_gpa). Never auto-rejects — staff see the result and decide.
-     * A NULL/0 program limit means "no limit". min_gpa uses Philippine grading (1.00 best, 5.00 failing),
-     * so the applicant passes when general_average <= min_gpa. A missing general average (optional field)
-     * is reported as "Not checked" and left out of the score.
-     *
-     * Returns ['score' => float 0..100 (share of checked criteria that passed), 'notes' => ?string (one line each)].
+     * Apply $action to $app (row with id + status). Refuses transitions outside the map and changes made
+     * concurrently by someone else (the UPDATE is conditional on the status the caller saw). Extra columns
+     * in $set are written in the same UPDATE. Audit-logged. Throws DomainException with a plain message.
      */
-    public static function evaluateEligibility(array $program, ?array $personal, ?array $education, ?array $family): array
+    public static function changeStatus(array $app, string $action, ?int $actorId, array $set = [], string $note = ''): void
     {
-        $checked = 0;
-        $passed = 0;
-        $lines = [];
+        $from = (string)$app['status'];
+        if (!self::can($action, $from)) {
+            throw new DomainException('This action is not possible while the application is "' . self::label($from) . '".');
+        }
+        $to = self::TRANSITIONS[$action]['to'];
 
-        if ((int)($program['max_age'] ?? 0) > 0) {
-            $checked++;
-            $maxAge = (int)$program['max_age'];
-            if (empty($personal['date_of_birth'])) {
-                $lines[] = "Age: date of birth is missing (maximum age $maxAge).";
-            } else {
-                $age = calculate_age((string)$personal['date_of_birth']);
-                if ($age <= $maxAge) $passed++;
-                else $lines[] = "Age: $age is above the maximum age of $maxAge.";
-            }
+        $cols = ['status' => $to] + $set;
+        $assign = implode(', ', array_map(static fn($k) => "`$k` = :$k", array_keys($cols)));
+        $stmt = Database::conn()->prepare("UPDATE applications SET $assign WHERE id = :id AND status = :from_status");
+        $stmt->execute($cols + ['id' => (int)$app['id'], 'from_status' => $from]);
+        if ($stmt->rowCount() !== 1) {
+            throw new DomainException('This application was changed by someone else. Please reload the page.');
         }
 
-        if ((float)($program['max_family_income'] ?? 0) > 0) {
-            $checked++;
-            $max = (float)$program['max_family_income'];
-            $income = (float)($family['total_family_income'] ?? 0);
-            if ($income <= $max) $passed++;
-            else $lines[] = 'Family income: ₱' . number_format($income, 2) . ' is above the maximum of ₱' . number_format($max, 2) . '.';
-        }
-
-        $requiredCitizenship = trim((string)($program['citizenship_required'] ?? ''));
-        if ($requiredCitizenship !== '') {
-            $checked++;
-            $citizenship = trim((string)($personal['citizenship'] ?? ''));
-            if (strcasecmp($citizenship, $requiredCitizenship) === 0) $passed++;
-            else $lines[] = 'Citizenship: "' . ($citizenship ?: 'not provided') . "\" does not match the required \"$requiredCitizenship\".";
-        }
-
-        if ((float)($program['min_gpa'] ?? 0) > 0) {
-            $minGpa = (float)$program['min_gpa'];
-            $ga = $education['general_average'] ?? null;
-            if ($ga === null || $ga === '') {
-                $lines[] = 'Not checked: general average not provided (program requires ' . number_format($minGpa, 2) . ' or better).';
-            } else {
-                $checked++;
-                if ((float)$ga <= $minGpa) $passed++;
-                else $lines[] = 'General average: ' . number_format((float)$ga, 2) . ' is below the required ' . number_format($minGpa, 2) . ' (1.00 is highest).';
-            }
-        }
-
-        return [
-            'score' => $checked > 0 ? round($passed / $checked * 100, 2) : 100.0,
-            'notes' => $lines ? implode("\n", $lines) : null,
-        ];
-    }
-
-    /** Shared by search() and count() so paging totals always match the rows. Placeholder names must be unique (native prepares). */
-    private static function where(array $filters): array
-    {
-        $sql = '';
-        $params = [];
-        if (!empty($filters['q'])) {
-            $sql .= " AND (u.full_name LIKE :q1 OR a.application_code LIKE :q2 OR u.email LIKE :q3)";
-            $params['q1'] = $params['q2'] = $params['q3'] = '%' . $filters['q'] . '%';
-        }
-        if (!empty($filters['status']))     { $sql .= " AND a.status = :st";              $params['st'] = $filters['status']; }
-        if (!empty($filters['school']))     { $sql .= " AND e.school_name = :school";     $params['school'] = $filters['school']; }
-        if (!empty($filters['course']))     { $sql .= " AND e.course_name LIKE :course";  $params['course'] = '%' . $filters['course'] . '%'; }
-        if (!empty($filters['year_level'])) { $sql .= " AND e.year_level = :yl";          $params['yl'] = $filters['year_level']; }
-        if (!empty($filters['program_id'])) { $sql .= " AND a.program_id = :pid";         $params['pid'] = (int)$filters['program_id']; }
-        if (isset($filters['max_income']) && $filters['max_income'] !== '') {
-            $sql .= " AND f.total_family_income <= :mi";
-            $params['mi'] = (float)$filters['max_income'];
-        }
-        return [$sql, $params];
+        AuditLog::write('application_' . $action, 'applications', (int)$app['id'],
+            "Status: $from → $to" . ($note !== '' ? " — $note" : ''),
+            ['status' => $from], ['status' => $to] + $set + ($actorId ? ['by' => $actorId] : []));
     }
 
     public static function find(int $id): ?array
     {
         $stmt = Database::conn()->prepare(
-            "SELECT a.*, sp.program_name, sp.academic_year, sp.semester
+            "SELECT a.*, sp.program_name, sp.academic_year, sp.application_start, sp.application_end,
+                    sp.min_gpa, sp.max_family_income, sp.max_age, sp.slots_available, sp.is_active AS program_open
              FROM applications a
              JOIN scholarship_programs sp ON sp.id = a.program_id
              WHERE a.id = ? LIMIT 1"
@@ -141,191 +71,284 @@ final class Application
         return $stmt->fetch() ?: null;
     }
 
-    public static function findByApplicant(int $applicantId): ?array
-    {
-        $stmt = Database::conn()->prepare(
-            "SELECT * FROM applications WHERE applicant_id = ? ORDER BY id DESC LIMIT 1"
-        );
-        $stmt->execute([$applicantId]);
-        return $stmt->fetch() ?: null;
-    }
-
+    /** Application with everything the screening/decision pages show. */
     public static function withDetails(int $id): ?array
     {
         $app = self::find($id);
         if (!$app) return null;
-
-        $app['applicant']   = Applicant::withUser((int)$app['applicant_id']);
-        $app['personal']    = Applicant::personalInfo((int)$app['applicant_id']);
-        $app['education']   = Applicant::education((int)$app['applicant_id']);
-        $app['family']      = Applicant::familyBackground((int)$app['applicant_id']);
-        $app['documents']   = Document::byApplication($id);
-        $app['interview']   = Interview::assignmentByApplication($id);
-        $app['evaluation']  = $app['interview'] ? Interview::evaluation((int)$app['interview']['id']) : null;
+        $applicantId = (int)$app['applicant_id'];
+        $app['applicant']  = Applicant::withUser($applicantId);
+        $app['personal']   = Applicant::personalInfo($applicantId);
+        $app['education']  = Applicant::education($applicantId);
+        $app['family']     = Applicant::familyBackground($applicantId);
+        $app['documents']  = Document::byApplication($id);
+        $app['interview']  = Interview::assignmentByApplication($id);
+        $app['evaluation'] = $app['interview'] ? Interview::evaluation((int)$app['interview']['id']) : null;
         return $app;
     }
 
-    public static function search(array $filters = [], int $limit = 25, int $offset = 0): array
+    /** User id of the applicant who owns the application (for notifications). */
+    public static function userId(int $applicationId): int
     {
-        $sql = "SELECT a.id, a.application_code, a.status, a.submitted_at, a.decided_at,
-                       u.full_name, u.email, u.contact_number,
-                       e.school_name, e.course_name, e.year_level,
-                       f.total_family_income,
-                       sp.program_name,
-                       (SELECT COUNT(*) FROM documents d WHERE d.application_id = a.id AND d.status = 'Verified') AS docs_verified,
-                       (SELECT COUNT(*) FROM documents d WHERE d.application_id = a.id) AS docs_total
-                FROM applications a
-                JOIN applicants ap ON ap.id = a.applicant_id
-                JOIN users u ON u.id = ap.user_id
-                JOIN scholarship_programs sp ON sp.id = a.program_id
-                LEFT JOIN education_records e ON e.applicant_id = ap.id
-                LEFT JOIN family_background f ON f.applicant_id = ap.id
-                WHERE 1=1";
-        [$w, $params] = self::where($filters);
-        $sql .= $w;
+        $stmt = Database::conn()->prepare(
+            "SELECT ap.user_id FROM applications a JOIN applicants ap ON ap.id = a.applicant_id WHERE a.id = ?"
+        );
+        $stmt->execute([$applicationId]);
+        return (int)$stmt->fetchColumn();
+    }
 
-        $sql .= " ORDER BY a.created_at DESC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
+    /** In-app + e-mail notification to the applicant (every status change they see). */
+    public static function notify(int $applicationId, string $title, string $message, string $type, string $route = 'applicant/dashboard'): void
+    {
+        $uid = self::userId($applicationId);
+        if ($uid) Notification::send($uid, $title, $message, $type, url($route), sendEmail: true);
+    }
 
-        $stmt = Database::conn()->prepare($sql);
+    /* ---------------------------------------------------------------------------------------------
+     *  Applicant side: which application is "current", completeness, submission
+     * --------------------------------------------------------------------------------------------- */
+
+    /**
+     * The applicant's CURRENT application (docs/PROCESS.md A2):
+     *  - an Active scholar: the application that made them a scholar (they can't apply elsewhere meanwhile);
+     *  - otherwise, while a program is open: the application for that program, or null (a Draft is created on first save);
+     *  - between cycles: the most recent application.
+     */
+    public static function currentForApplicant(int $applicantId): ?array
+    {
+        $pdo = Database::conn();
+        $base = "SELECT a.*, sp.program_name, sp.academic_year, sp.application_start, sp.application_end,
+                        sp.is_active AS program_open
+                 FROM applications a JOIN scholarship_programs sp ON sp.id = a.program_id";
+
+        $stmt = $pdo->prepare("$base JOIN scholars s ON s.application_id = a.id
+                               WHERE a.applicant_id = ? AND s.status = 'Active' ORDER BY s.id DESC LIMIT 1");
+        $stmt->execute([$applicantId]);
+        if ($row = $stmt->fetch()) return $row;
+
+        $open = Program::open();
+        if ($open) {
+            $stmt = $pdo->prepare("$base WHERE a.applicant_id = ? AND a.program_id = ? LIMIT 1");
+            $stmt->execute([$applicantId, (int)$open['id']]);
+            return $stmt->fetch() ?: null;
+        }
+        $stmt = $pdo->prepare("$base WHERE a.applicant_id = ? ORDER BY a.id DESC LIMIT 1");
+        $stmt->execute([$applicantId]);
+        return $stmt->fetch() ?: null;
+    }
+
+    /** Every application except the current one, newest first (read-only history). */
+    public static function pastForApplicant(int $applicantId, ?array $current): array
+    {
+        $stmt = Database::conn()->prepare(
+            "SELECT a.id, a.application_code, a.status, a.submitted_at, a.decided_at, a.decision_remarks,
+                    sp.program_name, sp.academic_year, s.scholar_code, s.status AS scholar_status, s.end_reason
+             FROM applications a
+             JOIN scholarship_programs sp ON sp.id = a.program_id
+             LEFT JOIN scholars s ON s.application_id = a.id
+             WHERE a.applicant_id = ? AND a.id <> ?
+             ORDER BY a.id DESC"
+        );
+        $stmt->execute([$applicantId, (int)($current['id'] ?? 0)]);
+        return $stmt->fetchAll();
+    }
+
+    /** Applicants may edit only a Draft or a Returned application. */
+    public static function isEditable(?array $app): bool
+    {
+        return $app === null || in_array($app['status'], ['Draft', 'Returned'], true);
+    }
+
+    /**
+     * What is still missing before the application can be submitted (server-side authority for Submit and
+     * the same list the Review step shows). Empty 'missing' = complete.
+     */
+    public static function completeness(int $applicationId): array
+    {
+        $app = self::find($applicationId);
+        if (!$app) return ['complete' => false, 'missing' => ['Application not found']];
+
+        $applicantId = (int)$app['applicant_id'];
+        $p = Applicant::personalInfo($applicantId);
+        $e = Applicant::education($applicantId);
+        $f = Applicant::familyBackground($applicantId);
+        $phone = '/^0[0-9]{10}$/';
+        $missing = [];
+
+        if (!$p) {
+            $missing[] = 'Personal Information';
+        } else {
+            if (trim((string)$p['first_name']) === '') $missing[] = 'First name';
+            if (trim((string)$p['last_name']) === '')  $missing[] = 'Last name';
+            if (empty($p['date_of_birth']))            $missing[] = 'Date of birth';
+            if (!preg_match($phone, (string)$p['contact_number'])) $missing[] = 'Contact number (11 digits)';
+            if (empty($p['purok_id']))                 $missing[] = 'Purok / subdivision';
+        }
+        if (!$e) {
+            $missing[] = 'Education';
+        } else {
+            if (trim((string)$e['school_name']) === '') $missing[] = 'School';
+            if (trim((string)$e['course_name']) === '') $missing[] = 'Course';
+        }
+        if (!$f) {
+            $missing[] = 'Family Background';
+        } else {
+            foreach (['father_contact' => "Father's contact number", 'mother_contact' => "Mother's contact number"] as $k => $label) {
+                if ((string)$f[$k] !== '' && !preg_match($phone, (string)$f[$k])) $missing[] = "$label (11 digits or blank)";
+            }
+        }
+        foreach (Document::missingTypes($applicationId) as $type) $missing[] = "Document: $type";
+
+        return ['complete' => !$missing, 'missing' => $missing];
+    }
+
+    /** A2 Submit / A3 resubmit. Returns ['ok'=>true,'resubmitted'=>bool] or ['ok'=>false,'error'=>string]. */
+    public static function submit(int $applicationId, int $userId): array
+    {
+        $app = self::find($applicationId);
+        if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
+        if (!self::can('submit', $app['status'])) {
+            return ['ok' => false, 'error' => 'This application has already been submitted.'];
+        }
+
+        // Window: only an open program inside its dates. A Returned application may be resubmitted after the
+        // end date (decision D2) — it was submitted on time and the SK office asked for the correction.
+        $resubmission = $app['status'] === 'Returned';
+        if (!$resubmission && (!$app['program_open'] || !Program::windowOpen($app))) {
+            return ['ok' => false, 'error' => "Applications for {$app['program_name']} are accepted from "
+                . date('F j, Y', strtotime($app['application_start'])) . ' to '
+                . date('F j, Y', strtotime($app['application_end'])) . ' while the program is open.'];
+        }
+
+        $check = self::completeness($applicationId);
+        if (!$check['complete']) {
+            return ['ok' => false, 'error' => 'Please complete these first: ' . implode('; ', $check['missing']) . '.'];
+        }
+
+        try {
+            self::changeStatus($app, 'submit', $userId, ['submitted_at' => date('Y-m-d H:i:s')],
+                $resubmission ? 'resubmitted after correction' : 'submitted');
+        } catch (DomainException $e) {
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+        return ['ok' => true, 'resubmitted' => $resubmission];
+    }
+
+    /* ---------------------------------------------------------------------------------------------
+     *  Eligibility (B2, also shown in B5): pass/fail rows computed from the submitted data
+     * --------------------------------------------------------------------------------------------- */
+
+    /**
+     * Rows: ['label','rule','value','result' => 'Pass'|'Fail'|'Not provided'|'No limit'].
+     * Nothing is decided automatically — staff see the rows next to the buttons.
+     */
+    public static function eligibility(array $app): array
+    {
+        $personal  = $app['personal']  ?? Applicant::personalInfo((int)$app['applicant_id']);
+        $education = $app['education'] ?? Applicant::education((int)$app['applicant_id']);
+        $family    = $app['family']    ?? Applicant::familyBackground((int)$app['applicant_id']);
+        $documents = $app['documents'] ?? Document::byApplication((int)$app['id']);
+        $rows = [];
+
+        // 1. Age on the submission date.
+        $maxAge = (int)($app['max_age'] ?? 0);
+        $onDate = $app['submitted_at'] ?: date('Y-m-d');
+        $age = !empty($personal['date_of_birth'])
+            ? (new DateTime($personal['date_of_birth']))->diff(new DateTime(substr((string)$onDate, 0, 10)))->y : null;
+        $rows[] = [
+            'label' => 'Age', 'rule' => $maxAge > 0 ? "at most $maxAge on the submission date" : 'no limit',
+            'value' => $age === null ? '—' : (string)$age,
+            'result' => $maxAge <= 0 ? 'No limit' : ($age === null ? 'Not provided' : ($age <= $maxAge ? 'Pass' : 'Fail')),
+        ];
+
+        // 2. Total family income.
+        $maxIncome = (float)($app['max_family_income'] ?? 0);
+        $income = $family ? (float)$family['total_family_income'] : null;
+        $rows[] = [
+            'label' => 'Total family income (monthly)', 'rule' => $maxIncome > 0 ? 'at most ₱' . number_format($maxIncome, 2) : 'no limit',
+            'value' => $income === null ? '—' : '₱' . number_format($income, 2),
+            'result' => $maxIncome <= 0 ? 'No limit' : ($income === null ? 'Not provided' : ($income <= $maxIncome ? 'Pass' : 'Fail')),
+        ];
+
+        // 3. GWA (Philippine scale: 1.00 highest, so a LOWER number is better).
+        $minGwa = (float)($app['min_gpa'] ?? 0);
+        $gwa = isset($education['general_average']) ? (float)$education['general_average'] : null;
+        $rows[] = [
+            'label' => 'GWA', 'rule' => $minGwa > 0 ? number_format($minGwa, 2) . ' or better (1.00 is highest)' : 'no limit',
+            'value' => $gwa === null ? '—' : number_format($gwa, 2),
+            'result' => $minGwa <= 0 ? 'No limit' : ($gwa === null ? 'Not provided' : ($gwa <= $minGwa ? 'Pass' : 'Fail')),
+        ];
+
+        // 4. Residency document present.
+        $hasResidency = false;
+        foreach ($documents as $d) {
+            if ($d['document_type'] === 'Certificate of Residency' && $d['file_path'] !== '') $hasResidency = true;
+        }
+        $rows[] = [
+            'label' => 'Certificate of Residency', 'rule' => 'uploaded',
+            'value' => $hasResidency ? 'Uploaded' : 'Missing', 'result' => $hasResidency ? 'Pass' : 'Fail',
+        ];
+
+        $failed = count(array_filter($rows, static fn($r) => $r['result'] === 'Fail' || $r['result'] === 'Not provided'));
+        return ['rows' => $rows, 'failed' => $failed, 'summary' => $failed === 0 ? 'Meets all rules' : "$failed rule(s) not met"];
+    }
+
+    /* ---------------------------------------------------------------------------------------------
+     *  Lists
+     * --------------------------------------------------------------------------------------------- */
+
+    /** Records list / queues: filters status, program_id, q (name, code, e-mail). */
+    public static function search(array $filters, int $limit = 25, int $offset = 0): array
+    {
+        [$where, $params] = self::where($filters);
+        $stmt = Database::conn()->prepare(
+            "SELECT a.id, a.application_code, a.status, a.submitted_at, a.updated_at,
+                    u.full_name, u.email, e.school_name, e.course_name, e.general_average,
+                    f.total_family_income, sp.program_name
+             FROM applications a
+             JOIN applicants ap ON ap.id = a.applicant_id
+             JOIN users u ON u.id = ap.user_id
+             JOIN scholarship_programs sp ON sp.id = a.program_id
+             LEFT JOIN education_records e ON e.applicant_id = ap.id
+             LEFT JOIN family_background f ON f.applicant_id = ap.id
+             WHERE 1=1 $where
+             ORDER BY COALESCE(a.submitted_at, a.created_at) ASC, a.id ASC
+             LIMIT " . (int)$limit . " OFFSET " . (int)$offset
+        );
         $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
-    public static function count(array $filters = []): int
+    public static function count(array $filters): int
     {
-        $sql = "SELECT COUNT(*) FROM applications a
-                JOIN applicants ap ON ap.id = a.applicant_id
-                JOIN users u ON u.id = ap.user_id
-                LEFT JOIN education_records e ON e.applicant_id = ap.id
-                LEFT JOIN family_background f ON f.applicant_id = ap.id
-                WHERE 1=1";
-        [$w, $params] = self::where($filters);
-        $sql .= $w;
-
-        $stmt = Database::conn()->prepare($sql);
+        [$where, $params] = self::where($filters);
+        $stmt = Database::conn()->prepare(
+            "SELECT COUNT(*) FROM applications a
+             JOIN applicants ap ON ap.id = a.applicant_id
+             JOIN users u ON u.id = ap.user_id
+             WHERE 1=1 $where"
+        );
         $stmt->execute($params);
         return (int)$stmt->fetchColumn();
     }
 
-    public static function updateStatus(int $id, string $status, ?int $actorId = null, ?string $remarks = null): void
+    /** Shared WHERE for search()/count(). Placeholder names are unique (native prepares). */
+    private static function where(array $filters): array
     {
-        $pdo = Database::conn();
-        $old = self::find($id);
-        $pdo->prepare(
-            "UPDATE applications SET status = ?, updated_at = NOW() WHERE id = ?"
-        )->execute([$status, $id]);
-
-        AuditLog::write('application_status_changed', 'applications', $id,
-            "Status changed to $status",
-            ['status' => $old['status'] ?? null],
-            ['status' => $status]
-        );
-    }
-
-    /** Marks an application Incomplete with a REQUIRED reason, kept separate from final decision_remarks. */
-    public static function markIncomplete(int $id, int $actorId, string $remarks): void
-    {
-        $pdo = Database::conn();
-        $old = self::find($id);
-        $pdo->prepare(
-            "UPDATE applications
-             SET status = 'Incomplete', review_remarks = ?, review_remarks_at = NOW(), review_remarks_by = ?, updated_at = NOW()
-             WHERE id = ?"
-        )->execute([$remarks, $actorId, $id]);
-
-        AuditLog::write('application_marked_incomplete', 'applications', $id,
-            'Application marked incomplete: ' . $remarks,
-            ['status' => $old['status'] ?? null],
-            ['status' => 'Incomplete', 'remarks' => $remarks]
-        );
-    }
-
-    /**
-     * Single source of truth for "is this application ready for interview scheduling?", used by both
-     * the application detail page (review summary) and the admin_for_interview action (server-side gate).
-     * Never trust the frontend checklist alone — this is the authoritative check.
-     */
-    public static function reviewCompleteness(int $applicationId): array
-    {
-        $app = self::find($applicationId);
-        if (!$app) {
-            return ['complete' => false, 'personal_ok' => false, 'education_ok' => false, 'family_ok' => false,
-                     'docs_uploaded' => 0, 'docs_required' => count(DOCUMENT_TYPES),
-                     'missing_documents' => [], 'missing_fields' => ['Application not found']];
+        $sql = '';
+        $params = [];
+        if (!empty($filters['status']) && in_array($filters['status'], APP_STATUS, true)) {
+            $sql .= ' AND a.status = :status';
+            $params['status'] = $filters['status'];
         }
-
-        $applicantId = (int)$app['applicant_id'];
-        $personal = Applicant::personalInfo($applicantId);
-        $education = Applicant::education($applicantId);
-        $family = Applicant::familyBackground($applicantId);
-        $phonePattern = '/^0[0-9]{10}$/';
-
-        $missingFields = [];
-        $personalOk = (bool)$personal;
-        if (!$personal) {
-            $missingFields[] = 'Personal Information';
-        } else {
-            if (trim((string)($personal['first_name'] ?? '')) === '') { $missingFields[] = 'First Name'; $personalOk = false; }
-            if (trim((string)($personal['last_name'] ?? '')) === '') { $missingFields[] = 'Last Name'; $personalOk = false; }
-            if (empty($personal['date_of_birth'])) { $missingFields[] = 'Date of Birth'; $personalOk = false; }
-            if (!preg_match($phonePattern, (string)($personal['contact_number'] ?? ''))) { $missingFields[] = 'Contact Number (must be 11 digits)'; $personalOk = false; }
-            if (empty($personal['purok_id'])) { $missingFields[] = 'Purok/Address'; $personalOk = false; }
+        if (!empty($filters['program_id'])) {
+            $sql .= ' AND a.program_id = :pid';
+            $params['pid'] = (int)$filters['program_id'];
         }
-
-        $educationOk = (bool)$education;
-        if (!$education) {
-            $missingFields[] = 'Education';
-        } else {
-            if (trim((string)($education['school_name'] ?? '')) === '') { $missingFields[] = 'School Name'; $educationOk = false; }
-            if (trim((string)($education['course_name'] ?? '')) === '') { $missingFields[] = 'Course'; $educationOk = false; }
+        if (($filters['q'] ?? '') !== '') {
+            $sql .= ' AND (u.full_name LIKE :q1 OR a.application_code LIKE :q2 OR u.email LIKE :q3)';
+            $params['q1'] = $params['q2'] = $params['q3'] = '%' . $filters['q'] . '%';
         }
-
-        $familyOk = (bool)$family;
-        if (!$family) {
-            $missingFields[] = 'Family Background';
-        } else {
-            foreach (['father_contact' => "Father's Contact Number", 'mother_contact' => "Mother's Contact Number"] as $field => $label) {
-                $v = (string)($family[$field] ?? '');
-                if ($v !== '' && !preg_match($phonePattern, $v)) { $missingFields[] = "$label (invalid format)"; $familyOk = false; }
-            }
-        }
-
-        $documents = Document::byApplication($applicationId);
-        $byType = [];
-        foreach ($documents as $d) $byType[$d['document_type']] = $d;
-        $missingDocuments = [];
-        $docsUploaded = 0;
-        foreach (DOCUMENT_TYPES as $dt) {
-            if (!empty($byType[$dt]['file_path'])) $docsUploaded++;
-            else $missingDocuments[] = $dt;
-        }
-
-        return [
-            'complete' => $personalOk && $educationOk && $familyOk && empty($missingDocuments),
-            'personal_ok' => $personalOk,
-            'education_ok' => $educationOk,
-            'family_ok' => $familyOk,
-            'docs_uploaded' => $docsUploaded,
-            'docs_required' => count(DOCUMENT_TYPES),
-            'missing_documents' => $missingDocuments,
-            'missing_fields' => $missingFields,
-        ];
-    }
-
-    public static function stats(): array
-    {
-        $pdo = Database::conn();
-        $row = $pdo->query(
-            "SELECT
-                COUNT(*) AS total,
-                SUM(status = 'Submitted' OR status = 'Under Initial Review') AS pending,
-                SUM(status = 'For Interview' OR status = 'Interview Scheduled') AS for_interview,
-                SUM(status = 'Interview Completed' OR status = 'For Final Evaluation') AS interviewed,
-                SUM(status = 'Approved') AS approved,
-                SUM(status = 'Rejected') AS rejected,
-                SUM(status = 'Waitlisted') AS waitlisted
-             FROM applications"
-        )->fetch();
-        return $row ?: [];
+        return [$sql, $params];
     }
 }

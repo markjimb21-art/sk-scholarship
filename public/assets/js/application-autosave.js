@@ -404,7 +404,7 @@
     card.dataset.docHasFile = '1';
     const pill = card.querySelector('[data-doc-status-pill]');
     if (pill) {
-      pill.textContent = doc.status;
+      pill.textContent = doc.status_label || doc.status;
       pill.className = 'doc-pill doc-' + doc.status.replace(/ /g, '-') + '';
       pill.setAttribute('data-doc-status-pill', '');
     }

@@ -103,7 +103,7 @@ final class Auth
 
         if (!$user['is_active']) return ['ok' => false, 'error' => 'Account deactivated.'];
 
-        // Applicants must verify their e-mail (OTP) before they can log in. Staff/admin/official
+        // Applicants must verify their e-mail (OTP) before they can log in. Admin
         // accounts are created by an administrator and are exempt (email_verified is backfilled to 1
         // for pre-existing accounts by the OTP migration).
         if ($user['role_name'] === 'applicant' && !$user['email_verified']) {
@@ -153,9 +153,7 @@ final class Auth
             $userId = (int)$pdo->lastInsertId();
 
             if ($roleName === 'applicant') {
-                $appCode = generate_code('APP');
-                $pdo->prepare("INSERT INTO applicants (user_id, application_code) VALUES (?, ?)")
-                    ->execute([$userId, $appCode]);
+                $pdo->prepare("INSERT INTO applicants (user_id) VALUES (?)")->execute([$userId]);
             }
             $pdo->commit();
             AuditLog::write('register', 'users', $userId, "New $roleName registered: $email");

@@ -83,6 +83,10 @@ Scheduled | Attended | No-show.
 | A8 | Claims cash for the current semester: uploads School ID + Grades → waits → re-uploads if Resubmit → sees Released (amount, date, reference). | `applicant/scholarship`, `applicant/claim/upload` *new*, `applicant/claim/submit` *new*, `applicant/term-documents/view` *new* | claim_status |
 | A9 | After the current semester is Released: uploads Enrollment Form + School ID for the next semester → waits → re-uploads if Resubmit → Approved opens the next semester (back to A8). | `applicant/scholarship`, `applicant/renewal/upload` *new*, `applicant/renewal/submit` *new* | renewal status |
 
+**One application at a time (server):** while an applicant holds an **Active** scholarship, their
+"current" application is the one that made them a scholar and they can't start another; once the
+scholarship has Ended they can apply to a later program. Between programs, the latest application is shown.
+
 **Applicant dashboard** (`applicant/dashboard`): one progress tracker
 (Apply → Screening → Interview → Result → Scholar: Claim → Renewal) with the current step highlighted,
 the status in plain words, and **one** "What you need to do next" box with the single action button, or

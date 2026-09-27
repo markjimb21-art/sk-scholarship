@@ -38,9 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Auto income sum
   const incomeFields = document.querySelectorAll('[data-sum]');
-  const incomeTarget = document.querySelector('[data-target="combined_income"]');
   const totalTarget = document.querySelector('[data-target="total_family_income"]');
-  if (incomeFields.length && incomeTarget) {
+  if (incomeFields.length && totalTarget) {
     const sum = () => {
       let total = 0;
       incomeFields.forEach(f => {
@@ -48,8 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isNaN(v)) total += v;
       });
       const formatted = total.toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-      incomeTarget.value = formatted;
-      if (totalTarget) totalTarget.value = formatted;
+      totalTarget.value = formatted;
     };
     incomeFields.forEach(f => f.addEventListener('input', sum));
     sum();
