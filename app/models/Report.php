@@ -10,7 +10,7 @@ final class Report
 {
     /** key => [title, description, program column, date column (null = date filter not applicable)] */
     public const CATALOG = [
-        'applicants' => ['Applicant list by status', 'Every submitted application with its status, GWA and family income', 'a.program_id', 'a.submitted_at'],
+        'applicant_list' => ['Applicant list by status', 'Every submitted application with its status, GWA and family income', 'a.program_id', 'a.submitted_at'],
         'interviews' => ['Interview schedule & attendance', 'Each schedule with the applicants assigned and their attendance', 's.program_id', 's.interview_date'],
         'ranking'    => ['Interview results / ranking', 'Rubric scores and ranking of interviewed applicants', 'a.program_id', 'ev.evaluated_at'],
         'scholars'   => ['Scholar masterlist', 'Every scholar with status, semesters and total released', 's.program_id', 's.approval_date'],
@@ -36,7 +36,7 @@ final class Report
         $label = static fn(string $s): string => APP_STATUS_LABELS[$s] ?? $s;
         $total = null;
         switch ($type) {
-            case 'applicants':
+            case 'applicant_list':
                 if ($status !== '' && in_array($status, APP_STATUS, true)) { $w .= ' AND a.status = :status'; $params['status'] = $status; }
                 $sql = "SELECT a.application_code AS 'Application', u.full_name AS 'Name', u.email AS 'E-mail', sp.program_name AS 'Program',
                                a.status AS 'Status', DATE(a.submitted_at) AS 'Submitted', e.general_average AS 'GWA',
@@ -151,7 +151,7 @@ final class Report
         $stmt->execute();
         $rows = $stmt->fetchAll();
 
-        if (isset($rows[0]['Status']) && in_array($type, ['applicants', 'ranking'], true)) {
+        if (isset($rows[0]['Status']) && in_array($type, ['applicant_list', 'ranking'], true)) {
             foreach ($rows as &$r) $r['Status'] = $label($r['Status']);
             unset($r);
         }
