@@ -9,6 +9,8 @@ require_once BASE_PATH . '/app/models/Program.php';
 require_once BASE_PATH . '/app/models/Scholar.php';
 require_once BASE_PATH . '/app/models/Term.php';
 require_once BASE_PATH . '/app/models/Renewal.php';
+require_once BASE_PATH . '/app/models/Budget.php';
+require_once BASE_PATH . '/app/models/TermSchedule.php';
 
 /** Applicant / scholar side of docs/PROCESS.md (A1 is in AuthController). */
 final class ApplicantController
@@ -150,11 +152,19 @@ final class ApplicantController
         $toScholarship = ['label' => 'Go to My Scholarship', 'route' => 'applicant/scholarship'];
         switch ($term['claim_status']) {
             case 'Waiting for Requirements':
+                $window = Term::claimWindow($term);
+                if (!$window['can_upload']) {
+                    return ['step' => 4, 'status' => "$sem — claim " . lcfirst(TermSchedule::STATE_LABELS[$window['state']]),
+                            'tone' => in_array($window['state'], ['deadline_passed', 'closed', 'cancelled'], true) ? 'danger' : 'secondary',
+                            'action' => null, 'next' => $window['message'], 'details' => []];
+                }
                 return ['step' => 4, 'status' => "$sem — claim not submitted", 'tone' => 'primary', 'action' => $toScholarship,
-                        'next' => "Upload your School ID and Grades to claim your cash for $sem.", 'details' => []];
+                        'next' => "Upload your School ID and Grades to claim your cash for $sem. " . $window['message'], 'details' => []];
             case 'Resubmit':
-                return ['step' => 4, 'status' => "$sem — please re-upload", 'tone' => 'warning', 'action' => $toScholarship,
-                        'next' => 'Re-upload the documents the SK office asked for, then submit again.',
+                $window = Term::claimWindow($term);
+                return ['step' => 4, 'status' => "$sem — please re-upload", 'tone' => 'warning',
+                        'action' => $window['can_upload'] ? $toScholarship : null,
+                        'next' => $window['can_upload'] ? 'Re-upload the documents the SK office asked for, then submit again.' : $window['message'],
                         'details' => ['Remarks' => (string)$term['remarks']]];
             case 'Submitted':
                 return ['step' => 4, 'status' => "$sem — claim submitted", 'tone' => 'info', 'action' => null,
@@ -171,13 +181,19 @@ final class ApplicantController
             . date('F j, Y', strtotime((string)$term['release_date'])) . ' (' . $term['payment_method']
             . ($term['reference_number'] ? ', ref. ' . $term['reference_number'] : '') . ')';
         $details = ["Released for $sem" => $released];
-        if (!$renewal) {
-            return ['step' => 5, 'status' => "$sem — cash released", 'tone' => 'success', 'action' => $toScholarship,
-                    'next' => "Renew for $nextSem: upload your updated Enrollment Form and School ID.", 'details' => $details];
-        }
-        if ($renewal['status'] === 'Resubmit') {
-            return ['step' => 5, 'status' => "Renewal for $nextSem — please re-upload", 'tone' => 'warning', 'action' => $toScholarship,
-                    'next' => 'Re-upload the documents the SK office asked for, then submit again.',
+        if (!$renewal || $renewal['status'] === 'Resubmit') {
+            $window = Renewal::window($term, $renewal);
+            if (!$renewal) {
+                return ['step' => 5, 'status' => "$sem — cash released", 'tone' => 'success',
+                        'action' => $window['can_upload'] ? $toScholarship : null,
+                        'next' => $window['can_upload']
+                            ? "Renew for $nextSem: upload your updated Enrollment Form and School ID. " . $window['message']
+                            : "Renewal for $nextSem: " . $window['message'],
+                        'details' => $details];
+            }
+            return ['step' => 5, 'status' => "Renewal for $nextSem — please re-upload", 'tone' => 'warning',
+                    'action' => $window['can_upload'] ? $toScholarship : null,
+                    'next' => $window['can_upload'] ? 'Re-upload the documents the SK office asked for, then submit again.' : $window['message'],
                     'details' => $details + ['Remarks' => (string)$renewal['remarks']]];
         }
         return ['step' => 5, 'status' => "Renewal for $nextSem submitted", 'tone' => 'info', 'action' => null,
@@ -508,6 +524,8 @@ final class ApplicantController
         $renewalDocs = $term ? Term::documents((int)$term['id'], 'renewal') : [];
         $renewal = $term ? Renewal::forTerm((int)$term['id']) : null;
         $nextSemester = $term ? Term::nextSemester($term['academic_year'], $term['semester']) : null;
+        $claimWindow = $term ? Term::claimWindow($term) : null;
+        $renewalWindow = $term && $term['claim_status'] === 'Released' ? Renewal::window($term, $renewal) : null;
 
         $pageTitle = 'My Scholarship';
         require VIEW_PATH . '/layouts/header.php';

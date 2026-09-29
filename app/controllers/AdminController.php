@@ -10,6 +10,7 @@ require_once BASE_PATH . '/app/models/Scholar.php';
 require_once BASE_PATH . '/app/models/Term.php';
 require_once BASE_PATH . '/app/models/Renewal.php';
 require_once BASE_PATH . '/app/models/Budget.php';
+require_once BASE_PATH . '/app/models/TermSchedule.php';
 
 /**
  * Admin area router + the shared admin pages. Only the admin role reaches this (public/index.php).
@@ -63,6 +64,10 @@ final class AdminController
         'renewals'                  => ['FundsController', 'renewals'],
         'renewals/view'             => ['FundsController', 'renewalView'],
         'renewals/decide'           => ['FundsController', 'renewalDecide'],
+        // Claim (release) and renewal submission windows
+        'release-schedule'          => ['FundsController', 'releaseSchedule'],
+        'renewal-schedule'          => ['FundsController', 'renewalSchedule'],
+        'term-schedule-save'        => ['FundsController', 'termScheduleSave'],
         // B10 scholars
         'scholars'                  => ['FundsController', 'scholars'],
         'scholar'                   => ['FundsController', 'scholar'],

@@ -340,9 +340,13 @@ final class Application
             self::changeStatus($app, 'approve', $adminId, ['decided_at' => $now, 'decided_by' => $adminId]);
             Scholar::createFromApplication($app, $adminId);
         });
-        if ($r['ok']) self::notify($id, 'Approved — welcome, scholar!',
-            "Congratulations! Your application to {$app['program_name']} was approved. Your first semester is open: "
-            . 'go to My Scholarship and upload your School ID and Grades to claim your cash.', 'success', 'applicant/scholarship');
+        if ($r['ok']) {
+            $window = TermSchedule::forSemester((int)$app['program_id'], $app['academic_year'], '1st Semester', 'release');
+            self::notify($id, 'Approved — welcome, scholar!',
+                "Congratulations! Your application to {$app['program_name']} was approved. Your first semester "
+                . "({$app['academic_year']} 1st Semester) is open. To claim your cash on My Scholarship: "
+                . TermSchedule::describeForScholar($window, 'release'), 'success', 'applicant/scholarship');
+        }
         return $r;
     }
 

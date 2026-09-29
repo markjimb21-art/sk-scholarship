@@ -28,6 +28,30 @@ final class Term
         return ['academic_year' => ($a + 1) . '-' . ($b + 1), 'semester' => '1st Semester'];
     }
 
+    /** Previous semester: 2nd -> 1st (same A.Y.), 1st -> 2nd of the previous A.Y. */
+    public static function previousSemester(string $academicYear, string $semester): array
+    {
+        if ($semester === '2nd Semester') return ['academic_year' => $academicYear, 'semester' => '1st Semester'];
+        [$a, $b] = array_map('intval', explode('-', $academicYear) + [0, 0]);
+        return ['academic_year' => ($a - 1) . '-' . ($b - 1), 'semester' => '2nd Semester'];
+    }
+
+    /**
+     * The release window (term_schedules, purpose 'release') for this semester's claim:
+     * ['schedule' => row|null, 'state' => TermSchedule::state(), 'can_upload' => bool, 'message' => text for the scholar].
+     */
+    public static function claimWindow(array $term): array
+    {
+        $schedule = TermSchedule::forSemester((int)$term['program_id'], $term['academic_year'], $term['semester'], 'release');
+        $resubmit = $term['claim_status'] === 'Resubmit';
+        return [
+            'schedule'   => $schedule,
+            'state'      => TermSchedule::state($schedule),
+            'can_upload' => TermSchedule::allowsUpload($schedule, $resubmit),
+            'message'    => TermSchedule::describeForScholar($schedule, 'release', $resubmit),
+        ];
+    }
+
     public static function find(int $id): ?array
     {
         $stmt = Database::conn()->prepare(
@@ -109,12 +133,13 @@ final class Term
         return true;
     }
 
-    /** Can the scholar change the CLAIM documents of this term right now? */
+    /** Can the scholar change the CLAIM documents of this term right now? Needs the admin's release window (§4). */
     public static function claimEditable(array $term): bool
     {
         return $term['scholar_status'] === 'Active'
             && self::canClaim('submit', $term['claim_status'])
-            && self::isCurrent($term);
+            && self::isCurrent($term)
+            && self::claimWindow($term)['can_upload'];
     }
 
     /**
@@ -125,7 +150,7 @@ final class Term
     {
         if (!in_array($type, TERM_DOCUMENT_TYPES[$purpose] ?? [], true)) return ['ok' => false, 'error' => 'Invalid document type.'];
         $allowed = $purpose === 'claim' ? self::claimEditable($term) : Renewal::editable($term);
-        if (!$allowed) return ['ok' => false, 'error' => 'These documents can’t be changed right now.'];
+        if (!$allowed) return ['ok' => false, 'error' => self::closedReason($term, $purpose) ?? 'These documents can’t be changed right now.'];
 
         $stored = Document::storeUpload($file, TERM_DOCUMENT_PATH, 'storage/term-documents/', (string)(int)$term['id']);
         if (!$stored['ok']) return $stored;
@@ -151,10 +176,17 @@ final class Term
         return ['ok' => true];
     }
 
+    /** When the only thing blocking the scholar is the admin's window, the window's message for them; otherwise null. */
+    public static function closedReason(array $term, string $purpose): ?string
+    {
+        $window = $purpose === 'claim' ? self::claimWindow($term) : Renewal::window($term);
+        return $window['can_upload'] ? null : $window['message'];
+    }
+
     /** A8: submit the claim once School ID + Grades are uploaded. */
     public static function submitClaim(array $term, int $userId): array
     {
-        if (!self::claimEditable($term)) return ['ok' => false, 'error' => 'This claim can’t be submitted right now.'];
+        if (!self::claimEditable($term)) return ['ok' => false, 'error' => self::closedReason($term, 'claim') ?? 'This claim can’t be submitted right now.'];
         if (!self::documentsReady((int)$term['id'], 'claim')) {
             return ['ok' => false, 'error' => 'Upload both your School ID and Grades first.'];
         }

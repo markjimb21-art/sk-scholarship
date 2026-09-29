@@ -68,6 +68,14 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
         <?= $term['reference_number'] ? '· Reference no. <strong>' . e($term['reference_number']) . '</strong>' : '' ?>
       </div>
     <?php else: ?>
+      <?php if (in_array($term['claim_status'], ['Waiting for Requirements', 'Resubmit'], true) && $scholar['status'] === 'Active'): ?>
+        <div class="alert alert-<?= $claimWindow['can_upload'] ? 'info' : ($claimWindow['state'] === 'not_created' || $claimWindow['state'] === 'not_open_yet' ? 'secondary' : 'danger') ?> py-2">
+          <i class="bi bi-calendar-event"></i> <?= e($claimWindow['message']) ?>
+          <?php if (!empty($claimWindow['schedule']['planned_date'])): ?>
+            <div class="small">Planned release date: <?= e(date('F j, Y', strtotime($claimWindow['schedule']['planned_date']))) ?></div>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
       <p class="text-muted small">Upload your School ID and your Grades for <?= e($sem) ?> (PDF, JPG or PNG, max 5MB each), then submit.</p>
       <?php foreach (TERM_DOCUMENT_TYPES['claim'] as $type) $docRow('claim', $type, $claimDocs[$type] ?? null, $claimEditable, (int)$term['id']); ?>
 
@@ -79,7 +87,7 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
             <i class="bi bi-send-check"></i> Submit claim
           </button>
         </form>
-      <?php else: ?>
+      <?php elseif (!in_array($term['claim_status'], ['Waiting for Requirements', 'Resubmit'], true)): ?>
         <p class="small text-muted mt-2 mb-0">Nothing to do — we will e-mail you when this changes.</p>
       <?php endif; ?>
     <?php endif; ?>
@@ -100,6 +108,14 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
     <?php if ($renewal && $renewal['status'] === 'Resubmit' && $renewal['remarks']): ?>
       <div class="alert alert-warning"><strong>SK office remarks:</strong> <?= nl2br(e($renewal['remarks'])) ?></div>
     <?php endif; ?>
+    <?php if ((!$renewal || $renewal['status'] === 'Resubmit') && $renewalWindow): ?>
+      <div class="alert alert-<?= $renewalWindow['can_upload'] ? 'info' : ($renewalWindow['state'] === 'not_created' || $renewalWindow['state'] === 'not_open_yet' ? 'secondary' : 'danger') ?> py-2">
+        <i class="bi bi-calendar-event"></i> <?= e($renewalWindow['message']) ?>
+        <?php if (!empty($renewalWindow['schedule']['planned_date'])): ?>
+          <div class="small">Semester starts: <?= e(date('F j, Y', strtotime($renewalWindow['schedule']['planned_date']))) ?></div>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
     <p class="text-muted small">Upload your updated Enrollment Form and School ID for <?= e($nextSem) ?>, then submit.</p>
     <?php foreach (TERM_DOCUMENT_TYPES['renewal'] as $type) $docRow('renewal', $type, $renewalDocs[$type] ?? null, $renewalEditable, (int)$term['id']); ?>
     <?php if ($renewalEditable): ?>
@@ -110,7 +126,7 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
           <i class="bi bi-send-check"></i> Submit renewal
         </button>
       </form>
-    <?php else: ?>
+    <?php elseif ($renewal && $renewal['status'] !== 'Resubmit'): ?>
       <p class="small text-muted mt-2 mb-0">Nothing to do — we will e-mail you when your renewal is reviewed.</p>
     <?php endif; ?>
   </div>

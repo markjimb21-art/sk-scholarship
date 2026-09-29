@@ -38,7 +38,8 @@ final class FundsController
     public function claims(): void
     {
         $rows = Term::byClaimStatus('Submitted');
-        render('admin/claims', compact('rows'), 'Claims');
+        $missed = TermSchedule::missedDeadline('release');
+        render('admin/claims', compact('rows', 'missed'), 'Claims');
     }
 
     public function claimView(): void
@@ -117,7 +118,8 @@ final class FundsController
     public function renewals(): void
     {
         $rows = Renewal::byStatus('Submitted');
-        render('admin/renewals', compact('rows'), 'Renewals');
+        $missed = TermSchedule::missedDeadline('renewal');
+        render('admin/renewals', compact('rows', 'missed'), 'Renewals');
     }
 
     public function renewalView(): void
@@ -141,6 +143,38 @@ final class FundsController
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/renewals/view&id=' . $id); }
         flash('success', ($_POST['decision'] === 'approve' ? 'Renewal approved — the next semester is open.' : 'Sent back for re-upload.') . ' The scholar was notified.');
         redirect('admin/renewals');
+    }
+
+    /* ---------------- Claim / renewal windows (term_schedules) ---------------- */
+
+    public function releaseSchedule(): void { $this->schedulePage('release'); }
+
+    public function renewalSchedule(): void { $this->schedulePage('renewal'); }
+
+    /** One page per purpose: windows with counts, semesters that still need one, and missed deadlines. */
+    private function schedulePage(string $purpose): void
+    {
+        $schedules = TermSchedule::all($purpose);
+        $needed = TermSchedule::needed($purpose);
+        $missed = TermSchedule::missedDeadline($purpose);
+        $programs = Program::options();
+        $years = TermSchedule::academicYearOptions();
+        render('admin/term_schedules', compact('purpose', 'schedules', 'needed', 'missed', 'programs', 'years'),
+            $purpose === 'release' ? 'Claim schedule' : 'Renewal schedule');
+    }
+
+    public function termScheduleSave(): void
+    {
+        $purpose = ($_POST['purpose'] ?? '') === 'renewal' ? 'renewal' : 'release';
+        $back = "admin/$purpose-schedule";
+        require_post($back);
+        $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+        if ($id && ($old = TermSchedule::find($id))) $back = "admin/{$old['purpose']}-schedule";
+        $r = TermSchedule::save($_POST, $id, admin_id());
+        if (!$r['ok']) { flash('danger', $r['error']); redirect($back); }
+        flash('success', ($id ? 'Schedule updated.' : 'Schedule created.')
+            . ($r['notified'] ? " {$r['notified']} scholar(s) were notified by e-mail and in-app." : ''));
+        redirect($back);
     }
 
     /* ---------------- B10 scholars ---------------- */

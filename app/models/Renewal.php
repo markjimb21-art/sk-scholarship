@@ -54,7 +54,25 @@ final class Renewal
     {
         if ($term['scholar_status'] !== 'Active' || $term['claim_status'] !== 'Released' || !Term::isCurrent($term)) return false;
         $req = self::forTerm((int)$term['id']);
-        return self::can('submit', $req['status'] ?? null);
+        return self::can('submit', $req['status'] ?? null) && self::window($term, $req)['can_upload'];
+    }
+
+    /**
+     * The renewal window (term_schedules, purpose 'renewal') for the semester AFTER $term:
+     * ['schedule','state','can_upload','message'] like Term::claimWindow(). $req = the renewal from $term, if known.
+     */
+    public static function window(array $term, ?array $req = null): array
+    {
+        $req ??= self::forTerm((int)$term['id']);
+        $next = Term::nextSemester($term['academic_year'], $term['semester']);
+        $schedule = TermSchedule::forSemester((int)$term['program_id'], $next['academic_year'], $next['semester'], 'renewal');
+        $resubmit = ($req['status'] ?? null) === 'Resubmit';
+        return [
+            'schedule'   => $schedule,
+            'state'      => TermSchedule::state($schedule),
+            'can_upload' => TermSchedule::allowsUpload($schedule, $resubmit),
+            'message'    => TermSchedule::describeForScholar($schedule, 'renewal', $resubmit),
+        ];
     }
 
     /** Renewal requests with a status (B9 queue), oldest first. */
@@ -121,8 +139,10 @@ final class Renewal
             if ((int)($e->errorInfo[1] ?? 0) === 1062) return ['ok' => false, 'error' => 'That semester is already open for this scholar.'];
             throw $e;
         }
+        $window = TermSchedule::forSemester((int)$req['program_id'], $req['academic_year'], $req['semester'], 'release');
         Notification::send((int)$req['user_id'], 'Renewal approved',
-            "Your renewal was approved. {$req['academic_year']} {$req['semester']} is now open — upload your School ID and Grades to claim your cash.",
+            "Your renewal was approved. {$req['academic_year']} {$req['semester']} is now open. To claim your cash on My Scholarship: "
+            . TermSchedule::describeForScholar($window, 'release'),
             'success', url('applicant/scholarship'), sendEmail: true);
         return ['ok' => true];
     }
@@ -155,7 +175,7 @@ final class Renewal
     /** A9: submit (or resubmit) the renewal for the next semester. */
     public static function submit(array $term, int $userId): array
     {
-        if (!self::editable($term)) return ['ok' => false, 'error' => 'A renewal can’t be submitted right now.'];
+        if (!self::editable($term)) return ['ok' => false, 'error' => Term::closedReason($term, 'renewal') ?? 'A renewal can’t be submitted right now.'];
         if (!Term::documentsReady((int)$term['id'], 'renewal')) {
             return ['ok' => false, 'error' => 'Upload both your Enrollment Form and School ID first.'];
         }

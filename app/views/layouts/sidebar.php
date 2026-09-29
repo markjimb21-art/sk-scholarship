@@ -38,8 +38,10 @@ $item = function (string $route, string $icon, string $label) use ($current) {
       $item('admin/decisions', 'bi-clipboard-check', 'Decisions');
       $section('Releasing of budget');
       $item('admin/budget', 'bi-wallet2', 'Budget');
+      $item('admin/release-schedule', 'bi-calendar-check', 'Claim schedule');
       $item('admin/claims', 'bi-file-earmark-check', 'Claims');
       $item('admin/releases', 'bi-cash-coin', 'Releases');
+      $item('admin/renewal-schedule', 'bi-calendar-range', 'Renewal schedule');
       $item('admin/renewals', 'bi-arrow-repeat', 'Renewals');
       $item('admin/scholars', 'bi-mortarboard', 'Scholars');
       $section('Records & reports');

@@ -2,17 +2,18 @@
 declare(strict_types=1);
 
 /**
- * Interview reminder e-mails (docs/PROCESS.md §8) — run from the command line only (Windows Task Scheduler /
- * cron), e.g. every hour:
+ * Reminder e-mails (docs/PROCESS.md §8) — run from the command line only (Windows Task Scheduler / cron), e.g. every hour:
  *
  *     php bin/send_reminders.php
  *
- * Sends one reminder per interview attempt that is still waiting (attendance Scheduled) on a schedule that is
- * not cancelled, when the interview starts within the next `interview_reminder_hours` hours (setting; 0 = off).
+ * 1. Interview reminders: one per interview attempt that is still waiting (attendance Scheduled) on a schedule that is
+ *    not cancelled, when the interview starts within the next `interview_reminder_hours` hours (setting; 0 = off).
+ * 2. Deadline reminders: one per open claim/renewal window whose deadline is within TERM_SCHEDULE_REMINDER_HOURS (48),
+ *    sent to every scholar of that window who hasn't submitted yet.
  *
- * Idempotent: each row is CLAIMED (reminder_sent_at set) before its notification is sent, and only unclaimed rows
- * are picked up, so re-running the script — or two overlapping runs — never sends the same reminder twice.
- * Interview::updateSchedule() clears reminder_sent_at when the date, time or venue changes.
+ * Idempotent: each row is CLAIMED (reminder_sent_at / deadline_reminder_sent_at set) before its notification is sent,
+ * and only unclaimed rows are picked up, so re-running the script — or two overlapping runs — never sends the same
+ * reminder twice. Interview::updateSchedule() and TermSchedule::save() clear the column when the time/deadline changes.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -28,6 +29,10 @@ require_once __DIR__ . '/../core/Helpers.php';
 require_once __DIR__ . '/../core/AuditLog.php';
 require_once __DIR__ . '/../core/Notification.php';
 require_once __DIR__ . '/../app/models/Interview.php';
+require_once __DIR__ . '/../app/models/Program.php';
+require_once __DIR__ . '/../app/models/Budget.php';
+require_once __DIR__ . '/../app/models/Term.php';
+require_once __DIR__ . '/../app/models/TermSchedule.php';
 
 if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
@@ -44,11 +49,6 @@ try {
 
     $setting = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'interview_reminder_hours'")->fetchColumn();
     $hours = ($setting === false || $setting === null || $setting === '') ? 24 : max(0, (int)$setting);
-    if ($hours === 0) {
-        out('Interview reminders are turned off (interview_reminder_hours = 0).');
-        exit(0);
-    }
-
     // Window bounds come from PHP (Asia/Manila) rather than MySQL NOW(), whose timezone may differ.
     $until = date('Y-m-d H:i:s', strtotime($now) + $hours * 3600);
     $stmt = $pdo->prepare(
@@ -66,7 +66,8 @@ try {
            AND TIMESTAMP(s.interview_date, s.start_time) <= ?
          ORDER BY s.interview_date, s.start_time"
     );
-    $stmt->execute([$now, $until]);
+    // interview_reminder_hours = 0 turns interview reminders off (deadline reminders below still run).
+    $stmt->execute($hours === 0 ? [$now, $now] : [$now, $until]);
 
     $claim   = $pdo->prepare("UPDATE interview_assignments SET reminder_sent_at = ? WHERE id = ? AND reminder_sent_at IS NULL");
     $release = $pdo->prepare("UPDATE interview_assignments SET reminder_sent_at = NULL WHERE id = ?");
@@ -89,7 +90,28 @@ try {
             out("FAILED reminder for interview #$id: " . $e->getMessage());
         }
     }
-    out("Interview reminders sent: $sent (window: next $hours hour(s)).");
+    out($hours === 0 ? 'Interview reminders are turned off (interview_reminder_hours = 0).'
+                     : "Interview reminders sent: $sent (window: next $hours hour(s)).");
+
+    // Claim (release) and renewal windows: one reminder TERM_SCHEDULE_REMINDER_HOURS before the deadline to every
+    // scholar who hasn't submitted yet. The window is claimed (deadline_reminder_sent_at) before sending, so re-runs and
+    // overlapping runs never repeat it; editing the deadline clears it (TermSchedule::save).
+    $claimSchedule   = $pdo->prepare("UPDATE term_schedules SET deadline_reminder_sent_at = ? WHERE id = ? AND deadline_reminder_sent_at IS NULL");
+    $releaseSchedule = $pdo->prepare("UPDATE term_schedules SET deadline_reminder_sent_at = NULL WHERE id = ?");
+    $windows = 0;
+    $scholars = 0;
+    foreach (TermSchedule::dueForReminder($now, TERM_SCHEDULE_REMINDER_HOURS) as $row) {
+        $claimSchedule->execute([$now, (int)$row['id']]);
+        if ($claimSchedule->rowCount() !== 1) continue;
+        try {
+            $scholars += TermSchedule::notifyAffected($row, 'reminder');
+            $windows++;
+        } catch (Throwable $e) {
+            $releaseSchedule->execute([(int)$row['id']]);
+            out("FAILED deadline reminder for window #{$row['id']}: " . $e->getMessage());
+        }
+    }
+    out("Deadline reminders sent: $windows window(s), $scholars scholar(s) (deadline within " . TERM_SCHEDULE_REMINDER_HOURS . ' hours).');
     exit(0);
 } catch (Throwable $e) {
     error_log('send_reminders failed: ' . $e->getMessage());

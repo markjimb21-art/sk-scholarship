@@ -80,6 +80,9 @@ const PAYMENT_METHODS = ['Cash', 'GCash', 'Bank', 'Check'];
 const ADDRESS_BARANGAY = 'BARANGAY ESTEFANIA';
 const ADDRESS_CITY = 'BACOLOD CITY';
 
+// Claim / renewal windows (term_schedules): the deadline reminder goes out this many hours before the deadline.
+const TERM_SCHEDULE_REMINDER_HOURS = 48;
+
 // Blood types offered on the application form (blank = not given).
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
