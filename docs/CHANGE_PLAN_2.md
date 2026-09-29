@@ -148,7 +148,7 @@ the scholar renews from.
 |---|---|
 | `app/models/TermSchedule.php` *new* | `find`, `forTerm(programId, ay, sem, purpose)`, `all(filters)`, `isWindowOpen(row)`, `save(data, id, adminId)`, `setStatus(id, status, adminId)`, `affectedScholars(row)`, `missedDeadline(purpose)`, `notifyAffected(row, kind)`, `dueForReminder(now)` |
 | `app/controllers/FundsController.php` | `releaseSchedules()`, `renewalSchedules()` (one list + create/edit modal per purpose), `termScheduleSave()`, `termScheduleStatus()` |
-| `app/controllers/AdminController.php` ROUTES | **add** `release-schedule`, `renewal-schedule`, `term-schedule-save`, `term-schedule-status` (no existing route renamed) |
+| `app/controllers/AdminController.php` ROUTES | **add** `release-schedule`, `renewal-schedule`, `term-schedule-save` (no existing route renamed). *Built without a separate `term-schedule-status` route: the edit form sets Open / Closed / Cancelled through `term-schedule-save`.* |
 | `app/views/admin/term_schedules.php` *new* | shared list + form for both purposes (deadline, opens at, planned date, notes, status) with the affected / submitted / missed counts per row |
 | `app/views/admin/claims.php`, `renewals.php` | link to the schedule page + a **"Missed deadline"** table (scholar, semester, deadline, status, links to Scholar page / edit schedule) |
 | `app/views/layouts/…` sidebar | "Release schedule" under Claims, "Renewal schedule" under Renewals |

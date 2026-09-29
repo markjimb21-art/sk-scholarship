@@ -2,7 +2,7 @@
 
 A web application for the Sangguniang Kabataan (SK) college scholarship. It covers application, screening, interview, final decision, the cash claim and release for each semester, renewals, budgets, analytics and reports.
 
-**The process is the source of truth:** [docs/PROCESS.md](docs/PROCESS.md) maps every step to its page, route and status, and states every rule and formula. [docs/TEST_CHECKLIST.md](docs/TEST_CHECKLIST.md) walks through it once end to end.
+**The process is the source of truth:** [docs/PROCESS.md](docs/PROCESS.md) maps every step to its page, route and status, and states every rule and formula. [docs/TEST_CHECKLIST.md](docs/TEST_CHECKLIST.md) walks through it once end to end; [docs/TEST_CHECKLIST_2.md](docs/TEST_CHECKLIST_2.md) covers claim/renewal windows, suggestions and document history.
 
 Built as a plain PHP MVC application (no framework) on top of PDO/MySQL, with Composer for PHP dependencies and npm for front-end libraries.
 
@@ -34,13 +34,13 @@ app/
                  ScreeningController (B2), InterviewController (B3–B5),
                  FundsController (B6–B10), ReportController (reports + analytics)
   models/        Analytics, Applicant, Application, Budget, Document, Interview, Program,
-                 Renewal, Report, Scholar, Term
+                 Renewal, Report, Scholar, Term, TermSchedule
   views/         admin/, applicant/, auth/, errors/, layouts/
-bin/             send_reminders.php (interview reminder e-mails, command line only)
+bin/             send_reminders.php (interview and claim/renewal deadline reminders, command line only)
 config/          config.php, constants.php (statuses, rubric, document types), database.php
 core/            Auth, AuditLog, Helpers, Notification, Otp, Validator
 database/        sk_scholarship.sql (schema + sample data), schema.sql (schema + reference lists), migrations/
-docs/            PROCESS.md, CHANGE_PLAN.md, TEST_CHECKLIST.md
+docs/            PROCESS.md, CHANGE_PLAN.md, CHANGE_PLAN_2.md, TEST_CHECKLIST.md, TEST_CHECKLIST_2.md
 public/          index.php (front controller), assets/
 storage/         private documents (documents/, term-documents/) + logs, outside the web root
 ```
@@ -77,7 +77,7 @@ Requests go through a single front controller, [public/index.php](public/index.p
    DELETE FROM applicants WHERE user_id = (SELECT id FROM users WHERE email = 'you@example.com');
    ```
 
-   **Upgrading an existing database?** Don't re-import. **Back up first**, then run the files in [database/migrations/](database/migrations/) you haven't applied yet, oldest first. Each is meant to be run once. `2026_09_28_restructure.sql` maps the old data to the new process and then drops what's no longer used — read its header before running it.
+   **Upgrading an existing database?** Don't re-import. **Back up first**, then run the files in [database/migrations/](database/migrations/) you haven't applied yet, oldest first. Each is meant to be run once. `2026_09_28_restructure.sql` maps the old data to the new process and then drops what's no longer used — read its header before running it. After `2026_09_30_scheduling_and_docs.sql`, scholars can't upload claim or renewal documents until you create a window under **Claim schedule** / **Renewal schedule**.
    ```bash
    mysqldump -u root sk_scholarship > backup.sql
    mysql -u root -p sk_scholarship < database/migrations/2026_09_27_add_education_general_average.sql
@@ -113,9 +113,12 @@ Requests go through a single front controller, [public/index.php](public/index.p
 
 ## Scheduled reminders
 
-[bin/send_reminders.php](bin/send_reminders.php) sends the **interview reminder** (in-app + e-mail). It goes to every applicant still marked *Scheduled* on an interview schedule that isn't cancelled, when the interview starts within the next `interview_reminder_hours` hours. You set that number in **Settings**; the default is 24, and 0 turns reminders off.
+[bin/send_reminders.php](bin/send_reminders.php) sends two kinds of reminders (in-app + e-mail):
 
-Each reminder is sent once. The script records `reminder_sent_at` before it sends, so running it again, or two runs overlapping, won't send duplicates. If a schedule's date, time or venue changes, its reminders are reset, and the applicants get a new reminder for the new time.
+- **Interview reminder** — to every applicant still marked *Scheduled* on an interview schedule that isn't cancelled, when the interview starts within the next `interview_reminder_hours` hours. You set that number in **Settings**; the default is 24, and 0 turns interview reminders off.
+- **Claim / renewal deadline reminder** — 48 hours before the deadline of an open claim or renewal window, to every scholar of that window who hasn't submitted yet.
+
+Each reminder is sent once. The script records `reminder_sent_at` (interviews) or `deadline_reminder_sent_at` (windows) before it sends, so running it again, or two runs overlapping, won't send duplicates. If an interview's date, time or venue changes, or a window's deadline changes, the reminder is reset and sent again for the new time.
 
 The script only runs from the command line. Run it **every hour**:
 

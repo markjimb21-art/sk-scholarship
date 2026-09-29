@@ -74,14 +74,14 @@ Scheduled | Attended | No-show.
 | Step | What the applicant does / sees | Page (route) | Status |
 |---|---|---|---|
 | A1 | Register → 6-digit e-mail code → login. Forgot password uses the same OTP. | `register`, `verify-otp`, `resend-otp`, `login`, `forgot-password`, `verify-reset-otp`, `reset-password` | — |
-| A2 | Multi-step form: Personal, Education, Family, Documents (Certificate of Residency, Form 138 / Grades, Enrollment Form, School ID, 2x2 Photo), Review & Submit. Autosaves a draft. **(server)** Only while a program is open and inside its dates; Submit only when complete. | `applicant/application`, `applicant/application/autosave`, `applicant/documents/upload`, `applicant/documents/view`, `applicant/application/submit` | Draft → Submitted |
+| A2 | Multi-step form: Personal (incl. blood type, religion, citizenship), Education, Family, Documents (Certificate of Residency, Form 138 / Grades, Enrollment Form, School ID, 2x2 Photo), Review & Submit. Autosaves a draft. **(server)** Only while a program is open and inside its dates; Submit only when complete. | `applicant/application`, `applicant/application/autosave`, `applicant/documents/upload`, `applicant/documents/view`, `applicant/application/submit` | Draft → Submitted |
 | A3 | Waits for screening. If Returned: the remarks are shown on the dashboard and at the top of the form; the form becomes editable; resubmit. | `applicant/dashboard`, `applicant/application` | Submitted / Returned / Rejected / Qualified |
 | A4 | Waits for a schedule; then sees date, time and venue (in-app + e-mail) and gets a reminder e-mail 24 h before. | `applicant/dashboard` ("What you need to do next" box) | Qualified → Interview Scheduled |
 | A5 | Attends. A first no-show goes back to "waiting for a new schedule" (one reschedule); a second no-show is Rejected. | `applicant/dashboard` | Interview Scheduled → Interviewed / Qualified / Rejected |
 | A6 | Waits for the final result. | `applicant/dashboard` | Interviewed → Approved / Waitlisted / Rejected |
 | A7 | Approved → Scholar; Semester 1 opens automatically. | `applicant/scholarship` *(rebuilt)* | Approved; term = Waiting for Requirements |
-| A8 | Claims cash for the current semester: uploads School ID + Grades → waits → re-uploads if Resubmit → sees Released (amount, date, reference). | `applicant/scholarship`, `applicant/claim/upload` *new*, `applicant/claim/submit` *new*, `applicant/term-documents/view` *new* | claim_status |
-| A9 | After the current semester is Released: uploads Enrollment Form + School ID for the next semester → waits → re-uploads if Resubmit → Approved opens the next semester (back to A8). | `applicant/scholarship`, `applicant/renewal/upload` *new*, `applicant/renewal/submit` *new* | renewal status |
+| A8 | Claims cash for the current semester: uploads School ID + Grades → waits → re-uploads if Resubmit → sees Released (amount, date, reference). **(server)** Only while the admin's **claim window** for that program + semester is open (§4a). | `applicant/scholarship`, `applicant/claim/upload` *new*, `applicant/claim/submit` *new*, `applicant/term-documents/view` *new* | claim_status |
+| A9 | After the current semester is Released: uploads Enrollment Form + School ID for the next semester → waits → re-uploads if Resubmit → Approved opens the next semester (back to A8). **(server)** Only while the admin's **renewal window** for the next semester is open (§4a). | `applicant/scholarship`, `applicant/renewal/upload` *new*, `applicant/renewal/submit` *new* | renewal status |
 
 **One application at a time (server):** while an applicant holds an **Active** scholarship, their
 "current" application is the one that made them a scholar and they can't start another; once the
@@ -133,6 +133,23 @@ before any second semester was opened (their slot is free again — that's when 
 | B8 | `admin/releases` *(rebuilt: "Ready to release" + history)*, `admin/release-save` | Amount pre-filled with the program's amount per semester; date, method (Cash / GCash / Bank / Check), reference no. Scholar is notified. | only Verified claims; one release per semester (`term_id` unique); blocked if no budget for program + A.Y., or if it would exceed Remaining |
 | B9 | `admin/renewals` *(rebuilt queue: Submitted)*, `admin/renewals/view&id=` *new*, `admin/renewals/decide` *new* | Enrollment Form + School ID → **Approved** (opens the next semester) or **Resubmit** (remarks). | only Submitted; scholar Active |
 | B10 | `admin/scholars`, `admin/scholar&id=` *renamed from scholar-view*, `admin/scholar-end` *new* | End the scholarship with a reason. Scholar is notified. | reason from the fixed list; Ended can't claim or renew |
+
+### 4a. Claim and renewal windows (`term_schedules`)
+
+| Page (route) | What it does | Rules (server) |
+|---|---|---|
+| `admin/release-schedule`, `admin/renewal-schedule`, `admin/term-schedule-save` | One window per program + academic year + semester + purpose: **release** = the cash claim of that semester (Grades + School ID); **renewal** = the renewal *into* that semester (Enrollment Form + School ID). Opens at, submission deadline, planned release date / semester start, notes, status Open / Closed / Cancelled. Lists semesters that have waiting scholars but no window yet, and **Missed deadline**. | opens < deadline; deadline in the future when created or changed; planned date ≥ deadline date; one per program + A.Y. + semester + purpose |
+
+- **Window open** = status Open and opens_at ≤ now ≤ deadline. Before that, the scholar sees "Not open yet" and no upload form; after it, "The deadline has passed — contact the SK office".
+- A re-upload the admin asked for (**Resubmit**) is still allowed after the deadline, unless the window is Cancelled.
+- Creating a window, changing its deadline and cancelling it notify every scholar who hasn't submitted (in-app + e-mail). A reminder goes out 48 h before the deadline (`bin/send_reminders.php`, once per window via `deadline_reminder_sent_at`, reset when the deadline changes).
+- Missed deadlines are listed on Claims, Renewals and the window pages. Nothing happens automatically: extend the deadline, follow up, or end the scholarship (B10).
+
+### 4b. Document versions
+
+A School ID or Enrollment Form uploaded during a claim or renewal becomes the applicant's **current** version (`is_current`). Older versions — in `documents` or `term_documents` — are marked superseded (`superseded_at`), never deleted, and audit-logged (`Document::supersede`). The application view and scholar view show the current version (`Document::current`) and a **Document history** list (`Document::history`). A claim or renewal review always shows what was submitted for it.
+
+**Suggestions (never filled in without a click):** B3 "New schedule" offers up to 5 free 2-hour slots (Mon–Sat, 8–12 and 1–5, from the day after the application end date to +60 days, skipping any open interview schedule of any program) — `Interview::suggestSlots`. B6 offers a total budget = slots × amount per semester × 2 — `Budget::suggestedTotal`.
 
 ---
 
@@ -216,6 +233,10 @@ Below them, for the selected program: slots used / total, and budget remaining f
 | Renewal: please re-upload (remarks) | B9 resubmit |
 | Renewal approved — next semester open | B9 approve |
 | Scholarship ended (reason) | B10 |
+| Claim / Renewal open: submit by <deadline> | window created (§4a) |
+| Claim / Renewal deadline changed | window deadline changed or reopened |
+| Claim / Renewal window cancelled | window cancelled |
+| Claim / Renewal reminder (48 h before the deadline) | `bin/send_reminders.php` (idempotent via `term_schedules.deadline_reminder_sent_at`) |
 
 Every status change is also written to the audit log (`AuditLog::write`).
 
