@@ -60,7 +60,11 @@
           <label class="form-label">Program</label>
           <select name="program_id" id="budgetProgram" class="form-select" required>
             <option value="">Choose…</option>
-            <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>" data-year="<?= e($p['academic_year']) ?>"><?= e($p['program_name']) ?></option><?php endforeach; ?>
+            <?php foreach ($programs as $p): $s = $suggestions[(int)$p['id']] ?? null; ?>
+              <option value="<?= (int)$p['id'] ?>" data-year="<?= e($p['academic_year']) ?>"
+                <?php if ($s): ?>data-suggested="<?= e(number_format($s['total'], 2, '.', '')) ?>"
+                data-suggested-text="<?= e('Suggested total budget: ' . $peso($s['total']) . ' (based on ' . $s['slots'] . ' slots × ' . $peso($s['amount']) . '/semester × 2 semesters)') ?>"<?php endif; ?>><?= e($p['program_name']) ?></option>
+            <?php endforeach; ?>
           </select>
         </div>
         <div class="mb-3">
@@ -74,7 +78,11 @@
         <div class="mb-1">
           <label class="form-label">Total budget (₱)</label>
           <input type="number" name="total_budget" id="budgetTotal" class="form-control" min="0.01" step="0.01" required>
-          <div class="form-text">Can’t be less than what was already released for that program and year.</div>
+          <div id="budgetSuggestion" class="alert alert-light border small py-2 mt-2 mb-0 d-none">
+            <span id="budgetSuggestionText"></span>
+            <button type="button" class="btn btn-sm btn-outline-primary ms-1" id="budgetUseSuggestion">Use this</button>
+          </div>
+          <div class="form-text">Can’t be less than what was already released for that program and year. The suggestion is optional — enter any amount.</div>
         </div>
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
@@ -88,9 +96,23 @@ function openBudgetModal(b) {
   document.getElementById('budgetYear').value = b ? b.academic_year : '';
   document.getElementById('budgetTotal').value = b ? b.total_budget : '';
   document.getElementById('budgetTitle').textContent = b ? 'Edit budget' : 'Add budget';
+  showBudgetSuggestion();
 }
+// Shows the server-computed suggestion (Budget::suggestedTotal) for the chosen program; never fills the field by itself.
+function showBudgetSuggestion() {
+  var sel = document.getElementById('budgetProgram'), opt = sel.options[sel.selectedIndex],
+      box = document.getElementById('budgetSuggestion');
+  var has = !!(opt && opt.dataset.suggested);
+  box.classList.toggle('d-none', !has);
+  document.getElementById('budgetSuggestionText').textContent = has ? opt.dataset.suggestedText : '';
+}
+document.getElementById('budgetUseSuggestion').addEventListener('click', function () {
+  var sel = document.getElementById('budgetProgram'), opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.suggested) document.getElementById('budgetTotal').value = opt.dataset.suggested;
+});
 document.getElementById('budgetProgram').addEventListener('change', function () {
   var y = document.getElementById('budgetYear'), opt = this.options[this.selectedIndex];
   if (!y.value && opt && opt.dataset.year) y.value = opt.dataset.year;
+  showBudgetSuggestion();
 });
 </script>

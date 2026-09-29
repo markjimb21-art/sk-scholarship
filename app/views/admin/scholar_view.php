@@ -8,6 +8,13 @@
       · application <a href="<?= url('admin/application&id=' . (int)$scholar['application_id']) ?>"><?= e($scholar['application_code']) ?></a>
       <?= $scholar['ended_at'] ? ' · ended ' . e(date('M d, Y', strtotime($scholar['ended_at']))) : '' ?>
     </p>
+    <p class="text-muted small mb-0">
+      Born <?= $scholar['date_of_birth'] ? e(date('M d, Y', strtotime($scholar['date_of_birth']))) : '—' ?>
+      · <?= e(($scholar['contact_number'] ?? '') ?: '—') ?>
+      · Blood type <?= e(($scholar['blood_type'] ?? '') ?: '—') ?>
+      · Religion <?= e(($scholar['religion'] ?? '') ?: '—') ?>
+      · Citizenship <?= e(($scholar['citizenship'] ?? '') ?: '—') ?>
+    </p>
   </div>
   <div class="text-end">
     <div class="small text-muted">Total released (sum of the releases below)</div>

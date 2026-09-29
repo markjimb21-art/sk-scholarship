@@ -56,6 +56,21 @@ final class Budget
         )->fetchAll(PDO::FETCH_COLUMN);
     }
 
+    /**
+     * Suggested total budget for a program's academic year = slots × amount per semester × 2 semesters.
+     * Returns ['total','slots','amount'], or null when the program is missing or either number isn't set.
+     * A suggestion only: the budget form never fills it in without the admin clicking "Use this".
+     */
+    public static function suggestedTotal(int $programId): ?array
+    {
+        $program = Program::find($programId);
+        if (!$program) return null;
+        $slots = (int)$program['slots_available'];
+        $amount = (float)$program['amount_per_semester'];
+        if ($slots <= 0 || $amount <= 0) return null;
+        return ['total' => round($slots * $amount * 2, 2), 'slots' => $slots, 'amount' => $amount];
+    }
+
     /** Sum of the actual releases for scholars of a program in an academic year. */
     public static function actualReleased(int $programId, string $academicYear): float
     {

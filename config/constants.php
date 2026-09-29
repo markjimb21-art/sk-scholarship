@@ -80,5 +80,8 @@ const PAYMENT_METHODS = ['Cash', 'GCash', 'Bank', 'Check'];
 const ADDRESS_BARANGAY = 'BARANGAY ESTEFANIA';
 const ADDRESS_CITY = 'BACOLOD CITY';
 
+// Blood types offered on the application form (blank = not given).
+const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
 // Year levels
 const YEAR_LEVELS = ['1st Year','2nd Year','3rd Year','4th Year','5th Year','Other'];

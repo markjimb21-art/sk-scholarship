@@ -11,7 +11,9 @@ final class FundsController
         $budgets = Budget::all();
         $programs = Program::options();
         $years = Budget::academicYears();
-        render('admin/budget', compact('budgets', 'programs', 'years'), 'Budget');
+        $suggestions = [];
+        foreach ($programs as $p) $suggestions[(int)$p['id']] = Budget::suggestedTotal((int)$p['id']);
+        render('admin/budget', compact('budgets', 'programs', 'years', 'suggestions'), 'Budget');
     }
 
     public function budgetSave(): void

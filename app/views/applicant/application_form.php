@@ -148,6 +148,24 @@ $program = $app ?: $openProgram;
             <input class="form-control bg-light" readonly value="<?= e(Auth::user()['email']) ?>">
             <div class="form-text">Automatically linked to your registered email.</div>
           </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Blood Type</label>
+            <select name="blood_type" class="form-select">
+              <option value="">—</option>
+              <?php foreach (BLOOD_TYPES as $bt): ?>
+                <option value="<?= e($bt) ?>" <?= ($personal['blood_type'] ?? '') === $bt ? 'selected' : '' ?>><?= e($bt) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Religion</label>
+            <input name="religion" class="form-control" maxlength="80" data-uppercase value="<?= e($personal['religion'] ?? '') ?>">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Citizenship</label>
+            <input name="citizenship" class="form-control" maxlength="50" data-uppercase value="<?= e($personal['citizenship'] ?? 'FILIPINO') ?>">
+          </div>
         </div>
         </fieldset>
 
