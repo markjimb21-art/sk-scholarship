@@ -31,7 +31,14 @@ final class ScreeningController
         $audit->execute([(int)$app['id'], (int)$app['id']]);
         $auditTrail = $audit->fetchAll();
 
-        render('admin/application_view', compact('app', 'eligibility', 'scholar', 'attempts', 'auditTrail'),
+        // School ID / Enrollment Form: the applicant's newest version (maybe from a claim or renewal) + every version.
+        $currentDocs = $docHistory = [];
+        foreach (VERSIONED_DOCUMENT_TYPES as $type) {
+            $currentDocs[$type] = Document::current((int)$app['applicant_id'], $type);
+            $docHistory[$type] = Document::history((int)$app['applicant_id'], $type);
+        }
+
+        render('admin/application_view', compact('app', 'eligibility', 'scholar', 'attempts', 'auditTrail', 'currentDocs', 'docHistory'),
             'Application ' . $app['application_code']);
     }
 

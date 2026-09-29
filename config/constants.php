@@ -31,6 +31,9 @@ const DOCUMENT_TYPES = [
     'Certificate of Residency', 'Form 138 / Grades', 'Enrollment Form', 'School ID', '2x2 Photo',
 ];
 
+// Document types a scholar updates later (claim/renewal); the newest version is shown everywhere, older ones in history.
+const VERSIONED_DOCUMENT_TYPES = ['School ID', 'Enrollment Form'];
+
 // Semesters: 1st -> 2nd (same A.Y.) -> 1st of the next A.Y.
 const SEMESTERS = ['1st Semester', '2nd Semester'];
 

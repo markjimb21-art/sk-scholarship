@@ -200,7 +200,13 @@ final class FundsController
         $stmt->execute([(int)$scholar['id']]);
         $renewals = $stmt->fetchAll();
         $totalReleased = array_sum(array_map(static fn($t) => (float)($t['released_amount'] ?? 0), $terms));
-        render('admin/scholar_view', compact('scholar', 'terms', 'renewals', 'totalReleased'), 'Scholar · ' . $scholar['scholar_code']);
+        $currentDocs = $docHistory = [];
+        foreach (VERSIONED_DOCUMENT_TYPES as $type) {
+            $currentDocs[$type] = Document::current((int)$scholar['applicant_id'], $type);
+            $docHistory[$type] = Document::history((int)$scholar['applicant_id'], $type);
+        }
+        render('admin/scholar_view', compact('scholar', 'terms', 'renewals', 'totalReleased', 'currentDocs', 'docHistory'),
+            'Scholar · ' . $scholar['scholar_code']);
     }
 
     public function scholarEnd(): void

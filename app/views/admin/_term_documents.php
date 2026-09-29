@@ -19,6 +19,11 @@
             <a href="<?= $src ?>" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Open</a> ·
             <a href="<?= $src ?>&download=1"><i class="bi bi-download"></i> Download</a>
             <div class="text-muted"><?= e($d['original_filename']) ?> · uploaded <?= e(date('M d, Y g:i A', strtotime($d['uploaded_at']))) ?></div>
+            <?php if (in_array($type, VERSIONED_DOCUMENT_TYPES, true)): ?>
+              <?= (int)$d['is_current']
+                ? '<span class="badge bg-success-subtle text-success border mt-1">Current on file</span>'
+                : '<span class="badge bg-light text-muted border mt-1">Replaced by a newer upload — see the scholar’s document history</span>' ?>
+            <?php endif; ?>
           </div>
         <?php endif; ?>
       </div></div>

@@ -102,14 +102,27 @@ final class Term
         return $cur && (int)$cur['id'] === (int)$term['id'];
     }
 
-    /** Uploaded documents of a term for one purpose, keyed by type. */
+    /**
+     * The documents submitted for one purpose of a term, keyed by type: the NEWEST version of each type (older
+     * re-uploads stay in the table as history). Not filtered on is_current: a claim keeps showing what was submitted
+     * for it even after a later renewal upload became the applicant's current School ID.
+     */
     public static function documents(int $termId, string $purpose): array
     {
-        $stmt = Database::conn()->prepare("SELECT * FROM term_documents WHERE term_id = ? AND purpose = ?");
+        $stmt = Database::conn()->prepare("SELECT * FROM term_documents WHERE term_id = ? AND purpose = ? ORDER BY id");
         $stmt->execute([$termId, $purpose]);
         $out = [];
-        foreach ($stmt->fetchAll() as $d) $out[$d['type']] = $d;
+        foreach ($stmt->fetchAll() as $d) $out[$d['type']] = $d;   // later id wins
         return $out;
+    }
+
+    /** Set status/remarks on the newest version of the given types (default: all) of a term + purpose. */
+    public static function markDocuments(int $termId, string $purpose, string $status, ?string $remarks, ?array $types = null): void
+    {
+        $stmt = Database::conn()->prepare("UPDATE term_documents SET status = ?, remarks = ? WHERE id = ?");
+        foreach (self::documents($termId, $purpose) as $type => $d) {
+            if ($types === null || in_array($type, $types, true)) $stmt->execute([$status, $remarks, (int)$d['id']]);
+        }
     }
 
     public static function document(int $id): ?array
@@ -143,7 +156,8 @@ final class Term
     }
 
     /**
-     * Store one claim or renewal document (A8 / A9), replacing the previous file for that type.
+     * Store one claim or renewal document (A8 / A9) as a NEW version: the previous file is kept, and every older
+     * version of that type for the applicant (application, claim or renewal) is superseded (Document::supersede).
      * The caller checks ownership; this checks the process rules. Returns ['ok'=>true] or ['ok'=>false,'error'].
      */
     public static function uploadDocument(array $term, string $purpose, string $type, array $file): array
@@ -156,23 +170,22 @@ final class Term
         if (!$stored['ok']) return $stored;
 
         $pdo = Database::conn();
-        $existing = self::documents((int)$term['id'], $purpose)[$type] ?? null;
-        if ($existing) {
-            Document::deleteFile($existing['file_path']);
+        try {
+            $pdo->beginTransaction();
             $pdo->prepare(
-                "UPDATE term_documents SET file_path = ?, original_filename = ?, file_size = ?, mime_type = ?,
-                        status = 'Submitted', remarks = NULL, uploaded_at = NOW() WHERE id = ?"
-            )->execute([$stored['rel'], $stored['original'], $stored['size'], $stored['mime'], $existing['id']]);
-            $docId = (int)$existing['id'];
-        } else {
-            $pdo->prepare(
-                "INSERT INTO term_documents (term_id, purpose, type, file_path, original_filename, file_size, mime_type)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)"
-            )->execute([(int)$term['id'], $purpose, $type, $stored['rel'], $stored['original'], $stored['size'], $stored['mime']]);
+                "INSERT INTO term_documents (term_id, purpose, type, file_path, original_filename, file_size, mime_type, uploaded_at, is_current)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)"
+            )->execute([(int)$term['id'], $purpose, $type, $stored['rel'], $stored['original'], $stored['size'], $stored['mime'], date('Y-m-d H:i:s')]);
             $docId = (int)$pdo->lastInsertId();
+            AuditLog::write('term_document_uploaded', 'term_documents', $docId,
+                "Uploaded $type ($purpose) for {$term['academic_year']} {$term['semester']}");
+            Document::supersede((int)$term['applicant_id'], $type, 'term_documents', $docId);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            Document::deleteFile($stored['rel']);
+            throw $e;
         }
-        AuditLog::write('term_document_uploaded', 'term_documents', $docId,
-            "Uploaded $type ($purpose) for {$term['academic_year']} {$term['semester']}");
         return ['ok' => true];
     }
 
@@ -236,7 +249,7 @@ final class Term
                 'gwa' => round((float)$gwa, 2), 'remarks' => null,
                 'reviewed_by' => $adminId, 'reviewed_at' => date('Y-m-d H:i:s'),
             ], 'GWA ' . number_format((float)$gwa, 2));
-            $pdo->prepare("UPDATE term_documents SET status = 'Verified', remarks = NULL WHERE term_id = ? AND purpose = 'claim'")->execute([$termId]);
+            self::markDocuments($termId, 'claim', 'Verified', null);
             $pdo->commit();
         } catch (DomainException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
@@ -261,8 +274,7 @@ final class Term
             self::changeClaimStatus($term, 'resubmit', $adminId, [
                 'remarks' => $remarks, 'reviewed_by' => $adminId, 'reviewed_at' => date('Y-m-d H:i:s'),
             ], $remarks);
-            $mark = $pdo->prepare("UPDATE term_documents SET status = 'Resubmit', remarks = ? WHERE term_id = ? AND purpose = 'claim' AND type = ?");
-            foreach ($types as $t) $mark->execute([$remarks, $termId, $t]);
+            self::markDocuments($termId, 'claim', 'Resubmit', $remarks, $types);
             $pdo->commit();
         } catch (DomainException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();

@@ -34,6 +34,92 @@ final class Document
         return array_values(array_diff(DOCUMENT_TYPES, $uploaded));
     }
 
+    /* ---------------- versions across documents + term_documents (docs/CHANGE_PLAN_2.md §5) ---------------- */
+
+    /**
+     * A new upload of $type is the applicant's current one: mark every other current row of that type for that
+     * applicant — in BOTH tables — as superseded (is_current = 0, superseded_at = now). Files are kept.
+     * $keepTable/$keepId is the new row itself. Each change is audit-logged. Returns how many rows were superseded.
+     */
+    public static function supersede(int $applicantId, string $type, string $keepTable, int $keepId): int
+    {
+        $pdo = Database::conn();
+        $now = date('Y-m-d H:i:s');
+        $found = [];
+        $stmt = $pdo->prepare(
+            "SELECT d.id FROM documents d JOIN applications a ON a.id = d.application_id
+             WHERE a.applicant_id = ? AND d.document_type = ? AND d.is_current = 1 AND d.file_path <> ''"
+        );
+        $stmt->execute([$applicantId, $type]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $id) $found[] = ['documents', (int)$id];
+        $stmt = $pdo->prepare(
+            "SELECT td.id FROM term_documents td
+             JOIN scholar_terms t ON t.id = td.term_id JOIN scholars s ON s.id = t.scholar_id
+             WHERE s.applicant_id = ? AND td.type = ? AND td.is_current = 1"
+        );
+        $stmt->execute([$applicantId, $type]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $id) $found[] = ['term_documents', (int)$id];
+
+        $count = 0;
+        foreach ($found as [$table, $id]) {
+            if ($table === $keepTable && $id === $keepId) continue;
+            $pdo->prepare("UPDATE `$table` SET is_current = 0, superseded_at = ? WHERE id = ? AND is_current = 1")->execute([$now, $id]);
+            AuditLog::write('document_superseded', $table, $id,
+                "$type superseded by a newer upload ($keepTable #$keepId)", ['is_current' => 1], ['is_current' => 0, 'superseded_at' => $now]);
+            $count++;
+        }
+        return $count;
+    }
+
+    /**
+     * Every version of one document type for an applicant, from the application(s) and from claims/renewals,
+     * newest first. Each row: source_table, id, type, original_filename, mime_type, uploaded_at, status, is_current,
+     * superseded_at, uploaded_during (Application | Claim | Renewal), context (application code or semester),
+     * admin_url (where an admin opens it).
+     */
+    public static function history(int $applicantId, string $type): array
+    {
+        return self::versions($applicantId, $type, false);
+    }
+
+    /** The applicant's current version of a document type (newest is_current row across both tables), or null. */
+    public static function current(int $applicantId, string $type): ?array
+    {
+        return self::versions($applicantId, $type, true)[0] ?? null;
+    }
+
+    private static function versions(int $applicantId, string $type, bool $currentOnly): array
+    {
+        $stmt = Database::conn()->prepare(
+            "SELECT * FROM (
+                SELECT 'documents' AS source_table, d.id, CAST(d.document_type AS CHAR(40)) AS type, d.original_filename,
+                       d.mime_type, d.uploaded_at, CAST(d.status AS CHAR(20)) AS status, d.is_current, d.superseded_at,
+                       'Application' AS uploaded_during, a.application_code AS context
+                FROM documents d JOIN applications a ON a.id = d.application_id
+                WHERE a.applicant_id = :applicant_doc AND d.document_type = :type_doc AND d.file_path <> ''
+                UNION ALL
+                SELECT 'term_documents', td.id, CAST(td.type AS CHAR(40)), td.original_filename,
+                       td.mime_type, td.uploaded_at, CAST(td.status AS CHAR(20)), td.is_current, td.superseded_at,
+                       IF(td.purpose = 'claim', 'Claim', 'Renewal'),
+                       IF(td.purpose = 'claim', CONCAT(t.academic_year, ' ', t.semester),
+                          CONCAT('for ', COALESCE(CONCAT(rr.academic_year, ' ', rr.semester), 'the next semester')))
+                FROM term_documents td
+                JOIN scholar_terms t ON t.id = td.term_id
+                JOIN scholars s ON s.id = t.scholar_id
+                LEFT JOIN renewal_requests rr ON rr.from_term_id = t.id AND td.purpose = 'renewal'
+                WHERE s.applicant_id = :applicant_term AND td.type = :type_term
+             ) v " . ($currentOnly ? 'WHERE v.is_current = 1 ' : '') . "
+             ORDER BY v.uploaded_at DESC, v.source_table DESC, v.id DESC"
+        );
+        $stmt->execute(['applicant_doc' => $applicantId, 'type_doc' => $type, 'applicant_term' => $applicantId, 'type_term' => $type]);
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$r) {
+            $r['admin_url'] = url(($r['source_table'] === 'documents' ? 'admin/documents/view&id=' : 'admin/term-documents/view&id=') . (int)$r['id']);
+        }
+        unset($r);
+        return $rows;
+    }
+
     /** Screening qualified the application: every uploaded document counts as verified. */
     public static function markAllVerified(int $applicationId): void
     {

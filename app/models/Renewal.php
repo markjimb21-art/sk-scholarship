@@ -127,8 +127,7 @@ final class Renewal
             AuditLog::write('term_opened', 'scholar_terms', (int)$pdo->lastInsertId(),
                 "Opened {$req['academic_year']} {$req['semester']} for {$req['scholar_code']} (renewal approved)");
             if ($req['from_term_id']) {
-                $pdo->prepare("UPDATE term_documents SET status = 'Verified', remarks = NULL WHERE term_id = ? AND purpose = 'renewal'")
-                    ->execute([(int)$req['from_term_id']]);
+                Term::markDocuments((int)$req['from_term_id'], 'renewal', 'Verified', null);
             }
             $pdo->commit();
         } catch (DomainException $e) {
@@ -159,8 +158,7 @@ final class Renewal
         try {
             $pdo->beginTransaction();
             self::changeStatus($req, 'resubmit', $adminId, ['remarks' => $remarks, 'reviewed_by' => $adminId, 'reviewed_at' => date('Y-m-d H:i:s')], $remarks);
-            $mark = $pdo->prepare("UPDATE term_documents SET status = 'Resubmit', remarks = ? WHERE term_id = ? AND purpose = 'renewal' AND type = ?");
-            foreach ($types as $t) $mark->execute([$remarks, (int)$req['from_term_id'], $t]);
+            Term::markDocuments((int)$req['from_term_id'], 'renewal', 'Resubmit', $remarks, $types);
             $pdo->commit();
         } catch (DomainException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();

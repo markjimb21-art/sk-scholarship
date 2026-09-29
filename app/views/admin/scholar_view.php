@@ -45,6 +45,33 @@
   </div>
 </div>
 
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white"><h6 class="mb-0">Current documents</h6></div>
+  <div class="card-body"><div class="row g-3">
+    <?php foreach ($currentDocs as $type => $cur): ?>
+      <div class="col-md-6">
+        <div class="border rounded p-3 h-100">
+          <div class="d-flex justify-content-between mb-2"><strong><?= e($type) ?></strong>
+            <?= $cur ? '<span class="badge bg-success">Current</span>' : '<span class="badge bg-secondary">None</span>' ?></div>
+          <?php if ($cur): ?>
+            <?php if (in_array($cur['mime_type'], ['image/jpeg', 'image/png'], true)): ?>
+              <a href="<?= e($cur['admin_url']) ?>" target="_blank" rel="noopener"><img src="<?= e($cur['admin_url']) ?>" class="img-fluid rounded border mb-2" style="max-height:160px" alt="<?= e($type) ?>"></a>
+            <?php endif; ?>
+            <div class="small">
+              <a href="<?= e($cur['admin_url']) ?>" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Open</a> ·
+              <a href="<?= e($cur['admin_url'] . '&download=1') ?>"><i class="bi bi-download"></i> Download</a>
+              <div class="text-muted"><?= e($cur['original_filename']) ?> · <?= e(date('M d, Y', strtotime($cur['uploaded_at']))) ?>
+                · uploaded during <?= e($cur['uploaded_during']) ?> (<?= e($cur['context']) ?>)</div>
+            </div>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+  <?php require VIEW_PATH . '/admin/_document_history.php'; ?>
+  </div>
+</div>
+
 <div class="row g-3">
   <div class="col-lg-7">
     <div class="card border-0 shadow-sm h-100">

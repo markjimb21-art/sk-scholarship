@@ -468,23 +468,28 @@ final class ApplicantController
         $stored = Document::storeUpload($_FILES['file'] ?? [], DOCUMENT_PATH, 'storage/documents/', (string)(int)$app['id']);
         if (!$stored['ok']) $fail($stored['error']);
 
+        // A draft/returned application replaces its own file in place (decision E6); the upload still becomes the
+        // applicant's current version of that type, superseding any older one (e.g. from an earlier scholarship).
         $pdo = Database::conn();
         $stmt = $pdo->prepare("SELECT id, file_path FROM documents WHERE application_id = ? AND document_type = ?");
         $stmt->execute([(int)$app['id'], $type]);
         $row = $stmt->fetch();
+        $pdo->beginTransaction();
         if ($row) {
-            Document::deleteFile($row['file_path']);
             $pdo->prepare("UPDATE documents SET file_path = ?, original_filename = ?, file_size = ?, mime_type = ?,
-                           status = 'Submitted', uploaded_at = NOW(), remarks = NULL WHERE id = ?")
+                           status = 'Submitted', uploaded_at = NOW(), remarks = NULL, is_current = 1, superseded_at = NULL WHERE id = ?")
                 ->execute([$stored['rel'], $stored['original'], $stored['size'], $stored['mime'], $row['id']]);
             $docId = (int)$row['id'];
         } else {
-            $pdo->prepare("INSERT INTO documents (application_id, document_type, file_path, original_filename, file_size, mime_type, status)
-                           VALUES (?, ?, ?, ?, ?, ?, 'Submitted')")
+            $pdo->prepare("INSERT INTO documents (application_id, document_type, file_path, original_filename, file_size, mime_type, status, is_current)
+                           VALUES (?, ?, ?, ?, ?, ?, 'Submitted', 1)")
                 ->execute([(int)$app['id'], $type, $stored['rel'], $stored['original'], $stored['size'], $stored['mime']]);
             $docId = (int)$pdo->lastInsertId();
         }
         AuditLog::write('document_uploaded', 'documents', $docId, "Uploaded $type for application {$app['application_code']}");
+        Document::supersede((int)$applicant['id'], $type, 'documents', $docId);
+        $pdo->commit();
+        if ($row) Document::deleteFile($row['file_path']);
 
         if ($isAjax) {
             json_response(['success' => true, 'document' => [

@@ -90,29 +90,46 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
 <div class="tab-content">
   <div class="tab-pane fade show active" id="tab-docs">
     <div class="row g-3">
-      <?php foreach ($app['documents'] as $d): $has = $d['file_path'] !== ''; ?>
+      <?php foreach ($app['documents'] as $d):
+        $has = $d['file_path'] !== '';
+        // School ID / Enrollment Form: show the applicant's CURRENT version (a later claim/renewal upload replaces this one).
+        $cur = $currentDocs[$d['document_type']] ?? null;
+        $isNewer = $cur && !($cur['source_table'] === 'documents' && (int)$cur['id'] === (int)$d['id']);
+        if ($isNewer) {
+            $has = true;
+            $src = $cur['admin_url'];
+            $shown = ['mime_type' => $cur['mime_type'], 'original_filename' => $cur['original_filename'], 'uploaded_at' => $cur['uploaded_at'], 'status' => $cur['status']];
+        } else {
+            $src = url('admin/documents/view&id=' . (int)$d['id']);
+            $shown = $d;
+        } ?>
         <div class="col-md-6 col-xl-4">
           <div class="card border-0 shadow-sm h-100"><div class="card-body">
             <div class="d-flex justify-content-between mb-2">
               <strong><?= e($d['document_type']) ?></strong>
-              <span class="badge bg-<?= $has ? ($d['status'] === 'Verified' ? 'success' : 'info') : 'secondary' ?>"><?= $has ? e($d['status'] === 'Verified' ? 'Verified' : 'Uploaded') : 'Missing' ?></span>
+              <span class="badge bg-<?= $has ? ($shown['status'] === 'Verified' ? 'success' : 'info') : 'secondary' ?>"><?= $has ? e($shown['status'] === 'Verified' ? 'Verified' : ($shown['status'] === 'Resubmit' ? 'Resubmit' : 'Uploaded')) : 'Missing' ?></span>
             </div>
+            <?php if ($isNewer): ?>
+              <div class="small mb-2"><span class="badge bg-primary">Current version</span>
+                updated during <?= e($cur['uploaded_during']) ?> · <?= e($cur['context']) ?>. The one from this application is in the document history.</div>
+            <?php endif; ?>
             <?php if ($has): ?>
-              <?php if (in_array($d['mime_type'], ['image/jpeg', 'image/png'], true)): ?>
-                <a href="<?= url('admin/documents/view&id=' . (int)$d['id']) ?>" target="_blank" rel="noopener">
-                  <img src="<?= url('admin/documents/view&id=' . (int)$d['id']) ?>" class="img-fluid rounded border mb-2" style="max-height:180px" alt="<?= e($d['document_type']) ?>">
+              <?php if (in_array($shown['mime_type'], ['image/jpeg', 'image/png'], true)): ?>
+                <a href="<?= e($src) ?>" target="_blank" rel="noopener">
+                  <img src="<?= e($src) ?>" class="img-fluid rounded border mb-2" style="max-height:180px" alt="<?= e($d['document_type']) ?>">
                 </a>
               <?php endif; ?>
               <div class="small">
-                <a href="<?= url('admin/documents/view&id=' . (int)$d['id']) ?>" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Open</a> ·
-                <a href="<?= url('admin/documents/view&id=' . (int)$d['id'] . '&download=1') ?>"><i class="bi bi-download"></i> Download</a>
-                <div class="text-muted"><?= e($d['original_filename']) ?> · <?= e(date('M d, Y', strtotime($d['uploaded_at']))) ?></div>
+                <a href="<?= e($src) ?>" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Open</a> ·
+                <a href="<?= e($src . '&download=1') ?>"><i class="bi bi-download"></i> Download</a>
+                <div class="text-muted"><?= e($shown['original_filename']) ?> · <?= e(date('M d, Y', strtotime($shown['uploaded_at']))) ?></div>
               </div>
             <?php endif; ?>
           </div></div>
         </div>
       <?php endforeach; ?>
     </div>
+    <?php require VIEW_PATH . '/admin/_document_history.php'; ?>
   </div>
 
   <div class="tab-pane fade" id="tab-personal">
