@@ -50,10 +50,24 @@
       <form method="POST" action="<?= url('admin/interview-schedule-save') ?>" class="card-body">
         <?= csrf_field() ?>
         <input type="hidden" name="program_id" value="<?= (int)$program['id'] ?>">
-        <div class="mb-2"><label class="form-label small">Date</label><input type="date" name="interview_date" class="form-control" min="<?= date('Y-m-d') ?>" required></div>
+        <div class="mb-3">
+          <div class="form-label small mb-1">Suggested slots <span class="text-muted">(optional)</span></div>
+          <?php if ($suggestions): ?>
+            <div class="d-flex flex-wrap gap-1">
+              <?php foreach ($suggestions as $s): ?>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-slot-date="<?= e($s['date']) ?>"
+                        data-slot-start="<?= e($s['start']) ?>" data-slot-end="<?= e($s['end']) ?>"><?= e($s['label']) ?></button>
+              <?php endforeach; ?>
+            </div>
+            <div class="form-text">Free 2-hour blocks after the application period, not overlapping any open interview schedule. A suggestion only — you can pick any date and time.</div>
+          <?php else: ?>
+            <div class="form-text"><?= e($noSuggestionReason ?? 'No suggestions.') ?> Pick a date and time below.</div>
+          <?php endif; ?>
+        </div>
+        <div class="mb-2"><label class="form-label small">Date</label><input type="date" name="interview_date" id="schedDate" class="form-control" min="<?= date('Y-m-d') ?>" required></div>
         <div class="row g-2 mb-2">
-          <div class="col"><label class="form-label small">Start</label><input type="time" name="start_time" class="form-control" required></div>
-          <div class="col"><label class="form-label small">End</label><input type="time" name="end_time" class="form-control" required></div>
+          <div class="col"><label class="form-label small">Start</label><input type="time" name="start_time" id="schedStart" class="form-control" required></div>
+          <div class="col"><label class="form-label small">End</label><input type="time" name="end_time" id="schedEnd" class="form-control" required></div>
         </div>
         <div class="mb-2"><label class="form-label small">Venue</label><input name="venue" class="form-control" maxlength="200" required></div>
         <div class="mb-3"><label class="form-label small">Capacity</label><input type="number" name="max_slots" class="form-control" min="1" value="20" required></div>
@@ -78,4 +92,14 @@
     </div>
   </div>
 </div>
+<script>
+document.querySelectorAll('[data-slot-date]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    document.getElementById('schedDate').value = b.dataset.slotDate;
+    document.getElementById('schedStart').value = b.dataset.slotStart;
+    document.getElementById('schedEnd').value = b.dataset.slotEnd;
+    document.querySelectorAll('[data-slot-date]').forEach(function (o) { o.classList.toggle('active', o === b); });
+  });
+});
+</script>
 <?php endif; ?>

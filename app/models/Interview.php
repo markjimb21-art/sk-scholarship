@@ -127,6 +127,64 @@ final class Interview
 
     /* ---------------- schedules (B3) ---------------- */
 
+    /** Interview blocks offered as suggestions (Mon–Sat, lunch hour skipped). */
+    public const SUGGESTION_BLOCKS = [['08:00', '10:00'], ['10:00', '12:00'], ['13:00', '15:00'], ['15:00', '17:00']];
+    /** Suggestions stay within this many days after the program's application end date. */
+    public const SUGGESTION_WINDOW_DAYS = 60;
+
+    /**
+     * Up to $limit free interview slots for a program, soonest first — a suggestion only; the admin can pick any time.
+     * Window: from the day after application_end (screening first) — or tomorrow, if that is already past — to
+     * application_end + 60 days. Monday–Saturday, SUGGESTION_BLOCKS only. A block is skipped when it overlaps any
+     * Open interview schedule of ANY program (the admin's time is shared).
+     * Returns [['date','start','end','label']], or [] with $why set when there is nothing to suggest.
+     */
+    public static function suggestSlots(int $programId, int $limit = 5, ?string &$why = null): array
+    {
+        $why = null;
+        $program = Program::find($programId);
+        if (!$program) { $why = 'Program not found.'; return []; }
+
+        $end = new DateTimeImmutable($program['application_end']);
+        $first = $end->modify('+1 day');
+        $tomorrow = new DateTimeImmutable('tomorrow');
+        if ($first < $tomorrow) $first = $tomorrow;
+        $last = $end->modify('+' . self::SUGGESTION_WINDOW_DAYS . ' days');
+        if ($first > $last) {
+            $why = 'No suggestions: the ' . self::SUGGESTION_WINDOW_DAYS . '-day window after the application period ('
+                . $end->format('M j, Y') . ') has passed.';
+            return [];
+        }
+
+        $stmt = Database::conn()->prepare(
+            "SELECT interview_date, start_time, end_time FROM interview_schedules
+             WHERE status = 'Open' AND interview_date BETWEEN ? AND ?"
+        );
+        $stmt->execute([$first->format('Y-m-d'), $last->format('Y-m-d')]);
+        $busy = [];
+        foreach ($stmt->fetchAll() as $s) {
+            $busy[$s['interview_date']][] = [substr($s['start_time'], 0, 5), substr($s['end_time'], 0, 5)];
+        }
+
+        $out = [];
+        for ($d = $first; $d <= $last && count($out) < $limit; $d = $d->modify('+1 day')) {
+            if ((int)$d->format('N') === 7) continue;   // Sunday
+            $date = $d->format('Y-m-d');
+            foreach (self::SUGGESTION_BLOCKS as [$from, $to]) {
+                foreach ($busy[$date] ?? [] as [$bFrom, $bTo]) {
+                    if ($bFrom < $to && $bTo > $from) continue 2;   // overlaps an existing schedule
+                }
+                $out[] = [
+                    'date' => $date, 'start' => $from, 'end' => $to,
+                    'label' => $d->format('D, M j') . ' · ' . date('g:i', strtotime($from)) . '–' . date('g:i A', strtotime($to)),
+                ];
+                if (count($out) >= $limit) break;
+            }
+        }
+        if (!$out) $why = 'No free 2-hour block in the ' . self::SUGGESTION_WINDOW_DAYS . ' days after the application period.';
+        return $out;
+    }
+
     /** Validates schedule input. Returns [clean data, error|null]. */
     private static function scheduleInput(array $data): array
     {

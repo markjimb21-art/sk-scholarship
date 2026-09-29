@@ -17,7 +17,9 @@ final class InterviewController
         $programs = Program::options();
         $schedules = $program ? Interview::schedulesByProgram((int)$program['id']) : [];
         $waiting = $program ? Interview::qualifiedWithoutSchedule((int)$program['id']) : [];
-        render('admin/interviews', compact('program', 'programs', 'schedules', 'waiting'), 'Interviews');
+        $noSuggestionReason = null;
+        $suggestions = $program ? Interview::suggestSlots((int)$program['id'], 5, $noSuggestionReason) : [];
+        render('admin/interviews', compact('program', 'programs', 'schedules', 'waiting', 'suggestions', 'noSuggestionReason'), 'Interviews');
     }
 
     /** One schedule: assigned applicants with attendance/score actions, and bulk-assign within capacity. */
