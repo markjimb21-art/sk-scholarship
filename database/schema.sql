@@ -114,6 +114,9 @@ CREATE TABLE applicants_personal_information (
     complete_address TEXT NOT NULL,
     purok_id INT UNSIGNED NULL,
     contact_number VARCHAR(20) NOT NULL,
+    blood_type VARCHAR(5) NULL,
+    religion VARCHAR(80) NULL,
+    citizenship VARCHAR(50) DEFAULT 'Filipino',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
     FOREIGN KEY (purok_id) REFERENCES puroks(id)
@@ -201,9 +204,12 @@ CREATE TABLE documents (
     status ENUM('Not Submitted','Submitted','Verified') NOT NULL DEFAULT 'Submitted',
     uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     remarks TEXT NULL,
+    is_current TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'Newest version of this type for the applicant',
+    superseded_at DATETIME NULL,
     FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
     INDEX idx_app (application_id),
     INDEX idx_status (status),
+    INDEX idx_doc_current (document_type, is_current),
     UNIQUE KEY uniq_doc_per_app (application_id, document_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -306,8 +312,33 @@ CREATE TABLE term_documents (
     status ENUM('Submitted','Resubmit','Verified') NOT NULL DEFAULT 'Submitted',
     remarks TEXT NULL,
     uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_term_doc (term_id, purpose, type),
+    is_current TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'Newest version of this type for the applicant',
+    superseded_at DATETIME NULL,
+    INDEX idx_term_doc (term_id, purpose, type),
+    INDEX idx_term_doc_current (type, is_current),
     CONSTRAINT fk_term_documents_term FOREIGN KEY (term_id) REFERENCES scholar_terms(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Admin-opened submission windows: 'release' = cash claim of this semester, 'renewal' = renewal INTO it.
+CREATE TABLE term_schedules (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    program_id INT UNSIGNED NOT NULL,
+    academic_year VARCHAR(20) NOT NULL,
+    semester ENUM('1st Semester','2nd Semester') NOT NULL,
+    purpose ENUM('release','renewal') NOT NULL,
+    opens_at DATETIME NOT NULL,
+    submission_deadline DATETIME NOT NULL,
+    planned_date DATE NULL COMMENT 'Planned release date (release) or semester start (renewal); information only',
+    status ENUM('Open','Closed','Cancelled') NOT NULL DEFAULT 'Open',
+    notes TEXT NULL,
+    deadline_reminder_sent_at DATETIME NULL COMMENT 'When the 48 h deadline reminder was sent',
+    created_by INT UNSIGNED NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_term_schedule (program_id, academic_year, semester, purpose),
+    INDEX idx_deadline (status, submission_deadline),
+    CONSTRAINT fk_term_schedules_program FOREIGN KEY (program_id) REFERENCES scholarship_programs(id),
+    CONSTRAINT fk_term_schedules_created_by FOREIGN KEY (created_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE renewal_requests (

@@ -66,6 +66,9 @@ CREATE TABLE `applicants_personal_information` (
   `complete_address` text NOT NULL,
   `purok_id` int(10) unsigned DEFAULT NULL,
   `contact_number` varchar(20) NOT NULL,
+  `blood_type` varchar(5) DEFAULT NULL,
+  `religion` varchar(80) DEFAULT NULL,
+  `citizenship` varchar(50) DEFAULT 'Filipino',
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `applicant_id` (`applicant_id`),
@@ -81,7 +84,7 @@ CREATE TABLE `applicants_personal_information` (
 
 LOCK TABLES `applicants_personal_information` WRITE;
 /*!40000 ALTER TABLE `applicants_personal_information` DISABLE KEYS */;
-INSERT INTO `applicants_personal_information` VALUES (1,1,'123','adf','adf','adf','2002-05-21','aadf',12,'adsffad','2026-09-16 07:36:08'),(17,8,'Juan','','Dela Cruz','Jr.','2001-01-01','Kung Saan Si Rene',48,'09123456789','2026-09-25 12:18:23');
+INSERT INTO `applicants_personal_information` VALUES (1,1,'123','adf','adf','adf','2002-05-21','aadf',12,'adsffad',NULL,NULL,'Filipino','2026-09-16 07:36:08'),(17,8,'Juan','','Dela Cruz','Jr.','2001-01-01','Kung Saan Si Rene',48,'09123456789','O+','ROMAN CATHOLIC','Filipino','2026-09-25 12:18:23');
 /*!40000 ALTER TABLE `applicants_personal_information` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -250,10 +253,13 @@ CREATE TABLE `documents` (
   `status` enum('Not Submitted','Submitted','Verified') NOT NULL DEFAULT 'Submitted',
   `uploaded_at` datetime DEFAULT current_timestamp(),
   `remarks` text DEFAULT NULL,
+  `is_current` tinyint(1) NOT NULL DEFAULT 1 COMMENT 'Newest version of this type for the applicant',
+  `superseded_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_doc_per_app` (`application_id`,`document_type`),
   KEY `idx_app` (`application_id`),
   KEY `idx_status` (`status`),
+  KEY `idx_doc_current` (`document_type`,`is_current`),
   CONSTRAINT `documents_ibfk_1` FOREIGN KEY (`application_id`) REFERENCES `applications` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=48 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -264,7 +270,7 @@ CREATE TABLE `documents` (
 
 LOCK TABLES `documents` WRITE;
 /*!40000 ALTER TABLE `documents` DISABLE KEYS */;
-INSERT INTO `documents` VALUES (1,1,'2x2 Photo','storage/documents/1/Profile_Picture_1789545482.jpg','Messenger_creation_CF0C390E-F22E-41DA-A137-B65DA075CC4A.jpeg',40547,'image/jpeg','Verified','2026-09-16 15:58:02','adfdf'),(2,1,'Certificate of Residency','storage/documents/1/Certificate_of_Residency_1789568164.jpg','Screenshot_20250819-213241.jpg',672809,'image/jpeg','Verified','2026-09-16 22:16:04',''),(3,1,'Form 138 / Grades','storage/documents/1/Form_138_1789568123.jpg','FB_IMG_1759373623430.jpg',32898,'image/jpeg','Verified','2026-09-16 22:15:23',''),(4,1,'Enrollment Form','storage/documents/1/Enrollment_Form_1789568171.jpg','Messenger_creation_CF0C390E-F22E-41DA-A137-B65DA075CC4A.jpeg',40547,'image/jpeg','Verified','2026-09-16 22:16:11',''),(5,1,'School ID','storage/documents/1/School_ID_1789568143.jpg','d727289d-ecd1-47e3-ae77-56572b46a9cd.jpg',167494,'image/jpeg','Verified','2026-09-16 22:15:43',''),(43,10,'2x2 Photo','storage/documents/10/c4c20c3c49477f04a7fef07bfcbea3e9.png','1000067256.png',1510666,'image/png','Verified','2026-09-25 20:46:07',NULL),(44,10,'Certificate of Residency','storage/documents/10/297d1f241faec92b0af1cf32fa62d358.png','contact.png',113324,'image/png','Verified','2026-09-25 20:36:50',NULL),(45,10,'Form 138 / Grades','storage/documents/10/5912f4c4ca4a742d7cd604339b50393a.png','seo.png',325507,'image/png','Verified','2026-09-25 20:36:45',NULL),(46,10,'Enrollment Form','storage/documents/10/a11f8f9c09a131b74d448ce742ba2e36.png','responsive.png',302908,'image/png','Verified','2026-09-25 20:36:50',NULL),(47,10,'School ID','storage/documents/10/0e9e22fb96f2ee65c4decc222a1551ea.png','og-image.png',196222,'image/png','Verified','2026-09-25 20:36:48',NULL);
+INSERT INTO `documents` VALUES (1,1,'2x2 Photo','storage/documents/1/Profile_Picture_1789545482.jpg','Messenger_creation_CF0C390E-F22E-41DA-A137-B65DA075CC4A.jpeg',40547,'image/jpeg','Verified','2026-09-16 15:58:02','adfdf',1,NULL),(2,1,'Certificate of Residency','storage/documents/1/Certificate_of_Residency_1789568164.jpg','Screenshot_20250819-213241.jpg',672809,'image/jpeg','Verified','2026-09-16 22:16:04','',1,NULL),(3,1,'Form 138 / Grades','storage/documents/1/Form_138_1789568123.jpg','FB_IMG_1759373623430.jpg',32898,'image/jpeg','Verified','2026-09-16 22:15:23','',1,NULL),(4,1,'Enrollment Form','storage/documents/1/Enrollment_Form_1789568171.jpg','Messenger_creation_CF0C390E-F22E-41DA-A137-B65DA075CC4A.jpeg',40547,'image/jpeg','Verified','2026-09-16 22:16:11','',1,NULL),(5,1,'School ID','storage/documents/1/School_ID_1789568143.jpg','d727289d-ecd1-47e3-ae77-56572b46a9cd.jpg',167494,'image/jpeg','Verified','2026-09-16 22:15:43','',1,NULL),(43,10,'2x2 Photo','storage/documents/10/c4c20c3c49477f04a7fef07bfcbea3e9.png','1000067256.png',1510666,'image/png','Verified','2026-09-25 20:46:07',NULL,1,NULL),(44,10,'Certificate of Residency','storage/documents/10/297d1f241faec92b0af1cf32fa62d358.png','contact.png',113324,'image/png','Verified','2026-09-25 20:36:50',NULL,1,NULL),(45,10,'Form 138 / Grades','storage/documents/10/5912f4c4ca4a742d7cd604339b50393a.png','seo.png',325507,'image/png','Verified','2026-09-25 20:36:45',NULL,1,NULL),(46,10,'Enrollment Form','storage/documents/10/a11f8f9c09a131b74d448ce742ba2e36.png','responsive.png',302908,'image/png','Verified','2026-09-25 20:36:50',NULL,1,NULL),(47,10,'School ID','storage/documents/10/0e9e22fb96f2ee65c4decc222a1551ea.png','og-image.png',196222,'image/png','Verified','2026-09-25 20:36:48',NULL,1,NULL);
 /*!40000 ALTER TABLE `documents` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -827,6 +833,46 @@ INSERT INTO `system_settings` VALUES (5,'email_notifications','1','bool','Enable
 UNLOCK TABLES;
 
 --
+-- Table structure for table `term_schedules`
+--
+
+DROP TABLE IF EXISTS `term_schedules`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `term_schedules` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `program_id` int(10) unsigned NOT NULL,
+  `academic_year` varchar(20) NOT NULL,
+  `semester` enum('1st Semester','2nd Semester') NOT NULL,
+  `purpose` enum('release','renewal') NOT NULL COMMENT 'release = cash claim of this semester; renewal = renewal INTO this semester',
+  `opens_at` datetime NOT NULL,
+  `submission_deadline` datetime NOT NULL,
+  `planned_date` date DEFAULT NULL COMMENT 'Planned release date (release) or semester start (renewal); information only',
+  `status` enum('Open','Closed','Cancelled') NOT NULL DEFAULT 'Open',
+  `notes` text DEFAULT NULL,
+  `deadline_reminder_sent_at` datetime DEFAULT NULL COMMENT 'When the 48 h deadline reminder was sent (NULL = not yet / reset after a deadline change)',
+  `created_by` int(10) unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_term_schedule` (`program_id`,`academic_year`,`semester`,`purpose`),
+  KEY `idx_deadline` (`status`,`submission_deadline`),
+  KEY `fk_term_schedules_created_by` (`created_by`),
+  CONSTRAINT `fk_term_schedules_program` FOREIGN KEY (`program_id`) REFERENCES `scholarship_programs` (`id`),
+  CONSTRAINT `fk_term_schedules_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `term_schedules`
+--
+
+LOCK TABLES `term_schedules` WRITE;
+/*!40000 ALTER TABLE `term_schedules` DISABLE KEYS */;
+/*!40000 ALTER TABLE `term_schedules` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `term_documents`
 --
 
@@ -845,8 +891,11 @@ CREATE TABLE `term_documents` (
   `status` enum('Submitted','Resubmit','Verified') NOT NULL DEFAULT 'Submitted',
   `remarks` text DEFAULT NULL,
   `uploaded_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `is_current` tinyint(1) NOT NULL DEFAULT 1 COMMENT 'Newest version of this type for the applicant',
+  `superseded_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_term_doc` (`term_id`,`purpose`,`type`),
+  KEY `idx_term_doc` (`term_id`,`purpose`,`type`),
+  KEY `idx_term_doc_current` (`type`,`is_current`),
   CONSTRAINT `fk_term_documents_term` FOREIGN KEY (`term_id`) REFERENCES `scholar_terms` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
