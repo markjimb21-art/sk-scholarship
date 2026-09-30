@@ -64,6 +64,12 @@ final class ReportController
                 'remaining' => Analytics::remaining($pid, $ay),
                 'surplus' => Analytics::surplus($pid, $ay),
                 'extraFundable' => Analytics::extraFundable($pid, $ay),
+                'attendance' => Analytics::attendanceRate($pid),
+                'noShow' => Analytics::noShowByAttempt($pid),
+                'scores' => Analytics::scoreSummary($pid),
+                'onTime' => Analytics::onTimeRate($pid, $ay),
+                'overdue' => Analytics::overdueCount($pid, $ay),
+                'avgDays' => Analytics::avgDaysToSubmit($pid, $ay),
             ];
         }
         render('admin/analytics', compact('program', 'programs', 'years', 'data'), 'Data Analytics');

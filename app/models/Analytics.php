@@ -170,6 +170,116 @@ final class Analytics
         return $remaining === null ? null : $remaining - self::projectedNeed($programId, $academicYear);
     }
 
+    /* ---------------- (3) Interview effectiveness ---------------- */
+
+    /** Score bands for the interview-score chart: label => [from (inclusive), to (exclusive)]. Total score is 0–100. */
+    public const SCORE_BANDS = ['Below 50' => [0, 50], '50–69.99' => [50, 70], '70–100' => [70, 100.01]];
+
+    /** Interview attempts of the program that happened (Attended or No-show), on schedules that weren't cancelled. */
+    private const ATTEMPTS_SQL = "FROM interview_assignments ia JOIN interview_schedules s ON s.id = ia.schedule_id
+                                  WHERE s.program_id = ? AND s.status <> 'Cancelled' AND ia.attendance IN ('Attended','No-show')";
+
+    /** Attendance rate = Attended ÷ (Attended + No-show). Returns ['rate' => float|null, 'attended', 'total']. */
+    public static function attendanceRate(int $programId): array
+    {
+        $stmt = Database::conn()->prepare("SELECT COUNT(*) AS total, COALESCE(SUM(ia.attendance = 'Attended'), 0) AS attended " . self::ATTEMPTS_SQL);
+        $stmt->execute([$programId]);
+        $r = $stmt->fetch();
+        $total = (int)$r['total'];
+        return ['rate' => $total > 0 ? (int)$r['attended'] / $total : null, 'attended' => (int)$r['attended'], 'total' => $total];
+    }
+
+    /**
+     * No-show rate = No-show ÷ (Attended + No-show), on the first attempt (reschedule_count 0) and after the one
+     * reschedule (reschedule_count 1). Returns [0 => ['rate','noshow','total'], 1 => [...]].
+     */
+    public static function noShowByAttempt(int $programId): array
+    {
+        $stmt = Database::conn()->prepare(
+            "SELECT LEAST(ia.reschedule_count, 1) AS attempt, COUNT(*) AS total, SUM(ia.attendance = 'No-show') AS noshow "
+            . self::ATTEMPTS_SQL . " GROUP BY LEAST(ia.reschedule_count, 1)"
+        );
+        $stmt->execute([$programId]);
+        $out = [0 => ['rate' => null, 'noshow' => 0, 'total' => 0], 1 => ['rate' => null, 'noshow' => 0, 'total' => 0]];
+        foreach ($stmt->fetchAll() as $r) {
+            $total = (int)$r['total'];
+            $out[(int)$r['attempt']] = ['rate' => $total > 0 ? (int)$r['noshow'] / $total : null, 'noshow' => (int)$r['noshow'], 'total' => $total];
+        }
+        return $out;
+    }
+
+    /** Average total score of the program's scored interviews + count per SCORE_BANDS band. Returns ['average','count','bands']. */
+    public static function scoreSummary(int $programId): array
+    {
+        $stmt = Database::conn()->prepare(
+            "SELECT ev.total_score FROM interview_evaluations ev
+             JOIN interview_assignments ia ON ia.id = ev.assignment_id
+             JOIN interview_schedules s ON s.id = ia.schedule_id
+             WHERE s.program_id = ? AND ia.attendance = 'Attended'"
+        );
+        $stmt->execute([$programId]);
+        $scores = array_map('floatval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        $bands = array_fill_keys(array_keys(self::SCORE_BANDS), 0);
+        foreach ($scores as $s) {
+            foreach (self::SCORE_BANDS as $label => [$from, $to]) {
+                if ($s >= $from && $s < $to) { $bands[$label]++; break; }
+            }
+        }
+        return ['average' => $scores ? array_sum($scores) / count($scores) : null, 'count' => count($scores), 'bands' => $bands];
+    }
+
+    /* ---------------- (4) On-time submissions (claims) ---------------- */
+
+    /**
+     * Submitted claims of a program + A.Y. joined to their release window: claim_status other than Waiting for
+     * Requirements, submitted_at set, a term_schedules row (purpose release) for the same program + A.Y. + semester.
+     */
+    private const SUBMITTED_WITH_WINDOW_SQL = "FROM scholar_terms t
+        JOIN scholars sc ON sc.id = t.scholar_id
+        JOIN term_schedules ts ON ts.program_id = sc.program_id AND ts.academic_year = t.academic_year
+                              AND ts.semester = t.semester AND ts.purpose = 'release'
+        WHERE sc.program_id = ? AND t.academic_year = ?
+          AND t.claim_status <> 'Waiting for Requirements' AND t.submitted_at IS NOT NULL";
+
+    /**
+     * On-time rate = submitted on or before the window's deadline ÷ submitted claims with a window.
+     * submitted_at is the LAST submission (a re-send after a Resubmit counts). Claims submitted with no window (history
+     * from before claim windows existed) are not counted; 'without_window' says how many.
+     * Returns ['rate' => float|null, 'on_time', 'total', 'without_window'].
+     */
+    public static function onTimeRate(int $programId, string $academicYear): array
+    {
+        $pdo = Database::conn();
+        $stmt = $pdo->prepare("SELECT COUNT(*) AS total, COALESCE(SUM(t.submitted_at <= ts.submission_deadline), 0) AS on_time " . self::SUBMITTED_WITH_WINDOW_SQL);
+        $stmt->execute([$programId, $academicYear]);
+        $r = $stmt->fetch();
+        $none = $pdo->prepare(
+            "SELECT COUNT(*) FROM scholar_terms t JOIN scholars sc ON sc.id = t.scholar_id
+             WHERE sc.program_id = ? AND t.academic_year = ? AND t.claim_status <> 'Waiting for Requirements' AND t.submitted_at IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM term_schedules ts WHERE ts.program_id = sc.program_id AND ts.academic_year = t.academic_year
+                                  AND ts.semester = t.semester AND ts.purpose = 'release')"
+        );
+        $none->execute([$programId, $academicYear]);
+        $total = (int)$r['total'];
+        return ['rate' => $total > 0 ? (int)$r['on_time'] / $total : null, 'on_time' => (int)$r['on_time'], 'total' => $total,
+                'without_window' => (int)$none->fetchColumn()];
+    }
+
+    /** Currently overdue claims = scholars in Analytics::overdue(program, A.Y., 'release') — the calendar's red deadlines. */
+    public static function overdueCount(int $programId, string $academicYear): int
+    {
+        return count(self::overdue($programId, $academicYear, 'release'));
+    }
+
+    /** Average days from the window opening to the claim's submission (same base as onTimeRate). Null with no data. */
+    public static function avgDaysToSubmit(int $programId, string $academicYear): ?float
+    {
+        $stmt = Database::conn()->prepare("SELECT AVG(TIMESTAMPDIFF(MINUTE, ts.opens_at, t.submitted_at)) " . self::SUBMITTED_WITH_WINDOW_SQL);
+        $stmt->execute([$programId, $academicYear]);
+        $minutes = $stmt->fetchColumn();
+        return $minutes === null ? null : (float)$minutes / 1440;
+    }
+
     /** Extra scholars fundable = floor(surplus ÷ (amount per semester × 2)); 0 when there is a shortfall. */
     public static function extraFundable(int $programId, string $academicYear): int
     {

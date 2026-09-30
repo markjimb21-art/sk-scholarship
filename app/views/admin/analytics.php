@@ -117,6 +117,66 @@ $pct = static fn($r) => $r === null ? 'no data' : number_format($r * 100, 1) . '
   </div>
 </div>
 
+<?php $att = $data['attendance']; $ns = $data['noShow']; $sc = $data['scores']; $ot = $data['onTime']; ?>
+<!-- (3) INTERVIEW EFFECTIVENESS -->
+<h5 class="fw-semibold mb-2 mt-4">3. Interview effectiveness — <?= e($program['program_name']) ?></h5>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <p class="small text-muted mb-2">Interviews that took place on this program’s schedules (not cancelled). Attempts still marked Scheduled are not counted yet.</p>
+      <div class="row g-2">
+        <div class="col-sm-4"><div class="border rounded p-2 h-100">
+          <div class="small text-muted">Attendance rate</div>
+          <div class="fs-4 fw-bold"><?= e($pct($att['rate'])) ?></div>
+          <div class="small text-muted"><?= (int)$att['attended'] ?> of <?= (int)$att['total'] ?> · = Attended ÷ (Attended + No-show)</div>
+        </div></div>
+        <div class="col-sm-4"><div class="border rounded p-2 h-100">
+          <div class="small text-muted">No-show, first attempt</div>
+          <div class="fs-4 fw-bold"><?= e($pct($ns[0]['rate'])) ?></div>
+          <div class="small text-muted"><?= (int)$ns[0]['noshow'] ?> of <?= (int)$ns[0]['total'] ?> · = No-show ÷ attempts with no reschedule</div>
+        </div></div>
+        <div class="col-sm-4"><div class="border rounded p-2 h-100">
+          <div class="small text-muted">No-show after the reschedule</div>
+          <div class="fs-4 fw-bold"><?= e($pct($ns[1]['rate'])) ?></div>
+          <div class="small text-muted"><?= (int)$ns[1]['noshow'] ?> of <?= (int)$ns[1]['total'] ?> · = No-show ÷ rescheduled attempts. Lower than the first attempt = rescheduling helps.</div>
+        </div></div>
+      </div>
+    </div></div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <h6 class="fw-semibold mb-1">Interview scores</h6>
+      <p class="small text-muted mb-1">
+        Average <strong><?= $sc['average'] === null ? 'no data' : e(number_format($sc['average'], 2)) . ' / 100' ?></strong>
+        = average total score of <?= (int)$sc['count'] ?> scored interview(s). Scores bunched in one band suggest the rubric isn’t separating applicants.
+      </p>
+      <div style="height:150px"><canvas id="scoreChart" role="img" aria-label="Interviews per score band"></canvas></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- (4) ON-TIME SUBMISSIONS -->
+<h5 class="fw-semibold mb-2 mt-4">4. On-time claim submissions — A.Y. <?= e($data['ay']) ?></h5>
+<div class="row g-3">
+  <div class="col-sm-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+    <div class="small text-muted">On-time rate</div>
+    <div class="fs-4 fw-bold"><?= e($pct($ot['rate'])) ?></div>
+    <div class="small text-muted"><?= (int)$ot['on_time'] ?> of <?= (int)$ot['total'] ?> · = claims submitted on or before their window’s deadline ÷ submitted claims with a window
+      (last submission counts)<?= $ot['without_window'] ? '. ' . (int)$ot['without_window'] . ' claim(s) from before claim windows existed are not counted' : '' ?>.</div>
+  </div></div></div>
+  <div class="col-sm-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+    <div class="small text-muted">Currently overdue</div>
+    <div class="fs-4 fw-bold <?= $data['overdue'] ? 'text-danger' : '' ?>"><?= (int)$data['overdue'] ?></div>
+    <div class="small text-muted">= scholars still Waiting for Requirements / Resubmit after their claim window’s deadline — the same list as
+      <a href="<?= url('admin/claims') ?>">Claims → Missed deadline</a> and the red deadlines on the <a href="<?= url('admin/calendar&program_id=' . (int)$program['id']) ?>">calendar</a>.</div>
+  </div></div></div>
+  <div class="col-sm-4"><div class="card border-0 shadow-sm h-100"><div class="card-body">
+    <div class="small text-muted">Average time to submit</div>
+    <div class="fs-4 fw-bold"><?= $data['avgDays'] === null ? 'no data' : e(number_format($data['avgDays'], 1)) . ' days' ?></div>
+    <div class="small text-muted">= average (claim submitted − window opened), same claims as the on-time rate. Close to the window length = people wait for the deadline.</div>
+  </div></div></div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   if (!window.Chart) return;
@@ -140,6 +200,7 @@ document.addEventListener('DOMContentLoaded', function () {
   bar('funnelChart', <?= js_json(array_map(static fn($s) => $s, Analytics::STAGES)) ?>, <?= js_json(array_values($c)) ?>, false);
   bar('budgetChart', ['Total budget', 'Released', 'Committed', 'Projected need'],
       <?= js_json([(float)($data['budget']['total_budget'] ?? 0), (float)($data['budget']['released'] ?? 0), round($data['committed'], 2), round($data['projectedNeed'], 2)]) ?>, true);
+  bar('scoreChart', <?= js_json(array_keys($sc['bands'])) ?>, <?= js_json(array_values($sc['bands'])) ?>, false);
 });
 </script>
 <?php endif; ?>
