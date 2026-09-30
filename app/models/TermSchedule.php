@@ -154,6 +154,22 @@ final class TermSchedule
         return $rows;
     }
 
+    /**
+     * Windows (not Cancelled) whose deadline or planned date falls in [$from, $to] (dates), for the calendar;
+     * optionally of one program.
+     */
+    public static function inRange(string $from, string $to, ?int $programId = null): array
+    {
+        $sql = "SELECT ts.*, sp.program_name FROM term_schedules ts JOIN scholarship_programs sp ON sp.id = ts.program_id
+                WHERE ts.status <> 'Cancelled'
+                  AND (DATE(ts.submission_deadline) BETWEEN ? AND ? OR ts.planned_date BETWEEN ? AND ?)";
+        $params = [$from, $to, $from, $to];
+        if ($programId) { $sql .= " AND ts.program_id = ?"; $params[] = $programId; }
+        $stmt = Database::conn()->prepare($sql . " ORDER BY ts.submission_deadline");
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
     /** Scholars who hadn't submitted when a (not cancelled) window's deadline passed — for the admin to decide. */
     public static function missedDeadline(string $purpose): array
     {

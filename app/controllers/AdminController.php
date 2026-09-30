@@ -11,6 +11,7 @@ require_once BASE_PATH . '/app/models/Term.php';
 require_once BASE_PATH . '/app/models/Renewal.php';
 require_once BASE_PATH . '/app/models/Budget.php';
 require_once BASE_PATH . '/app/models/TermSchedule.php';
+require_once BASE_PATH . '/app/models/Analytics.php';
 
 /**
  * Admin area router + the shared admin pages. Only the admin role reaches this (public/index.php).
@@ -24,6 +25,9 @@ final class AdminController
         'dashboard'                 => ['AdminController', 'dashboard'],
         'notifications'             => ['AdminController', 'notifications'],
         'applications'              => ['AdminController', 'applications'],
+        // Calendar: interviews + claim/renewal windows (read-only)
+        'calendar'                  => ['CalendarController', 'index'],
+        'calendar-feed'             => ['CalendarController', 'feed'],
         'application'               => ['ScreeningController', 'view'],
         'documents/view'            => ['ScreeningController', 'document'],
         // B1 programs

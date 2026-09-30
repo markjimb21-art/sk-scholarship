@@ -30,6 +30,26 @@ final class Analytics
         };
     }
 
+    /* ---------------- Overdue (shared by the calendar and section 4) ---------------- */
+
+    /**
+     * Scholars who missed a claim/renewal deadline: TermSchedule::missedDeadline() — the same list as Claims/Renewals →
+     * Missed deadline — filtered by program, academic year and purpose (null = all). One row per scholar per window,
+     * with the window in ['schedule']. The calendar colours a window red when it has at least one row here.
+     */
+    public static function overdue(?int $programId = null, ?string $academicYear = null, ?string $purpose = null): array
+    {
+        $rows = [];
+        foreach ($purpose ? [$purpose] : TermSchedule::PURPOSES as $p) {
+            foreach (TermSchedule::missedDeadline($p) as $m) {
+                if ($programId && (int)$m['schedule']['program_id'] !== $programId) continue;
+                if ($academicYear !== null && $m['schedule']['academic_year'] !== $academicYear) continue;
+                $rows[] = $m;
+            }
+        }
+        return $rows;
+    }
+
     /* ---------------- (1) Possible scholars ---------------- */
 
     /** Count of the program's applications currently in each stage. */

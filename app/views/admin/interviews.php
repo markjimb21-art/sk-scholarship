@@ -25,9 +25,9 @@
           <tbody>
             <?php if (!$schedules): ?><tr><td colspan="6" class="text-center text-muted py-4">No schedules yet.</td></tr><?php endif; ?>
             <?php foreach ($schedules as $s):
-              $past = $s['interview_date'] < date('Y-m-d');
-              $status = $s['status'] === 'Cancelled' ? 'Cancelled' : ($past ? 'Done' : ((int)$s['assigned_count'] >= (int)$s['max_slots'] ? 'Full' : 'Open'));
-              $color = ['Cancelled' => 'danger', 'Done' => 'secondary', 'Full' => 'warning', 'Open' => 'success'][$status]; ?>
+              // Same rule and colours as the calendar (Interview::displayStatus).
+              $status = Interview::displayStatus($s);
+              $color = Interview::STATUS_COLORS[$status]; ?>
               <tr>
                 <td><div class="fw-semibold"><?= e(date('D, M d, Y', strtotime($s['interview_date']))) ?></div>
                     <small class="text-muted"><?= e(date('g:i A', strtotime($s['start_time']))) ?> – <?= e(date('g:i A', strtotime($s['end_time']))) ?></small></td>

@@ -31,6 +31,8 @@ $item = function (string $route, string $icon, string $label) use ($current) {
       // In process order (docs/PROCESS.md).
       $section = static function (string $label): void { echo '<li class="nav-item small text-uppercase text-muted px-3 pt-3 pb-1" style="font-size:.7rem">' . e($label) . '</li>'; };
       $item('admin/dashboard', 'bi-speedometer2', 'Dashboard');
+      // Overview across both processes (interviews + claim/renewal deadlines), so it sits with the dashboard.
+      $item('admin/calendar', 'bi-calendar3', 'Calendar');
       $section('Application process');
       $item('admin/programs', 'bi-collection', 'Programs');
       $item('admin/screening', 'bi-inbox', 'Screening');

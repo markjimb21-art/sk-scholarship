@@ -127,6 +127,35 @@ final class Interview
 
     /* ---------------- schedules (B3) ---------------- */
 
+    /** Bootstrap colour per displayed schedule status — shared by the Interviews list and the calendar. */
+    public const STATUS_COLORS = ['Open' => 'success', 'Full' => 'warning', 'Done' => 'secondary', 'Cancelled' => 'danger'];
+
+    /**
+     * What a schedule shows as on the Interviews list and the calendar: Cancelled, Done (date passed), Full (assigned
+     * reached capacity) or Open. Needs a row with status, interview_date, assigned_count and max_slots.
+     */
+    public static function displayStatus(array $schedule): string
+    {
+        if ($schedule['status'] === 'Cancelled') return 'Cancelled';
+        if ($schedule['interview_date'] < date('Y-m-d')) return 'Done';
+        return (int)$schedule['assigned_count'] >= (int)$schedule['max_slots'] ? 'Full' : 'Open';
+    }
+
+    /** Schedules dated in [$from, $to] with program name and assigned count (calendar), optionally of one program. */
+    public static function schedulesInRange(string $from, string $to, ?int $programId = null): array
+    {
+        $sql = "SELECT s.*, sp.program_name, COUNT(ia.id) AS assigned_count
+                FROM interview_schedules s
+                JOIN scholarship_programs sp ON sp.id = s.program_id
+                LEFT JOIN interview_assignments ia ON ia.schedule_id = s.id
+                WHERE s.interview_date BETWEEN ? AND ?";
+        $params = [$from, $to];
+        if ($programId) { $sql .= " AND s.program_id = ?"; $params[] = $programId; }
+        $stmt = Database::conn()->prepare($sql . " GROUP BY s.id ORDER BY s.interview_date, s.start_time");
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
     /** Interview blocks offered as suggestions (Mon–Sat, lunch hour skipped). */
     public const SUGGESTION_BLOCKS = [['08:00', '10:00'], ['10:00', '12:00'], ['13:00', '15:00'], ['15:00', '17:00']];
     /** Suggestions stay within this many days after the program's application end date. */
