@@ -191,7 +191,19 @@ All functions live in `app/models/Analytics.php`, one small function per number.
 - **Surplus / Shortfall** = Remaining − Projected need (positive = surplus, negative = shortfall).
 - **Extra scholars fundable** = floor(Surplus ÷ (amount per semester × 2)), 0 when there is a shortfall.
 
-Charts (Chart.js, served locally): stage funnel (bar); budget Total vs Released vs Committed vs Projected need (bar).
+### (3) Interview effectiveness — per program
+Base: interview attempts on the program's schedules that aren't cancelled and that happened (Attended or No-show).
+- **Attendance rate** = Attended ÷ (Attended + No-show).
+- **No-show rate** on the first attempt (`reschedule_count` = 0) vs after the one reschedule (`reschedule_count` = 1), each = No-show ÷ attempts.
+- **Average score** = average `total_score` of scored interviews; count per band < 50 · 50–69.99 · 70–100 (`Analytics::SCORE_BANDS`).
+
+### (4) On-time claim submissions — per program + academic year
+Base: the program's semesters of that A.Y. whose claim was submitted, joined to their release window (`term_schedules`).
+- **On-time rate** = submitted (last submission) on or before the window's deadline ÷ submitted claims with a window. Claims from before windows existed are not counted.
+- **Currently overdue** = scholars in `Analytics::overdue(program, A.Y., 'release')` — the same list as Claims → Missed deadline and the red deadlines on the calendar.
+- **Average time to submit** = average (submitted_at − window opens_at), in days.
+
+Charts (Chart.js, served locally): stage funnel (bar); budget Total vs Released vs Committed vs Projected need (bar); interview score bands (bar).
 
 ---
 
@@ -244,6 +256,10 @@ Every status change is also written to the audit log (`AuditLog::write`).
 
 ## 9. Kept supporting pages
 
+`admin/calendar` + `admin/calendar-feed` (read-only calendar of interview schedules, claim/renewal deadlines and
+planned dates; interview colours from `Interview::displayStatus()` like the Interviews list, red deadlines from
+`Analytics::overdue()` like Missed deadline, amber within 48 h like the deadline reminder; a list below the calendar is
+linked both ways),
 `admin/applications` (read-only search of all applications — the "database of applications"),
 `admin/users` (admin accounts), `admin/settings` (e-mail on/off, reminder hours, Send Test Email),
 `admin/audit-logs`, `admin/notifications`, `admin/documents/view`, `admin/term-documents/view` *new*.

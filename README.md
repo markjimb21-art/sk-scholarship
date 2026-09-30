@@ -2,7 +2,7 @@
 
 A web application for the Sangguniang Kabataan (SK) college scholarship. It covers application, screening, interview, final decision, the cash claim and release for each semester, renewals, budgets, analytics and reports.
 
-**The process is the source of truth:** [docs/PROCESS.md](docs/PROCESS.md) maps every step to its page, route and status, and states every rule and formula. [docs/TEST_CHECKLIST.md](docs/TEST_CHECKLIST.md) walks through it once end to end; [docs/TEST_CHECKLIST_2.md](docs/TEST_CHECKLIST_2.md) covers claim/renewal windows, suggestions and document history.
+**The process is the source of truth:** [docs/PROCESS.md](docs/PROCESS.md) maps every step to its page, route and status, and states every rule and formula. [docs/TEST_CHECKLIST.md](docs/TEST_CHECKLIST.md) walks through it once end to end; [docs/TEST_CHECKLIST_2.md](docs/TEST_CHECKLIST_2.md) covers claim/renewal windows, suggestions and document history; [docs/TEST_CHECKLIST_3.md](docs/TEST_CHECKLIST_3.md) the calendar and the interview / on-time analytics.
 
 Built as a plain PHP MVC application (no framework) on top of PDO/MySQL, with Composer for PHP dependencies and npm for front-end libraries.
 
@@ -15,6 +15,7 @@ Built as a plain PHP MVC application (no framework) on top of PDO/MySQL, with Co
   - `dompdf/dompdf` — PDF generation (reports, certificates)
 - **Front-end packages ([package.json](package.json)):**
   - `chart.js` — analytics charts. The page loads a copy of `node_modules/chart.js/dist/chart.umd.min.js` from `public/assets/vendor/chart.js/`, so charts work without internet. After upgrading chart.js, copy that file again.
+  - `@fullcalendar/core` + `@fullcalendar/daygrid` — the admin calendar. The page loads copies of their `index.global.min.js` from `public/assets/vendor/fullcalendar/` (`core.global.min.js`, `daygrid.global.min.js`). After upgrading, copy both files again.
 - **Server:** Apache (XAMPP) with `mod_rewrite`
 
 ## Requirements
@@ -32,7 +33,8 @@ app/
   controllers/   AuthController (A1), ApplicantController (A2–A9),
                  AdminController (router + dashboard, programs, users, settings, audit),
                  ScreeningController (B2), InterviewController (B3–B5),
-                 FundsController (B6–B10), ReportController (reports + analytics)
+                 FundsController (B6–B10), ReportController (reports + analytics),
+                 CalendarController (admin calendar + its JSON feed)
   models/        Analytics, Applicant, Application, Budget, Document, Interview, Program,
                  Renewal, Report, Scholar, Term, TermSchedule
   views/         admin/, applicant/, auth/, errors/, layouts/
@@ -40,7 +42,7 @@ bin/             send_reminders.php (interview and claim/renewal deadline remind
 config/          config.php, constants.php (statuses, rubric, document types), database.php
 core/            Auth, AuditLog, Helpers, Notification, Otp, Validator
 database/        sk_scholarship.sql (schema + sample data), schema.sql (schema + reference lists), migrations/
-docs/            PROCESS.md, CHANGE_PLAN.md, CHANGE_PLAN_2.md, TEST_CHECKLIST.md, TEST_CHECKLIST_2.md
+docs/            PROCESS.md, CHANGE_PLAN.md … CHANGE_PLAN_3.md, TEST_CHECKLIST.md … TEST_CHECKLIST_3.md
 public/          index.php (front controller), assets/
 storage/         private documents (documents/, term-documents/) + logs, outside the web root
 ```
