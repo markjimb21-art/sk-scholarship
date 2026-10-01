@@ -114,3 +114,17 @@ plus), two applicant accounts and an e-mail address you can read. Numbered steps
 6. As the Treasurer end a first-semester scholarship. → Ended; no redirect to the (reviewer-only) Decisions page.
 7. Deactivate a staff account. → They can no longer log in.
 8. Admin can still open every page.
+
+## 7. Security cleanup
+1. `git status` / `git log --all --name-only` → no `.env` and no `*.sql` dump outside `database/` is or ever was committed.
+2. Create a file `backup_test.sql` in the project root → `git status` does not list it (ignored); delete it.
+3. The project folder contains no SQL dumps; backups are in `C:\xampp\sk-scholarship-backups\`.
+4. README → Security notes tells you to keep backups outside the project and to rotate any credential that was ever
+   committed or shared (MySQL password, Gmail App Password).
+
+## 8. Everything
+1. `php -l` on every PHP file → no errors.
+2. On a copy of `database/sk_scholarship.sql` as it was before these changes, run the five `2026_10_01_*.sql`
+   migrations → no errors; the result matches `database/sk_scholarship.sql` and `database/schema.sql`.
+3. Every new POST (slot request, slot decision, reschedule, holidays, document invalidation, user role change) without
+   a CSRF token is refused.

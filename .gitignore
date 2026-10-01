@@ -5,3 +5,9 @@ storage/logs/*
 # Private applicant/scholar uploads — never commit personal documents
 storage/documents/
 storage/term-documents/
+
+# Database dumps / backups contain personal data and password hashes — keep them OUTSIDE the project
+# (e.g. C:\xampp\sk-scholarship-backups\). These patterns stop one from being committed by accident.
+backup_*.sql
+/*.sql
+*.sql.gz

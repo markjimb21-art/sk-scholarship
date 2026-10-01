@@ -2,7 +2,7 @@
 
 A web application for the Sangguniang Kabataan (SK) college scholarship. It covers application, screening, interview, final decision, the cash claim and release for each semester, renewals, budgets, analytics and reports.
 
-**The process is the source of truth:** [docs/PROCESS.md](docs/PROCESS.md) maps every step to its page, route and status, and states every rule and formula. [docs/TEST_CHECKLIST.md](docs/TEST_CHECKLIST.md) walks through it once end to end; [docs/TEST_CHECKLIST_2.md](docs/TEST_CHECKLIST_2.md) covers claim/renewal windows, suggestions and document history; [docs/TEST_CHECKLIST_3.md](docs/TEST_CHECKLIST_3.md) the calendar and the interview / on-time analytics.
+**The process is the source of truth:** [docs/PROCESS.md](docs/PROCESS.md) maps every step to its page, route and status, and states every rule and formula. [docs/TEST_CHECKLIST.md](docs/TEST_CHECKLIST.md) walks through it once end to end; [docs/TEST_CHECKLIST_2.md](docs/TEST_CHECKLIST_2.md) covers claim/renewal windows, suggestions and document history; [docs/TEST_CHECKLIST_3.md](docs/TEST_CHECKLIST_3.md) the calendar and the interview / on-time analytics; [docs/TEST_CHECKLIST_4.md](docs/TEST_CHECKLIST_4.md) notifications, scheduling, data retention, profile analytics, dashboard charts and staff roles.
 
 Built as a plain PHP MVC application (no framework) on top of PDO/MySQL, with Composer for PHP dependencies and npm for front-end libraries.
 
@@ -42,7 +42,7 @@ bin/             send_reminders.php (interview and claim/renewal deadline remind
 config/          config.php, constants.php (statuses, rubric, document types), database.php
 core/            Auth, AuditLog, Helpers, Notification, Otp, Validator
 database/        sk_scholarship.sql (schema + sample data), schema.sql (schema + reference lists), migrations/
-docs/            PROCESS.md, CHANGE_PLAN.md … CHANGE_PLAN_3.md, TEST_CHECKLIST.md … TEST_CHECKLIST_3.md
+docs/            PROCESS.md, CHANGE_PLAN.md … CHANGE_PLAN_3.md, TEST_CHECKLIST.md … TEST_CHECKLIST_4.md
 public/          index.php (front controller), assets/
 storage/         private documents (documents/, term-documents/) + logs, outside the web root
 ```
@@ -53,7 +53,9 @@ Requests go through a single front controller, [public/index.php](public/index.p
 
 | Role | Description |
 |---|---|
-| `admin` | Runs the whole process (`admin/*`) |
+| `admin` | Runs the whole process (`admin/*`), including programs, users, settings, reports, analytics and audit logs |
+| `reviewer` | Screening, interviews (incl. scheduling and slot requests) and decisions — no budget, claims or releases |
+| `treasurer` | Budget, claim/renewal schedules, claims, releases, renewals and scholars — no applicant review |
 | `applicant` | Registers, applies and, once approved, is a scholar (`applicant/*`) — same account |
 
 ## Setup
@@ -79,9 +81,10 @@ Requests go through a single front controller, [public/index.php](public/index.p
    DELETE FROM applicants WHERE user_id = (SELECT id FROM users WHERE email = 'you@example.com');
    ```
 
-   **Upgrading an existing database?** Don't re-import. **Back up first**, then run the files in [database/migrations/](database/migrations/) you haven't applied yet, oldest first. Each is meant to be run once. `2026_09_28_restructure.sql` maps the old data to the new process and then drops what's no longer used — read its header before running it. After `2026_09_30_scheduling_and_docs.sql`, scholars can't upload claim or renewal documents until you create a window under **Claim schedule** / **Renewal schedule**.
+   **Upgrading an existing database?** Don't re-import. **Back up first**, then run the files in [database/migrations/](database/migrations/) you haven't applied yet, oldest first. Each is meant to be run once. `2026_09_28_restructure.sql` maps the old data to the new process and then drops what's no longer used — read its header before running it. After `2026_09_30_scheduling_and_docs.sql`, scholars can't upload claim or renewal documents until you create a window under **Claim schedule** / **Renewal schedule**. The `2026_10_01_*.sql` files (notifications digest, slot requests and holidays, data retention, profile sex, staff roles) are independent of each other.
    ```bash
-   mysqldump -u root sk_scholarship > backup.sql
+   mysqldump -u root sk_scholarship > C:
+mpp\sk-scholarship-backups\backup_YYYY-MM-DD.sql   # outside the project
    mysql -u root -p sk_scholarship < database/migrations/2026_09_27_add_education_general_average.sql
    ```
 
@@ -115,10 +118,11 @@ Requests go through a single front controller, [public/index.php](public/index.p
 
 ## Scheduled reminders
 
-[bin/send_reminders.php](bin/send_reminders.php) sends two kinds of reminders (in-app + e-mail):
+[bin/send_reminders.php](bin/send_reminders.php) sends three kinds of reminders (in-app + e-mail):
 
 - **Interview reminder** — to every applicant still marked *Scheduled* on an interview schedule that isn't cancelled, when the interview starts within the next `interview_reminder_hours` hours. You set that number in **Settings**; the default is 24, and 0 turns interview reminders off.
 - **Claim / renewal deadline reminder** — 48 hours before the deadline of an open claim or renewal window, to every scholar of that window who hasn't submitted yet.
+- **Daily digest** (Settings → *Daily interview digest*) — on the first run of each day: "Your interview is today" to each applicant interviewed that day, and one list of the day's interviews (times, venues, applicants, how many not yet marked) to the admins. Recorded in `system_settings.daily_digest_sent_on`, so it is sent once per day.
 
 Each reminder is sent once. The script records `reminder_sent_at` (interviews) or `deadline_reminder_sent_at` (windows) before it sends, so running it again, or two runs overlapping, won't send duplicates. If an interview's date, time or venue changes, or a window's deadline changes, the reminder is reset and sent again for the new time.
 
@@ -142,6 +146,11 @@ You can also run it by hand: `C:\xampp\php\php.exe C:\xampp\htdocs\sk-scholarshi
 ```
 
 ## Security notes
+
+- **Keep database dumps and backups outside the project folder** (e.g. `C:
+mpp\sk-scholarship-backups\`). They contain applicants' personal data and password hashes. `.gitignore` refuses `backup_*.sql` and any `.sql` in the project root, but the safe place is outside `htdocs` entirely.
+- **Rotate any credential that was ever committed, pasted or shared** (in chat, e-mail, screenshots or a backup copied to someone): change the MySQL password (`DB_PASS`) and generate a new Gmail App Password (`MAIL_PASS`), then update `.env`. `.env` has never been committed to this repository, but a credential shown anywhere else should still be treated as exposed.
+- Staff roles: `AdminController::ROUTES` lists the roles allowed on every admin route (default deny); give staff the narrowest role that fits.
 
 - `.env` contains live database and email credentials. It is listed in `.gitignore`; commit only [.env.example](.env.example), which has placeholder values, and never commit real secrets.
 - Deployed servers must run with `APP_ENV=production`.
