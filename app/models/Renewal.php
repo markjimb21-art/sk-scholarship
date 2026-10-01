@@ -147,7 +147,7 @@ final class Renewal
     }
 
     /** B9 Resubmit (remarks required): the chosen documents (default: both) must be uploaded again. */
-    public static function resubmit(int $id, string $remarks, array $types, int $adminId): array
+    public static function resubmit(int $id, string $remarks, array $types, int $adminId, bool $invalid = false): array
     {
         $req = self::find($id);
         if (!$req) return ['ok' => false, 'error' => 'Renewal not found.'];
@@ -159,6 +159,7 @@ final class Renewal
             $pdo->beginTransaction();
             self::changeStatus($req, 'resubmit', $adminId, ['remarks' => $remarks, 'reviewed_by' => $adminId, 'reviewed_at' => date('Y-m-d H:i:s')], $remarks);
             Term::markDocuments((int)$req['from_term_id'], 'renewal', 'Resubmit', $remarks, $types);
+            if ($invalid) Term::invalidateNewest((int)$req['from_term_id'], 'renewal', $types, $remarks, $adminId);
             $pdo->commit();
         } catch (DomainException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();

@@ -72,6 +72,8 @@
   </div>
 </div>
 
+<?php require VIEW_PATH . '/admin/_field_history.php'; ?>
+
 <div class="row g-3">
   <div class="col-lg-7">
     <div class="card border-0 shadow-sm h-100">

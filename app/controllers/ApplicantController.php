@@ -12,6 +12,7 @@ require_once BASE_PATH . '/app/models/Renewal.php';
 require_once BASE_PATH . '/app/models/Budget.php';
 require_once BASE_PATH . '/app/models/TermSchedule.php';
 require_once BASE_PATH . '/app/models/SlotRequest.php';
+require_once BASE_PATH . '/app/models/RecordHistory.php';
 
 /** Applicant / scholar side of docs/PROCESS.md (A1 is in AuthController). */
 final class ApplicantController
@@ -25,6 +26,7 @@ final class ApplicantController
             case 'application/submit':   $this->submit(); break;                  // A2 / A3 resubmit
             case 'documents/upload':     $this->uploadDocument(); break;          // A2 documents
             case 'documents/view':       $this->viewDocument(); break;
+            case 'documents/invalidate': $this->invalidateDocument(); break;      // A2 "this file is wrong"
             case 'scholarship':          $this->scholarship(); break;             // A7–A9
             case 'claim/upload':         $this->uploadTermDocument('claim'); break;
             case 'claim/submit':         $this->submitClaim(); break;             // A8
@@ -227,6 +229,8 @@ final class ApplicantController
         // Editable: a Draft/Returned application, or none yet while a program is open (and not already a scholar).
         $editable = $app ? Application::isEditable($app) : ($openProgram !== null && !Scholar::hasActive((int)$applicant['id']));
         $completeness = $app ? Application::completeness((int)$app['id']) : null;
+        // Returned with flags: only these fields/documents may change (enforced again in autosave/upload).
+        $flags = $app && $app['status'] === 'Returned' ? Application::flags($app) : [];
 
         $puroks = $pdo->query("SELECT id, purok_name FROM puroks ORDER BY purok_name")->fetchAll();
         $schools = $pdo->query("SELECT school_name FROM schools WHERE is_active = 1 ORDER BY school_name")->fetchAll();
@@ -283,10 +287,12 @@ final class ApplicantController
                 $pdo->rollBack();
                 json_response(['success' => false, 'message' => $error]);
             }
-            match ($step) {
-                'personal'  => $this->savePersonal((int)$applicant['id'], $_POST),
-                'education' => $this->saveEducation((int)$applicant['id'], $_POST),
-                'family'    => $this->saveFamily((int)$applicant['id'], $_POST),
+            $post = $this->lockUnflagged($app, $step, (int)$applicant['id'], $_POST);
+            $userId = (int)Auth::user()['id'];
+            if ($post !== null) match ($step) {
+                'personal'  => $this->savePersonal((int)$applicant['id'], $post),
+                'education' => $this->saveEducation((int)$applicant['id'], $post, $userId),
+                'family'    => $this->saveFamily((int)$applicant['id'], $post, $userId),
             };
             $pdo->commit();
         } catch (Throwable $e) {
@@ -346,6 +352,32 @@ final class ApplicantController
         return $parts[0] ?? '';
     }
 
+    /**
+     * Returned WITH flagged fields: every field of $step that was NOT flagged is reset to its stored value, so the data the
+     * SK office accepted stays exactly as submitted whatever the browser sends (server-side lock). Returns null when the
+     * step has no flagged field at all (nothing may be saved). Drafts and unflagged returns pass $post through.
+     */
+    private function lockUnflagged(array $app, string $step, int $applicantId, array $post): ?array
+    {
+        $flags = Application::flags($app);
+        if ($app['status'] !== 'Returned' || !$flags) return $post;
+        $fields = RETURN_FLAG_FIELDS[$step] ?? [];
+        $flagged = array_filter(array_keys($fields), static fn($f) => in_array("$step.$f", $flags, true));
+        if (!$flagged) return null;
+        $stored = match ($step) {
+            'personal'  => Applicant::personalInfo($applicantId) ?? [],
+            'education' => Applicant::education($applicantId) ?? [],
+            'family'    => Applicant::familyBackground($applicantId) ?? [],
+        };
+        if ($step === 'personal') $stored['address_unit'] = $this->splitAddressUnit($stored['complete_address'] ?? '');
+        foreach (array_keys($fields) as $f) {
+            if (in_array($f, $flagged, true)) continue;
+            $v = $stored[$f] ?? '';
+            $post[$f] = in_array($f, ['previous_scholarship', 'current_scholarship'], true) ? ((int)$v ? '1' : '') : (string)$v;
+        }
+        return $post;
+    }
+
     private function savePersonal(int $applicantId, array $post): void
     {
         // date_of_birth is NOT NULL; autosave fires before the applicant reaches it, so wait until it is given.
@@ -381,7 +413,8 @@ final class ApplicantController
         ]);
     }
 
-    private function saveEducation(int $applicantId, array $post): void
+    /** Education: one record per applicant, UPDATED in place (never deleted); key-field changes go to record_history. */
+    private function saveEducation(int $applicantId, array $post, int $userId = 0): void
     {
         // GWA on the Philippine 1.00 (highest) – 5.00 scale; anything else is stored as NULL.
         $ga = trim((string)($post['general_average'] ?? ''));
@@ -389,15 +422,8 @@ final class ApplicantController
         $yearLevel = in_array($post['year_level'] ?? '', YEAR_LEVELS, true) ? $post['year_level'] : '1st Year';
 
         $pdo = Database::conn();
-        $pdo->prepare("DELETE FROM education_records WHERE applicant_id = ?")->execute([$applicantId]);
-        $pdo->prepare(
-            "INSERT INTO education_records
-                (applicant_id, school_name, year_level, year_level_other, course_name, major, general_average,
-                 previous_scholarship, previous_scholarship_details, current_scholarship, current_scholarship_details)
-             VALUES (:applicant_id, :school_name, :year_level, :year_level_other, :course_name, :major, :general_average,
-                     :previous_scholarship, :previous_scholarship_details, :current_scholarship, :current_scholarship_details)"
-        )->execute([
-            'applicant_id'                 => $applicantId,
+        $old = Applicant::education($applicantId);
+        $values = [
             'school_name'                  => trim($post['school_name'] ?? ''),
             'year_level'                   => $yearLevel,
             'year_level_other'             => trim($post['year_level_other'] ?? ''),
@@ -408,14 +434,33 @@ final class ApplicantController
             'previous_scholarship_details' => trim($post['previous_scholarship_details'] ?? ''),
             'current_scholarship'          => !empty($post['current_scholarship']) ? 1 : 0,
             'current_scholarship_details'  => trim($post['current_scholarship_details'] ?? ''),
-        ]);
+        ];
+        if ($old) {
+            $assign = implode(', ', array_map(static fn($k) => "`$k` = :$k", array_keys($values)));
+            $pdo->prepare("UPDATE education_records SET $assign WHERE id = :id")->execute($values + ['id' => (int)$old['id']]);
+            RecordHistory::record('education_records', (int)$old['id'], $applicantId, $old, $values, $userId);
+            return;
+        }
+        $pdo->prepare(
+            "INSERT INTO education_records
+                (applicant_id, school_name, year_level, year_level_other, course_name, major, general_average,
+                 previous_scholarship, previous_scholarship_details, current_scholarship, current_scholarship_details)
+             VALUES (:applicant_id, :school_name, :year_level, :year_level_other, :course_name, :major, :general_average,
+                     :previous_scholarship, :previous_scholarship_details, :current_scholarship, :current_scholarship_details)"
+        )->execute(['applicant_id' => $applicantId] + $values);
     }
 
-    private function saveFamily(int $applicantId, array $post): void
+    /** Family background: upserted in place (one row per applicant); income changes go to record_history. */
+    private function saveFamily(int $applicantId, array $post, int $userId = 0): void
     {
         $status = static fn($v) => in_array($v, ['Available', 'Deceased', 'Unknown', 'Not Applicable'], true) ? $v : 'Available';
         $fi = max(0.0, (float)($post['father_income'] ?? 0));
         $mi = max(0.0, (float)($post['mother_income'] ?? 0));
+        $old = Applicant::familyBackground($applicantId);
+        if ($old) {
+            RecordHistory::record('family_background', (int)$old['id'], $applicantId, $old,
+                ['father_income' => $fi, 'mother_income' => $mi, 'total_family_income' => $fi + $mi], $userId);
+        }
         Database::conn()->prepare(
             "INSERT INTO family_background
                 (applicant_id, father_name, father_age, father_occupation, father_address, father_contact, father_income, father_status,
@@ -475,31 +520,15 @@ final class ApplicantController
         [$app, $error] = $this->editableApplication($applicant);
         if (!$app) $fail($error);
 
-        $stored = Document::storeUpload($_FILES['file'] ?? [], DOCUMENT_PATH, 'storage/documents/', (string)(int)$app['id']);
-        if (!$stored['ok']) $fail($stored['error']);
-
-        // A draft/returned application replaces its own file in place (decision E6); the upload still becomes the
-        // applicant's current version of that type, superseding any older one (e.g. from an earlier scholarship).
-        $pdo = Database::conn();
-        $stmt = $pdo->prepare("SELECT id, file_path FROM documents WHERE application_id = ? AND document_type = ?");
-        $stmt->execute([(int)$app['id'], $type]);
-        $row = $stmt->fetch();
-        $pdo->beginTransaction();
-        if ($row) {
-            $pdo->prepare("UPDATE documents SET file_path = ?, original_filename = ?, file_size = ?, mime_type = ?,
-                           status = 'Submitted', uploaded_at = NOW(), remarks = NULL, is_current = 1, superseded_at = NULL WHERE id = ?")
-                ->execute([$stored['rel'], $stored['original'], $stored['size'], $stored['mime'], $row['id']]);
-            $docId = (int)$row['id'];
-        } else {
-            $pdo->prepare("INSERT INTO documents (application_id, document_type, file_path, original_filename, file_size, mime_type, status, is_current)
-                           VALUES (?, ?, ?, ?, ?, ?, 'Submitted', 1)")
-                ->execute([(int)$app['id'], $type, $stored['rel'], $stored['original'], $stored['size'], $stored['mime']]);
-            $docId = (int)$pdo->lastInsertId();
+        // Returned with flags: only the flagged documents may be uploaded again; the others stay as submitted.
+        if (!Application::fieldEditable($app, "documents.$type")) {
+            $fail("Your $type was accepted as submitted — only the items the SK office flagged can be changed.");
         }
-        AuditLog::write('document_uploaded', 'documents', $docId, "Uploaded $type for application {$app['application_code']}");
-        Document::supersede((int)$applicant['id'], $type, 'documents', $docId);
-        $pdo->commit();
-        if ($row) Document::deleteFile($row['file_path']);
+
+        // A new version is added and the older one kept (Document::storeApplicationDocument — the one writer).
+        $stored = Document::storeApplicationDocument($app, $type, $_FILES['file'] ?? [], (int)Auth::user()['id']);
+        if (!$stored['ok']) $fail($stored['error']);
+        $docId = (int)$stored['id'];
 
         if ($isAjax) {
             json_response(['success' => true, 'document' => [
@@ -509,6 +538,28 @@ final class ApplicantController
             ]]);
         }
         flash('success', "$type uploaded.");
+        redirect('applicant/application');
+    }
+
+    /**
+     * The applicant flags one of their own uploaded files as wrong (POST id, reason): the row is kept as Invalid with the
+     * reason and only the file is removed; they upload the right one next. Only while that document may still change.
+     */
+    private function invalidateDocument(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('applicant/application');
+        verify_csrf();
+        $applicant = $this->applicant();
+        $doc = Document::find((int)($_POST['id'] ?? 0));
+        $app = $doc ? Application::find((int)$doc['application_id']) : null;
+        if (!$doc || !$app || (int)$app['applicant_id'] !== (int)$applicant['id']) { flash('danger', 'Document not found.'); redirect('applicant/application'); }
+        if (!Application::fieldEditable($app, 'documents.' . $doc['document_type'])) {
+            flash('danger', 'This document can’t be changed now.');
+            redirect('applicant/application');
+        }
+        $reason = trim((string)($_POST['reason'] ?? '')) ?: 'Wrong file uploaded';
+        $r = Document::markInvalid('documents', (int)$doc['id'], 'Removed by the applicant: ' . $reason, (int)Auth::user()['id']);
+        flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? "{$doc['document_type']} removed. Upload the correct file." : $r['error']);
         redirect('applicant/application');
     }
 

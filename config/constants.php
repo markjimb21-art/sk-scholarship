@@ -86,6 +86,35 @@ const ADDRESS_CITY = 'BACOLOD CITY';
 // Claim / renewal windows (term_schedules): the deadline reminder goes out this many hours before the deadline.
 const TERM_SCHEDULE_REMINDER_HOURS = 48;
 
+// Fields an admin can flag as wrong when returning an application (B2), per form step: POST name => label.
+// When an application is Returned with flags, ONLY the flagged fields/documents may change (server-side).
+const RETURN_FLAG_FIELDS = [
+    'personal' => [
+        'first_name' => 'First name', 'middle_name' => 'Middle name', 'last_name' => 'Last name', 'suffix' => 'Suffix',
+        'date_of_birth' => 'Date of birth', 'address_unit' => 'Address (unit / house no.)', 'purok_id' => 'Purok / subdivision',
+        'contact_number' => 'Contact number', 'blood_type' => 'Blood type', 'religion' => 'Religion', 'citizenship' => 'Citizenship',
+    ],
+    'education' => [
+        'school_name' => 'School', 'year_level' => 'Year level', 'year_level_other' => 'Year level (other)', 'course_name' => 'Course',
+        'major' => 'Major', 'general_average' => 'GWA', 'previous_scholarship' => 'Previous scholarship',
+        'previous_scholarship_details' => 'Previous scholarship details', 'current_scholarship' => 'Current scholarship',
+        'current_scholarship_details' => 'Current scholarship details',
+    ],
+    'family' => [
+        'father_name' => "Father's name", 'father_age' => "Father's age", 'father_occupation' => "Father's occupation",
+        'father_address' => "Father's address", 'father_contact' => "Father's contact", 'father_income' => "Father's income",
+        'father_status' => "Father's status", 'mother_name' => "Mother's name", 'mother_age' => "Mother's age",
+        'mother_occupation' => "Mother's occupation", 'mother_address' => "Mother's address", 'mother_contact' => "Mother's contact",
+        'mother_income' => "Mother's income", 'mother_status' => "Mother's status", 'family_size' => 'Family size',
+    ],
+];
+
+// Key applicant fields whose every change is kept in record_history (shown as "History" to admins): table => [column => label].
+const HISTORY_FIELDS = [
+    'education_records' => ['general_average' => 'GWA', 'school_name' => 'School', 'course_name' => 'Course', 'year_level' => 'Year level'],
+    'family_background' => ['father_income' => "Father's income", 'mother_income' => "Mother's income", 'total_family_income' => 'Total family income'],
+];
+
 // Blood types offered on the application form (blank = not given).
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 

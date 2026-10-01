@@ -7,14 +7,84 @@ declare(strict_types=1);
  */
 final class Document
 {
+    /** The application's documents: the NEWEST version of each type (older versions stay in the table as history). */
     public static function byApplication(int $applicationId): array
     {
         $stmt = Database::conn()->prepare(
-            "SELECT * FROM documents WHERE application_id = ?
-             ORDER BY FIELD(document_type, 'Certificate of Residency','Form 138 / Grades','Enrollment Form','School ID','2x2 Photo')"
+            "SELECT d.* FROM documents d
+             WHERE d.application_id = ?
+               AND d.id = (SELECT MAX(d2.id) FROM documents d2 WHERE d2.application_id = d.application_id AND d2.document_type = d.document_type)
+             ORDER BY FIELD(d.document_type, 'Certificate of Residency','Form 138 / Grades','Enrollment Form','School ID','2x2 Photo')"
         );
         $stmt->execute([$applicationId]);
         return $stmt->fetchAll();
+    }
+
+    /**
+     * A2 upload — the ONE place application documents are written. Never overwrites a file: a re-upload adds a new
+     * version row and supersedes the older one(s) of that type for the applicant (Document::supersede), keeping the file.
+     * Only an empty placeholder row (no file yet) is filled in place. The caller checks ownership and editability.
+     * Returns ['ok'=>true,'id','original','size'] or ['ok'=>false,'error'].
+     */
+    public static function storeApplicationDocument(array $app, string $type, array $file, int $userId): array
+    {
+        if (!in_array($type, DOCUMENT_TYPES, true)) return ['ok' => false, 'error' => 'Invalid document type.'];
+        $stored = self::storeUpload($file, DOCUMENT_PATH, 'storage/documents/', (string)(int)$app['id']);
+        if (!$stored['ok']) return $stored;
+
+        $newest = null;
+        foreach (self::byApplication((int)$app['id']) as $d) if ($d['document_type'] === $type) $newest = $d;
+        $pdo = Database::conn();
+        try {
+            $pdo->beginTransaction();
+            if ($newest && $newest['file_path'] === '') {
+                $pdo->prepare("UPDATE documents SET file_path = ?, original_filename = ?, file_size = ?, mime_type = ?, status = 'Submitted',
+                               uploaded_at = NOW(), remarks = NULL, is_current = 1, superseded_at = NULL WHERE id = ?")
+                    ->execute([$stored['rel'], $stored['original'], $stored['size'], $stored['mime'], (int)$newest['id']]);
+                $docId = (int)$newest['id'];
+            } else {
+                $pdo->prepare("INSERT INTO documents (application_id, document_type, file_path, original_filename, file_size, mime_type, status, uploaded_at, is_current)
+                               VALUES (?, ?, ?, ?, ?, ?, 'Submitted', NOW(), 1)")
+                    ->execute([(int)$app['id'], $type, $stored['rel'], $stored['original'], $stored['size'], $stored['mime']]);
+                $docId = (int)$pdo->lastInsertId();
+            }
+            AuditLog::write('document_uploaded', 'documents', $docId,
+                "Uploaded $type for application {$app['application_code']}" . ($newest && $newest['file_path'] !== '' ? ' (new version; the previous file is kept)' : ''),
+                null, ['by' => $userId]);
+            self::supersede((int)$app['applicant_id'], $type, 'documents', $docId);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            self::deleteFile($stored['rel']);   // nothing references the new file
+            throw $e;
+        }
+        return ['ok' => true, 'id' => $docId, 'original' => $stored['original'], 'size' => $stored['size']];
+    }
+
+    /**
+     * Flag a document (application or claim/renewal) as INVALID with a reason: the row is kept (status Invalid, reason,
+     * who, when; no longer current) and only the file is removed. This is the only way a document file is deleted.
+     */
+    public static function markInvalid(string $table, int $id, string $reason, int $actorId): array
+    {
+        if (!in_array($table, ['documents', 'term_documents'], true)) return ['ok' => false, 'error' => 'Unknown document table.'];
+        $reason = trim($reason);
+        if ($reason === '') return ['ok' => false, 'error' => 'Write why the document is invalid.'];
+        $stmt = Database::conn()->prepare("SELECT * FROM `$table` WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        $doc = $stmt->fetch();
+        if (!$doc || $doc['file_path'] === '') return ['ok' => false, 'error' => 'Document not found.'];
+        if ($doc['status'] === 'Invalid') return ['ok' => false, 'error' => 'This document is already marked invalid.'];
+        $now = date('Y-m-d H:i:s');
+        Database::conn()->prepare(
+            "UPDATE `$table` SET status = 'Invalid', invalid_reason = ?, invalidated_by = ?, invalidated_at = ?, file_removed_at = ?,
+                    is_current = 0, superseded_at = COALESCE(superseded_at, ?) WHERE id = ? AND status <> 'Invalid'"
+        )->execute([mb_substr($reason, 0, 1000), $actorId ?: null, $now, $now, $now, $id]);
+        self::deleteFile($doc['file_path']);
+        $type = $doc['document_type'] ?? $doc['type'];
+        AuditLog::write('document_invalidated', $table, $id, "$type marked invalid and its file removed: $reason",
+            ['status' => $doc['status']], ['status' => 'Invalid', 'by' => $actorId]);
+        return ['ok' => true];
     }
 
     public static function find(int $id): ?array
@@ -29,7 +99,7 @@ final class Document
     {
         $uploaded = [];
         foreach (self::byApplication($applicationId) as $d) {
-            if ($d['file_path'] !== '') $uploaded[] = $d['document_type'];
+            if ($d['file_path'] !== '' && $d['status'] !== 'Invalid') $uploaded[] = $d['document_type'];
         }
         return array_values(array_diff(DOCUMENT_TYPES, $uploaded));
     }
@@ -93,13 +163,13 @@ final class Document
         $stmt = Database::conn()->prepare(
             "SELECT * FROM (
                 SELECT 'documents' AS source_table, d.id, CAST(d.document_type AS CHAR(40)) AS type, d.original_filename,
-                       d.mime_type, d.uploaded_at, CAST(d.status AS CHAR(20)) AS status, d.is_current, d.superseded_at,
+                       d.mime_type, d.uploaded_at, CAST(d.status AS CHAR(20)) AS status, d.is_current, d.superseded_at, d.invalid_reason,
                        'Application' AS uploaded_during, a.application_code AS context
                 FROM documents d JOIN applications a ON a.id = d.application_id
                 WHERE a.applicant_id = :applicant_doc AND d.document_type = :type_doc AND d.file_path <> ''
                 UNION ALL
                 SELECT 'term_documents', td.id, CAST(td.type AS CHAR(40)), td.original_filename,
-                       td.mime_type, td.uploaded_at, CAST(td.status AS CHAR(20)), td.is_current, td.superseded_at,
+                       td.mime_type, td.uploaded_at, CAST(td.status AS CHAR(20)), td.is_current, td.superseded_at, td.invalid_reason,
                        IF(td.purpose = 'claim', 'Claim', 'Renewal'),
                        IF(td.purpose = 'claim', CONCAT(t.academic_year, ' ', t.semester),
                           CONCAT('for ', COALESCE(CONCAT(rr.academic_year, ' ', rr.semester), 'the next semester')))
@@ -123,8 +193,11 @@ final class Document
     /** Screening qualified the application: every uploaded document counts as verified. */
     public static function markAllVerified(int $applicationId): void
     {
-        Database::conn()->prepare("UPDATE documents SET status = 'Verified' WHERE application_id = ? AND file_path <> ''")
-            ->execute([$applicationId]);
+        // Only the newest, valid version of each type — older versions keep their own status.
+        $stmt = Database::conn()->prepare("UPDATE documents SET status = 'Verified' WHERE id = ?");
+        foreach (self::byApplication($applicationId) as $d) {
+            if ($d['file_path'] !== '' && $d['status'] !== 'Invalid') $stmt->execute([(int)$d['id']]);
+        }
     }
 
     /**
@@ -170,11 +243,14 @@ final class Document
         return ['ok' => true, 'rel' => $relPrefix . $subDir . '/' . $filename, 'original' => $original, 'size' => $size, 'mime' => $mime];
     }
 
-    /** Delete a stored file (after it was replaced). Silently ignores anything outside the private stores. */
+    /**
+     * Delete a stored file. Only for a file flagged INVALID (markInvalid) or a just-stored file that no row references
+     * (failed save). Replaced files are kept. Silently ignores anything outside the private stores.
+     */
     public static function deleteFile(?string $rel): void
     {
         $path = self::absolutePath($rel);
-        if ($path !== null && !unlink($path)) error_log('Could not delete replaced document: ' . $rel);
+        if ($path !== null && !unlink($path)) error_log('Could not delete document file: ' . $rel);
     }
 
     /**

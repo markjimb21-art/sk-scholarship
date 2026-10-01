@@ -8,10 +8,13 @@
         <div class="d-flex justify-content-between mb-2">
           <strong><?= e($type) ?></strong>
           <?php if ($d): ?>
-            <span class="badge bg-<?= $d['status'] === 'Resubmit' ? 'warning' : ($d['status'] === 'Verified' ? 'success' : 'info') ?>"><?= e($d['status'] === 'Submitted' ? 'Uploaded' : $d['status']) ?></span>
+            <span class="badge bg-<?= ['Resubmit' => 'warning', 'Verified' => 'success', 'Invalid' => 'danger'][$d['status']] ?? 'info' ?>"><?= e($d['status'] === 'Submitted' ? 'Uploaded' : $d['status']) ?></span>
           <?php else: ?><span class="badge bg-secondary">Missing</span><?php endif; ?>
         </div>
-        <?php if ($d): $src = url('admin/term-documents/view&id=' . (int)$d['id']); ?>
+        <?php if ($d && $d['status'] === 'Invalid'): ?>
+          <div class="alert alert-danger py-2 small mb-0">Marked invalid <?= $d['invalidated_at'] ? e(date('M d, Y', strtotime($d['invalidated_at']))) : '' ?>: <?= e($d['invalid_reason']) ?>
+            <div class="text-muted">The file was removed; the record is kept. Waiting for the scholar to upload a new one.</div></div>
+        <?php elseif ($d): $src = url('admin/term-documents/view&id=' . (int)$d['id']); ?>
           <?php if (in_array($d['mime_type'], ['image/jpeg', 'image/png'], true)): ?>
             <a href="<?= $src ?>" target="_blank" rel="noopener"><img src="<?= $src ?>" class="img-fluid rounded border mb-2" style="max-height:240px" alt="<?= e($type) ?>"></a>
           <?php endif; ?>

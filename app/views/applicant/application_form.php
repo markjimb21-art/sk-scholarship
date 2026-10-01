@@ -5,9 +5,11 @@ $documents = $documents ?? [];
 $docByType = [];
 foreach ($documents as $d) { $docByType[$d['document_type']] = $d; }
 $docsUploaded = 0;
-foreach (DOCUMENT_TYPES as $dt) { if (!empty($docByType[$dt]['file_path'])) $docsUploaded++; }
+foreach (DOCUMENT_TYPES as $dt) { if (!empty($docByType[$dt]['file_path']) && $docByType[$dt]['status'] !== 'Invalid') $docsUploaded++; }
+$flags = $flags ?? [];
+$flagLabels = Application::flagOptions();
 $updatedAt = $app['updated_at'] ?? null;
-$docLabels = ['Not Submitted' => 'Missing', 'Submitted' => 'Uploaded', 'Verified' => 'Verified'];
+$docLabels = ['Not Submitted' => 'Missing', 'Submitted' => 'Uploaded', 'Verified' => 'Verified', 'Invalid' => 'Invalid — upload again'];
 $program = $app ?: $openProgram;
 ?>
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
@@ -32,6 +34,10 @@ $program = $app ?: $openProgram;
     <h6 class="fw-semibold mb-2"><i class="bi bi-exclamation-triangle"></i> Returned for correction</h6>
     <p class="mb-1">The SK office asked you to fix these items, then submit again:</p>
     <p class="mb-0 fw-semibold"><?= nl2br(e($app['review_remarks'] ?? '')) ?></p>
+    <?php if ($flags): ?>
+      <p class="mb-0 mt-2"><strong>Only these items can be changed:</strong> <?= e(implode(', ', array_map(static fn($k) => $flagLabels[$k], $flags))) ?>.
+        Everything else stays exactly as you submitted it.</p>
+    <?php endif; ?>
   </div>
 <?php elseif (!$app && !$editable): ?>
   <div class="alert alert-secondary">
@@ -366,18 +372,27 @@ $program = $app ?: $openProgram;
           <?php foreach (DOCUMENT_TYPES as $dt):
             $doc = $docByType[$dt] ?? null;
             $status = $doc['status'] ?? 'Not Submitted';
-            $hasFile = $doc && $doc['file_path'];
+            $hasFile = $doc && $doc['file_path'] && $status !== 'Invalid';
+            $docEditable = !$flags || in_array("documents.$dt", $flags, true);
+            $docFlagged = $flags && $docEditable;
             $isImage = $hasFile && in_array(($doc['mime_type'] ?? ''), ['image/jpeg', 'image/png'], true);
           ?>
           <div class="col-md-6" data-doc-card data-doc-type="<?= e($dt) ?>" data-doc-has-file="<?= $hasFile ? '1' : '0' ?>">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card shadow-sm h-100 <?= $docFlagged ? 'border border-2 border-danger' : 'border-0' ?>">
               <div class="card-body">
+                <?php if ($docFlagged): ?><div class="small text-danger fw-semibold mb-1"><i class="bi bi-flag-fill"></i> Flagged by the SK office — upload a new file</div><?php endif; ?>
                 <div class="d-flex justify-content-between align-items-start mb-2">
                   <h6 class="fw-semibold mb-0"><i class="bi bi-file-earmark-text me-1 text-primary"></i><?= e($dt) ?> <span class="text-danger">*</span></h6>
                   <span class="doc-pill doc-<?= e(str_replace(' ','-',$status)) ?>" data-doc-status-pill><?= e($docLabels[$status] ?? $status) ?></span>
                 </div>
 
-                <?php if ($editable): ?>
+                <?php if ($editable && !$docEditable): ?>
+                  <div class="small text-success"><i class="bi bi-lock-fill"></i> Accepted as submitted — no change needed.</div>
+                <?php endif; ?>
+                <?php if ($doc && $status === 'Invalid'): ?>
+                  <div class="alert alert-danger py-2 small">Removed: <?= e((string)$doc['invalid_reason']) ?></div>
+                <?php endif; ?>
+                <?php if ($editable && $docEditable): ?>
                 <div class="doc-dropzone" data-doc-dropzone tabindex="0" role="button">
                   <div data-doc-preview class="doc-preview" style="<?= $hasFile ? '' : 'display:none' ?>">
                     <?php if ($isImage): ?>
@@ -402,6 +417,12 @@ $program = $app ?: $openProgram;
                     <a href="<?= e(url('applicant/documents/view&id=' . (int)$doc['id'])) ?>" target="_blank" rel="noopener" data-doc-view-link>View</a>
                   <?php endif; ?>
                 </p>
+                <?php if ($editable && $docEditable && $hasFile): ?>
+                  <form method="POST" action="<?= url('applicant/documents/invalidate') ?>" class="small" onsubmit="return confirm('Remove this file? Use this only if you uploaded the wrong file. The record is kept.');">
+                    <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><input type="hidden" name="reason" value="Wrong file uploaded">
+                    <button class="btn btn-link btn-sm text-danger p-0">This is the wrong file — remove it</button>
+                  </form>
+                <?php endif; ?>
                 <div class="alert alert-danger py-2 small mb-0" data-doc-remarks style="<?= (!empty($doc['remarks'])) ? '' : 'display:none' ?>">
                   <strong>Remarks:</strong> <span data-doc-remarks-text><?= e($doc['remarks'] ?? '') ?></span>
                 </div>
@@ -516,3 +537,27 @@ $program = $app ?: $openProgram;
     </div>
   </div>
 </div>
+<?php if ($flags): ?>
+<script>
+// Returned with flagged items: highlight them and lock everything else (the server keeps unflagged values regardless).
+document.addEventListener('DOMContentLoaded', function () {
+  var flags = <?= js_json($flags) ?>, fields = <?= js_json(array_map('array_keys', RETURN_FLAG_FIELDS)) ?>;
+  Object.keys(fields).forEach(function (step) {
+    var form = document.querySelector('form[data-step="' + step + '"]');
+    if (!form) return;
+    fields[step].forEach(function (name) {
+      form.querySelectorAll('[name="' + name + '"]').forEach(function (el) {
+        if (flags.indexOf(step + '.' + name) !== -1) {
+          el.classList.add('is-invalid');
+          var note = document.createElement('div'); note.className = 'invalid-feedback d-block'; note.textContent = 'Flagged by the SK office — please correct.';
+          (el.closest('.col-12, [class*="col-"]') || el.parentNode).appendChild(note);
+        } else {
+          el.disabled = true;
+          el.title = 'Accepted as submitted';
+        }
+      });
+    });
+  });
+});
+</script>
+<?php endif; ?>

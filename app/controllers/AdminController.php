@@ -13,6 +13,7 @@ require_once BASE_PATH . '/app/models/Budget.php';
 require_once BASE_PATH . '/app/models/TermSchedule.php';
 require_once BASE_PATH . '/app/models/Analytics.php';
 require_once BASE_PATH . '/app/models/SlotRequest.php';
+require_once BASE_PATH . '/app/models/RecordHistory.php';
 
 /**
  * Admin area router + the shared admin pages. Only the admin role reaches this (public/index.php).
@@ -31,6 +32,7 @@ final class AdminController
         'calendar-feed'             => ['CalendarController', 'feed'],
         'application'               => ['ScreeningController', 'view'],
         'documents/view'            => ['ScreeningController', 'document'],
+        'documents/invalidate'      => ['ScreeningController', 'invalidateDocument'],
         // B1 programs
         'programs'                  => ['AdminController', 'programs'],
         'program-save'              => ['AdminController', 'programSave'],

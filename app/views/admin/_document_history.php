@@ -8,7 +8,7 @@ $versionCount = array_sum(array_map('count', $docHistory));
     <a class="text-decoration-none fw-semibold" data-bs-toggle="collapse" href="#<?= e($historyId) ?>" role="button" aria-expanded="false">
       <i class="bi bi-clock-history"></i> Document history <span class="badge bg-secondary ms-1"><?= (int)$versionCount ?> version(s)</span>
     </a>
-    <div class="small text-muted">Every School ID and Enrollment Form this applicant uploaded. The newest one is shown everywhere; older ones are kept here.</div>
+    <div class="small text-muted">Every document version this applicant uploaded. The newest one is shown everywhere; replaced and invalid ones are kept here.</div>
   </div>
   <div class="collapse" id="<?= e($historyId) ?>">
     <div class="table-responsive">
@@ -22,8 +22,8 @@ $versionCount = array_sum(array_map('count', $docHistory));
               <td class="text-nowrap"><?= e(date('M d, Y g:i A', strtotime($v['uploaded_at']))) ?>
                 <?php if ($v['superseded_at']): ?><div class="text-muted">replaced <?= e(date('M d, Y', strtotime($v['superseded_at']))) ?></div><?php endif; ?></td>
               <td><?= e($v['uploaded_during']) ?> <span class="text-muted">· <?= e($v['context']) ?></span></td>
-              <td><?= e($v['status'] === 'Submitted' ? 'Uploaded' : $v['status']) ?></td>
-              <td class="text-end"><a href="<?= e($v['admin_url']) ?>" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Open</a></td>
+              <td><?= e($v['status'] === 'Submitted' ? 'Uploaded' : $v['status']) ?><?= $v['status'] === 'Invalid' ? '<div class="text-danger">' . e((string)$v['invalid_reason']) . ' (file removed)</div>' : '' ?></td>
+              <td class="text-end"><?php if ($v['status'] !== 'Invalid'): ?><a href="<?= e($v['admin_url']) ?>" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Open</a><?php endif; ?></td>
             </tr>
           <?php endforeach; endforeach; ?>
         </tbody>

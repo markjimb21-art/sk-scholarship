@@ -101,7 +101,7 @@ Other applicant pages kept: `applicant/notifications` (inbox), `applicant/profil
 | Step | Page (route) | What it does | Rules (server) |
 |---|---|---|---|
 | B1 | `admin/programs`, `admin/program-save`, `admin/program-toggle` | Create/edit a program: name, academic year, application start/end, slots, amount per scholar per semester, minimum GWA, maximum family income, maximum age. Open / close. | end ≥ start; numbers ≥ 0; applicants can apply only when open **and** today is inside the dates |
-| B2 | `admin/screening` *new* (queue: Submitted), `admin/application&id=` (one page per application, any status), `admin/screening/decide` *new*, `admin/documents/view` | One page per application: form data, every document viewable, eligibility check as pass/fail rows. Buttons: **Qualify for interview**, **Return for correction** (remarks required), **Reject** (reason required). | transition map; remarks/reason non-empty |
+| B2 | `admin/screening` *new* (queue: Submitted), `admin/application&id=` (one page per application, any status), `admin/screening/decide` *new*, `admin/documents/view` | One page per application: form data, every document viewable, eligibility check as pass/fail rows. Buttons: **Qualify for interview**, **Return for correction** (remarks required; tick the wrong fields/documents — see Data retention), **Reject** (reason required). Any document can be **marked invalid** (`admin/documents/invalidate`). | transition map; remarks/reason non-empty; on a flagged return only the flagged items can change and flagged documents must be re-uploaded before resubmitting |
 | B3 | `admin/interviews` *renamed from admin/interview-scheduling*, `admin/interview-schedule-save`, `-update`, `-cancel`, `-delete`, `admin/interview-schedule&id=` *renamed from interview-schedule-detail*, `admin/interview-assign` (bulk), `admin/interview-unassign` | Create a schedule (date, start/end, venue, capacity); bulk-assign Qualified applicants. Assign, edit (date/time/venue) and cancel notify the applicants. | capacity; only Qualified; delete only when empty; cancel sends everyone back to Qualified |
 | B4 | `admin/interview-schedule&id=` (attendance column), `admin/interview-no-show` *new*, `admin/interview-score&id=` (saving a score marks Attended) *renamed from interview-evaluate*, `admin/interview-score-save` *renamed* | Mark Attended / No-show; score attendees with the rubric + remarks. | rubric bounds from the one constant; one reschedule |
 | B5 | `admin/decisions&program_id=` *new*, `admin/decisions/decide` *new* | Ranking of Interviewed (and Waitlisted) applicants: score, GWA, family income, eligibility result; "Slots: X approved / Y total". Approve / Waitlist / Reject (reason). "Promote next waitlisted?" prompt when a first-semester scholar ends. | approve blocked when X ≥ Y |
@@ -293,6 +293,42 @@ whenever e-mail is on). Each links to the item in its queue.
 The admin dashboard also lists today's interviews (time, venue, program, applicants, how many not yet marked).
 
 Every status change is also written to the audit log (`AuditLog::write`).
+
+---
+
+## 8a. Data retention
+
+Correct data is kept; only data explicitly flagged as invalid is removed — and even then the record stays.
+
+**Never hard-deleted (no code path deletes them):** applicants, applications, scholars, semesters, renewal requests, releases,
+application documents and claim/renewal documents, record history, audit logs.
+
+- **Re-uploads are versions.** A new application, claim or renewal upload adds a row; the older one is superseded
+  (`is_current = 0`, `superseded_at`) and its file kept (`Document::storeApplicationDocument`, `Term::uploadDocument`,
+  `Document::supersede`), with an audit entry. Every version is listed under **Document history** on the application and
+  scholar pages.
+- **Invalid documents.** The only way a document file is deleted: an admin (any document, or ticking "invalid — remove
+  file" on Return / claim / renewal Resubmit) or the applicant ("This is the wrong file", own documents that may still
+  change) flags it invalid with a reason (`Document::markInvalid`). The row is kept with status `Invalid`, the reason,
+  who and when, and `file_removed_at`; it no longer counts as uploaded. Audit-logged.
+- **Field history.** Education is updated in place (no delete + re-insert); changes to GWA, school, course, year level
+  and family income are kept in `record_history` (old → new, who, when) and shown as **Changes to key information**.
+- **Flagged returns.** On Return the admin ticks the wrong fields/documents (`applications.flagged_fields`). The
+  applicant sees them highlighted; every other field and document stays exactly as submitted (the server resets
+  unflagged fields on save and refuses unflagged uploads). Resubmitting needs a new upload of each flagged document.
+  Ticking nothing reopens the whole form (as before).
+
+**What can be removed, and by whom (admin only):**
+
+| Item | When | Where |
+|---|---|---|
+| Interview schedule | only while nobody is assigned (otherwise cancel it) | schedule page → Delete |
+| Budget | only while nothing was released against it | Budget → delete |
+| Document **file** | only when flagged invalid (row kept) | as above |
+| Holiday | any time (a setting, not a record) | Settings → Holidays |
+
+A waiting interview attempt that is moved or unassigned is removed (it never happened); attempts with attendance
+recorded are kept.
 
 ---
 

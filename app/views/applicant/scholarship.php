@@ -5,7 +5,10 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
       <div>
         <strong><?= e($type) ?></strong>
-        <?php if ($doc): ?>
+        <?php if ($doc && $doc['status'] === 'Invalid'): ?>
+          <span class="badge bg-danger ms-1">Invalid — please upload again</span>
+          <div class="small text-danger"><?= e($doc['invalid_reason']) ?></div>
+        <?php elseif ($doc): ?>
           <span class="badge bg-<?= $doc['status'] === 'Resubmit' ? 'warning' : ($doc['status'] === 'Verified' ? 'success' : 'info') ?> ms-1">
             <?= e($doc['status'] === 'Resubmit' ? 'Please re-upload' : ($doc['status'] === 'Verified' ? 'Verified' : 'Uploaded')) ?>
           </span>

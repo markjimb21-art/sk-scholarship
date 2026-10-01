@@ -57,7 +57,7 @@ final class FundsController
         require_post('admin/claims/view&id=' . $id);
         $r = match ($_POST['decision'] ?? '') {
             'verify'   => Term::verifyClaim($id, (string)($_POST['gwa'] ?? ''), admin_id()),
-            'resubmit' => Term::resubmitClaim($id, (string)($_POST['remarks'] ?? ''), (array)($_POST['types'] ?? []), admin_id()),
+            'resubmit' => Term::resubmitClaim($id, (string)($_POST['remarks'] ?? ''), (array)($_POST['types'] ?? []), admin_id(), !empty($_POST['invalid'])),
             default    => ['ok' => false, 'error' => 'Unknown decision.'],
         };
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/claims/view&id=' . $id); }
@@ -137,7 +137,7 @@ final class FundsController
         require_post('admin/renewals/view&id=' . $id);
         $r = match ($_POST['decision'] ?? '') {
             'approve'  => Renewal::approve($id, admin_id()),
-            'resubmit' => Renewal::resubmit($id, (string)($_POST['remarks'] ?? ''), (array)($_POST['types'] ?? []), admin_id()),
+            'resubmit' => Renewal::resubmit($id, (string)($_POST['remarks'] ?? ''), (array)($_POST['types'] ?? []), admin_id(), !empty($_POST['invalid'])),
             default    => ['ok' => false, 'error' => 'Unknown decision.'],
         };
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/renewals/view&id=' . $id); }
@@ -205,7 +205,8 @@ final class FundsController
             $currentDocs[$type] = Document::current((int)$scholar['applicant_id'], $type);
             $docHistory[$type] = Document::history((int)$scholar['applicant_id'], $type);
         }
-        render('admin/scholar_view', compact('scholar', 'terms', 'renewals', 'totalReleased', 'currentDocs', 'docHistory'),
+        $fieldHistory = RecordHistory::forApplicant((int)$scholar['applicant_id']);
+        render('admin/scholar_view', compact('scholar', 'terms', 'renewals', 'totalReleased', 'currentDocs', 'docHistory', 'fieldHistory'),
             'Scholar · ' . $scholar['scholar_code']);
     }
 

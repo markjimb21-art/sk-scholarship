@@ -136,14 +136,23 @@ final class Term
         return $stmt->fetch() ?: null;
     }
 
-    /** Both required documents for $purpose are uploaded and none is waiting to be re-uploaded. */
+    /** Both required documents for $purpose are uploaded and none is waiting to be re-uploaded (Resubmit) or Invalid. */
     public static function documentsReady(int $termId, string $purpose): bool
     {
         $docs = self::documents($termId, $purpose);
         foreach (TERM_DOCUMENT_TYPES[$purpose] as $type) {
-            if (!isset($docs[$type]) || $docs[$type]['status'] === 'Resubmit') return false;
+            if (!isset($docs[$type]) || in_array($docs[$type]['status'], ['Resubmit', 'Invalid'], true)) return false;
         }
         return true;
+    }
+
+    /** B7/B9 "the file is invalid": mark the newest version of each type Invalid (row kept, file removed) with the remark. */
+    public static function invalidateNewest(int $termId, string $purpose, array $types, string $reason, int $adminId): void
+    {
+        $types = array_values(array_intersect($types, TERM_DOCUMENT_TYPES[$purpose] ?? [])) ?: (TERM_DOCUMENT_TYPES[$purpose] ?? []);
+        foreach (self::documents($termId, $purpose) as $type => $d) {
+            if (in_array($type, $types, true) && $d['status'] !== 'Invalid') Document::markInvalid('term_documents', (int)$d['id'], $reason, $adminId);
+        }
     }
 
     /** Can the scholar change the CLAIM documents of this term right now? Needs the admin's release window (§4). */
@@ -263,7 +272,7 @@ final class Term
     }
 
     /** B7 Resubmit (remarks required): the chosen documents (default: both) must be uploaded again. */
-    public static function resubmitClaim(int $termId, string $remarks, array $types, int $adminId): array
+    public static function resubmitClaim(int $termId, string $remarks, array $types, int $adminId, bool $invalid = false): array
     {
         $term = self::find($termId);
         if (!$term) return ['ok' => false, 'error' => 'Semester not found.'];
@@ -277,6 +286,7 @@ final class Term
                 'remarks' => $remarks, 'reviewed_by' => $adminId, 'reviewed_at' => date('Y-m-d H:i:s'),
             ], $remarks);
             self::markDocuments($termId, 'claim', 'Resubmit', $remarks, $types);
+            if ($invalid) self::invalidateNewest($termId, 'claim', $types, $remarks, $adminId);
             $pdo->commit();
         } catch (DomainException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();

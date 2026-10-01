@@ -159,6 +159,34 @@ final class Application
         return $app === null || in_array($app['status'], ['Draft', 'Returned'], true);
     }
 
+    /** Every key an admin may flag on Return: "<step>.<field>" (RETURN_FLAG_FIELDS) and "documents.<type>" => label. */
+    public static function flagOptions(): array
+    {
+        $out = [];
+        foreach (RETURN_FLAG_FIELDS as $step => $fields) foreach ($fields as $f => $label) $out["$step.$f"] = $label;
+        foreach (DOCUMENT_TYPES as $t) $out["documents.$t"] = $t;
+        return $out;
+    }
+
+    /** The fields/documents flagged when the application was last returned (empty = none flagged). */
+    public static function flags(?array $app): array
+    {
+        $list = json_decode((string)($app['flagged_fields'] ?? ''), true);
+        return is_array($list) ? array_values(array_intersect($list, array_keys(self::flagOptions()))) : [];
+    }
+
+    /**
+     * May the applicant change this field/document right now? A Draft: everything. Returned WITH flags: only the flagged
+     * ones — everything else stays exactly as submitted. Returned without flags (older returns): everything.
+     */
+    public static function fieldEditable(array $app, string $key): bool
+    {
+        if ($app['status'] === 'Draft') return true;
+        if ($app['status'] !== 'Returned') return false;
+        $flags = self::flags($app);
+        return !$flags || in_array($key, $flags, true);
+    }
+
     /**
      * What is still missing before the application can be submitted (server-side authority for Submit and
      * the same list the Review step shows). Empty 'missing' = complete.
@@ -224,6 +252,17 @@ final class Application
         if (!$check['complete']) {
             return ['ok' => false, 'error' => 'Please complete these first: ' . implode('; ', $check['missing']) . '.'];
         }
+        // Returned with flagged documents: each must have been uploaded again since the return.
+        if ($resubmission) {
+            $notRedone = [];
+            foreach (Document::byApplication($applicationId) as $d) {
+                if (in_array('documents.' . $d['document_type'], self::flags($app), true)
+                    && ($d['file_path'] === '' || $d['status'] === 'Invalid' || (string)$d['uploaded_at'] < (string)$app['review_remarks_at'])) {
+                    $notRedone[] = $d['document_type'];
+                }
+            }
+            if ($notRedone) return ['ok' => false, 'error' => 'Upload a new ' . implode(' and ', $notRedone) . ' first — the SK office flagged it.'];
+        }
 
         try {
             self::changeStatus($app, 'submit', $userId, ['submitted_at' => date('Y-m-d H:i:s')],
@@ -272,22 +311,40 @@ final class Application
     }
 
     /** B2 Return for correction (remarks required). */
-    public static function returnForCorrection(int $id, int $adminId, string $remarks): array
+    /**
+     * B2 Return for correction. $flags = the "<step>.<field>" / "documents.<type>" keys the admin ticked as wrong: only
+     * those can be changed by the applicant; the rest stays as submitted. $invalidDocs (document types, each also flagged)
+     * are marked INVALID with the remark as the reason and their file removed (the rows are kept).
+     */
+    public static function returnForCorrection(int $id, int $adminId, string $remarks, array $flags = [], array $invalidDocs = []): array
     {
         $remarks = trim($remarks);
         if ($remarks === '') return ['ok' => false, 'error' => 'Write the items the applicant must correct.'];
         $app = self::find($id);
         if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
-        $r = self::decide(function () use ($app, $adminId, $remarks) {
+        $invalidDocs = array_values(array_intersect($invalidDocs, DOCUMENT_TYPES));
+        $flags = array_values(array_unique(array_intersect(
+            array_merge($flags, array_map(static fn($t) => "documents.$t", $invalidDocs)), array_keys(self::flagOptions()))));
+        $r = self::decide(function () use ($app, $adminId, $remarks, $flags, $invalidDocs) {
             $now = date('Y-m-d H:i:s');
             self::changeStatus($app, 'return', $adminId, [
                 'reviewed_at' => $now, 'reviewed_by' => $adminId,
                 'review_remarks' => $remarks, 'review_remarks_at' => $now, 'review_remarks_by' => $adminId,
-            ], $remarks);
+                'flagged_fields' => $flags ? json_encode($flags) : null,
+            ], $remarks . ($flags ? ' — flagged: ' . implode(', ', $flags) : ''));
+            foreach (Document::byApplication((int)$app['id']) as $d) {
+                if (in_array($d['document_type'], $invalidDocs, true) && $d['file_path'] !== '' && $d['status'] !== 'Invalid') {
+                    Document::markInvalid('documents', (int)$d['id'], $remarks, $adminId);
+                }
+            }
         });
-        if ($r['ok']) self::notify($id, 'Returned for correction',
-            "Your application needs corrections before it can be screened:\n$remarks\n\nPlease fix these items and submit again.",
-            'warning', 'applicant/application');
+        if ($r['ok']) {
+            $labels = self::flagOptions();
+            $list = $flags ? "\n\nPlease correct only: " . implode(', ', array_map(static fn($k) => $labels[$k], $flags)) . '. Everything else stays as you submitted it.' : '';
+            self::notify($id, 'Returned for correction',
+                "Your application needs corrections before it can be screened:\n$remarks$list\n\nPlease fix these items and submit again.",
+                'warning', 'applicant/application');
+        }
         return $r;
     }
 

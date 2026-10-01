@@ -58,6 +58,8 @@ $minGwa = $term['min_gpa'] !== null ? (float)$term['min_gpa'] : 0.0;
         <?php foreach (TERM_DOCUMENT_TYPES['claim'] as $t): ?>
           <div class="form-check"><input class="form-check-input" type="checkbox" name="types[]" value="<?= e($t) ?>" id="rt<?= md5($t) ?>" checked><label class="form-check-label" for="rt<?= md5($t) ?>"><?= e($t) ?></label></div>
         <?php endforeach; ?>
+        <div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="invalid" value="1" id="markInvalid">
+          <label class="form-check-label" for="markInvalid">The file is invalid (wrong person or wrong document) — remove it. The record is kept, marked Invalid with your remarks.</label></div>
         <label class="form-label mt-2">Remarks <span class="text-danger">*</span></label>
         <textarea name="remarks" class="form-control" rows="3" required placeholder="The Grades are blurred — please upload a clearer copy."></textarea>
       </div>

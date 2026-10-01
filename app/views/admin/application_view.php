@@ -25,7 +25,13 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
 </div>
 
 <?php if ($app['status'] === 'Returned'): ?>
-  <div class="alert alert-warning"><strong>Returned for correction</strong> on <?= e(date('M d, Y', strtotime($app['review_remarks_at']))) ?>: <?= nl2br(e($app['review_remarks'])) ?></div>
+  <div class="alert alert-warning"><strong>Returned for correction</strong> on <?= e(date('M d, Y', strtotime($app['review_remarks_at']))) ?>: <?= nl2br(e($app['review_remarks'])) ?>
+    <?php if ($flags): $labels = Application::flagOptions(); ?>
+      <div class="mt-1 small"><strong>Flagged (only these can change):</strong> <?= e(implode(', ', array_map(static fn($k) => $labels[$k], $flags))) ?></div>
+    <?php endif; ?>
+  </div>
+<?php elseif ($flags && $app['status'] === 'Submitted'): $labels = Application::flagOptions(); ?>
+  <div class="alert alert-info small">Resubmitted after correction. Flagged last time: <?= e(implode(', ', array_map(static fn($k) => $labels[$k], $flags))) ?>.</div>
 <?php elseif ($app['status'] === 'Rejected'): ?>
   <div class="alert alert-danger"><strong>Rejected</strong><?= $app['decided_at'] ? ' on ' . e(date('M d, Y', strtotime($app['decided_at']))) : '' ?>: <?= e($app['decision_remarks'] ?? '') ?></div>
 <?php elseif (in_array($app['status'], ['Interviewed', 'Waitlisted'], true)): ?>
@@ -113,6 +119,10 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
               <div class="small mb-2"><span class="badge bg-primary">Current version</span>
                 updated during <?= e($cur['uploaded_during']) ?> · <?= e($cur['context']) ?>. The one from this application is in the document history.</div>
             <?php endif; ?>
+            <?php if (!$isNewer && $d['status'] === 'Invalid'): $has = false; ?>
+              <div class="alert alert-danger py-2 small mb-0">Marked invalid<?= $d['invalidated_at'] ? ' ' . e(date('M d, Y', strtotime($d['invalidated_at']))) : '' ?>: <?= e($d['invalid_reason']) ?>
+                <div class="text-muted">The file was removed; the record is kept (see the document history).</div></div>
+            <?php endif; ?>
             <?php if ($has): ?>
               <?php if (in_array($shown['mime_type'], ['image/jpeg', 'image/png'], true)): ?>
                 <a href="<?= e($src) ?>" target="_blank" rel="noopener">
@@ -124,6 +134,16 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
                 <a href="<?= e($src . '&download=1') ?>"><i class="bi bi-download"></i> Download</a>
                 <div class="text-muted"><?= e($shown['original_filename']) ?> · <?= e(date('M d, Y', strtotime($shown['uploaded_at']))) ?></div>
               </div>
+              <?php $invTable = $isNewer ? $cur['source_table'] : 'documents'; $invId = $isNewer ? (int)$cur['id'] : (int)$d['id']; ?>
+              <details class="small mt-2">
+                <summary class="text-danger">Mark this file invalid…</summary>
+                <form method="POST" action="<?= url('admin/documents/invalidate') ?>" class="mt-1" onsubmit="return confirm('Remove this file? The record is kept, marked Invalid with your reason.');">
+                  <?= csrf_field() ?><input type="hidden" name="table" value="<?= e($invTable) ?>"><input type="hidden" name="id" value="<?= $invId ?>">
+                  <input type="hidden" name="back" value="<?= e('admin/application&id=' . (int)$app['id']) ?>">
+                  <input name="reason" class="form-control form-control-sm mb-1" required maxlength="500" placeholder="Why (e.g. another person's ID)">
+                  <button class="btn btn-sm btn-outline-danger">Mark invalid and remove the file</button>
+                </form>
+              </details>
             <?php endif; ?>
           </div></div>
         </div>
@@ -189,6 +209,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
   </div>
 
   <div class="tab-pane fade" id="tab-audit">
+    <?php require VIEW_PATH . '/admin/_field_history.php'; ?>
     <div class="card border-0 shadow-sm"><div class="table-responsive">
       <table class="table mb-0 small align-middle">
         <thead class="table-light"><tr><th>When</th><th>By</th><th>What happened</th></tr></thead>
@@ -211,8 +232,29 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
       <div class="modal-header"><h5 class="modal-title">Return for correction</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
         <label class="form-label">Items the applicant must fix <span class="text-danger">*</span></label>
-        <textarea name="remarks" class="form-control" rows="5" required placeholder="1. The Certificate of Residency is unreadable — upload a clearer copy.&#10;2. Your father's contact number is incomplete."></textarea>
-        <div class="form-text">The applicant sees exactly this text and can edit and resubmit.</div>
+        <textarea name="remarks" class="form-control" rows="4" required placeholder="1. The Certificate of Residency is unreadable — upload a clearer copy.&#10;2. Your father's contact number is incomplete."></textarea>
+        <div class="form-text mb-2">The applicant sees exactly this text.</div>
+        <p class="small fw-semibold mb-1">Tick what is wrong <span class="fw-normal text-muted">— only these can be changed; everything else stays as submitted. Tick nothing to reopen the whole form.</span></p>
+        <div style="max-height:260px;overflow:auto" class="border rounded p-2 small">
+          <?php foreach (RETURN_FLAG_FIELDS as $step => $fields): ?>
+            <div class="fw-semibold text-uppercase text-muted mt-1" style="font-size:.7rem"><?= e(ucfirst($step)) ?></div>
+            <div class="row g-0">
+              <?php foreach ($fields as $f => $label): $fid = 'fl_' . md5("$step.$f"); ?>
+                <div class="col-6 form-check"><input class="form-check-input" type="checkbox" name="flags[]" value="<?= e("$step.$f") ?>" id="<?= $fid ?>">
+                  <label class="form-check-label" for="<?= $fid ?>"><?= e($label) ?></label></div>
+              <?php endforeach; ?>
+            </div>
+          <?php endforeach; ?>
+          <div class="fw-semibold text-uppercase text-muted mt-2" style="font-size:.7rem">Documents</div>
+          <?php foreach (DOCUMENT_TYPES as $t): $fid = 'fd_' . md5($t); ?>
+            <div class="d-flex gap-3">
+              <div class="form-check"><input class="form-check-input" type="checkbox" name="flags[]" value="<?= e("documents.$t") ?>" id="<?= $fid ?>">
+                <label class="form-check-label" for="<?= $fid ?>"><?= e($t) ?> — re-upload</label></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" name="invalid_docs[]" value="<?= e($t) ?>" id="<?= $fid ?>i">
+                <label class="form-check-label text-danger" for="<?= $fid ?>i">invalid — remove file</label></div>
+            </div>
+          <?php endforeach; ?>
+        </div>
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-warning">Return to applicant</button></div>
     </form>

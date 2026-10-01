@@ -183,6 +183,7 @@ CREATE TABLE applications (
     review_remarks_by INT UNSIGNED NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    flagged_fields TEXT NULL COMMENT 'JSON list of fields/documents flagged when returned',
     FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
     FOREIGN KEY (program_id) REFERENCES scholarship_programs(id),
     FOREIGN KEY (reviewed_by) REFERENCES users(id),
@@ -201,16 +202,20 @@ CREATE TABLE documents (
     original_filename VARCHAR(255) NOT NULL,
     file_size INT UNSIGNED NULL,
     mime_type VARCHAR(100) NULL,
-    status ENUM('Not Submitted','Submitted','Verified') NOT NULL DEFAULT 'Submitted',
+    status ENUM('Not Submitted','Submitted','Verified','Invalid') NOT NULL DEFAULT 'Submitted',
     uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     remarks TEXT NULL,
     is_current TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'Newest version of this type for the applicant',
     superseded_at DATETIME NULL,
+    invalid_reason TEXT NULL,
+    invalidated_by INT UNSIGNED NULL,
+    invalidated_at DATETIME NULL,
+    file_removed_at DATETIME NULL COMMENT 'File deleted because it was flagged invalid; the row is kept',
     FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
     INDEX idx_app (application_id),
     INDEX idx_status (status),
     INDEX idx_doc_current (document_type, is_current),
-    UNIQUE KEY uniq_doc_per_app (application_id, document_type)
+    INDEX idx_doc_app_type (application_id, document_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- INTERVIEWS (B3-B4) ----------
@@ -260,6 +265,22 @@ CREATE TABLE interview_evaluations (
     evaluated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (assignment_id) REFERENCES interview_assignments(id) ON DELETE CASCADE,
     FOREIGN KEY (interviewer_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Old → new value of key applicant fields (GWA, school, course, year level, income); shown as "History".
+CREATE TABLE record_history (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    table_name VARCHAR(64) NOT NULL,
+    record_id INT UNSIGNED NOT NULL,
+    applicant_id INT UNSIGNED NULL,
+    field VARCHAR(64) NOT NULL,
+    old_value TEXT NULL,
+    new_value TEXT NULL,
+    changed_by INT UNSIGNED NULL,
+    changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_history_record (table_name, record_id),
+    INDEX idx_history_applicant (applicant_id, changed_at),
+    CONSTRAINT fk_history_changed_by FOREIGN KEY (changed_by) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Dates never suggested for interviews (Settings → Holidays).
@@ -340,11 +361,15 @@ CREATE TABLE term_documents (
     original_filename VARCHAR(255) NOT NULL,
     file_size INT UNSIGNED NULL,
     mime_type VARCHAR(100) NULL,
-    status ENUM('Submitted','Resubmit','Verified') NOT NULL DEFAULT 'Submitted',
+    status ENUM('Submitted','Resubmit','Verified','Invalid') NOT NULL DEFAULT 'Submitted',
     remarks TEXT NULL,
     uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     is_current TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'Newest version of this type for the applicant',
     superseded_at DATETIME NULL,
+    invalid_reason TEXT NULL,
+    invalidated_by INT UNSIGNED NULL,
+    invalidated_at DATETIME NULL,
+    file_removed_at DATETIME NULL COMMENT 'File deleted because it was flagged invalid; the row is kept',
     INDEX idx_term_doc (term_id, purpose, type),
     INDEX idx_term_doc_current (type, is_current),
     CONSTRAINT fk_term_documents_term FOREIGN KEY (term_id) REFERENCES scholar_terms(id) ON DELETE CASCADE

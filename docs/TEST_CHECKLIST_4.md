@@ -49,3 +49,26 @@ plus), two applicant accounts and an e-mail address you can read. Numbered steps
     admins' "First no-show" notification links to the scheduling page. A second no-show still rejects the application.
 14. Security: a crafted request for a slot that isn't one of the applicant's 3 suggestions, or one without the CSRF
     token, is refused; an applicant opening `admin/interview-reschedule` gets "not found".
+
+## 3. Retain correct data, remove only invalid data
+1. As a Draft applicant, upload a School ID, then upload a different one. → Two versions exist; the first file is still
+   on disk (`storage/documents/<application>/`); the audit log says "new version; the previous file is kept".
+2. Press **This is the wrong file — remove it** under a document. → The document shows "Removed: Wrong file uploaded";
+   it counts as missing; the record is kept as Invalid (admin → Document history shows it with "(file removed)").
+3. Submit an application. Admin → Return for correction: tick **Contact number**, **GWA**, **School ID — re-upload** and
+   **2x2 Photo — invalid**, with a remark. → The applicant's e-mail lists exactly those items; the photo is marked
+   Invalid with the remark as reason and its file removed.
+4. As the applicant open the form. → The flagged fields are highlighted, everything else is greyed out; the Certificate,
+   Form 138 and Enrollment Form cards say "Accepted as submitted".
+5. Try to change your name (e.g. with the browser's developer tools re-enable the field) and save. → The name stays as
+   submitted; only the contact number changes. Changing the school in the Education step is ignored; the GWA changes.
+6. Try to upload the Certificate of Residency. → Refused ("accepted as submitted").
+7. Resubmit before re-uploading the School ID and photo. → Refused, naming the documents. Upload both and resubmit. → Submitted.
+8. Admin → application → History tab → **Changes to key information** shows "GWA 1.60 → 1.80" with who and when.
+   The scholar page shows the same panel.
+9. Admin → a document card → **Mark this file invalid…** with a reason. → The card shows "Marked invalid …", the record
+   stays in Document history, and the audit log has "document_invalidated".
+10. Claim (or renewal) → Resubmit with **"The file is invalid — remove it"** ticked. → That document shows Invalid with the
+    remark; the scholar can't submit until they upload a new one.
+11. Confirm in the database that no applicant, application, scholar, release or document row was deleted by any of the
+    above (row counts only grow).
