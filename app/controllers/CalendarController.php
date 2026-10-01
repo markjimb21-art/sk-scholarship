@@ -51,7 +51,11 @@ final class CalendarController
         $programId = $this->programId();
 
         $events = [];
-        foreach (Interview::schedulesInRange($from, $to, $programId) as $s) $events[] = $this->interviewEvent($s);
+        // Each staff role sees only what it may open: interviews (reviewer) and claim/renewal windows (treasurer).
+        if (AdminController::canAccess('interviews')) {
+            foreach (Interview::schedulesInRange($from, $to, $programId) as $s) $events[] = $this->interviewEvent($s);
+        }
+        if (!AdminController::canAccess('release-schedule')) { header('Cache-Control: private, no-store'); json_response($events); }
 
         // Windows with at least one scholar in the Missed-deadline list are overdue (one shared function).
         $overdue = [];

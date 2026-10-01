@@ -97,7 +97,8 @@ switch ($route) {
         if (Auth::role() === 'applicant' && str_starts_with($route, 'applicant/')) {
             require __DIR__ . '/../app/controllers/ApplicantController.php';
             (new ApplicantController())->handle(substr($route, 10));
-        } elseif (Auth::role() === 'admin' && str_starts_with($route, 'admin/')) {
+        } elseif (Auth::hasRole('admin', 'reviewer', 'treasurer') && str_starts_with($route, 'admin/')) {
+            // Staff area; AdminController::ROUTES decides which page each staff role may open.
             require __DIR__ . '/../app/controllers/AdminController.php';
             (new AdminController())->handle(substr($route, 6));
         } else {

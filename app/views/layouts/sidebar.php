@@ -28,8 +28,19 @@ $item = function (string $route, string $icon, string $label) use ($current) {
       ?>
     <?php else: ?>
     <?php
-      // In process order (docs/PROCESS.md).
-      $section = static function (string $label): void { echo '<li class="nav-item small text-uppercase text-muted px-3 pt-3 pb-1" style="font-size:.7rem">' . e($label) . '</li>'; };
+      // In process order (docs/PROCESS.md). Only the pages this staff role may open (AdminController::canAccess);
+      // a section heading is printed only when at least one of its pages is shown.
+      $pendingSection = null;
+      $section = static function (string $label) use (&$pendingSection): void { $pendingSection = $label; };
+      $staffItem = $item;
+      $item = static function (string $route, string $icon, string $label) use (&$pendingSection, $staffItem): void {
+          if (!AdminController::canAccess(substr($route, 6))) return;
+          if ($pendingSection !== null) {
+              echo '<li class="nav-item small text-uppercase text-muted px-3 pt-3 pb-1" style="font-size:.7rem">' . e($pendingSection) . '</li>';
+              $pendingSection = null;
+          }
+          $staffItem($route, $icon, $label);
+      };
       $item('admin/dashboard', 'bi-speedometer2', 'Dashboard');
       // Overview across both processes (interviews + claim/renewal deadlines), so it sits with the dashboard.
       $item('admin/calendar', 'bi-calendar3', 'Calendar');

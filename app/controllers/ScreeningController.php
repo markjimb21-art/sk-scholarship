@@ -89,6 +89,11 @@ final class ScreeningController
         $back = (string)($_POST['back'] ?? 'admin/dashboard');
         if (!preg_match('#^admin/[a-z/-]+(&id=\d+)?$#', $back)) $back = 'admin/dashboard';
         require_post($back);
+        // Application documents belong to the reviewer's work, claim/renewal documents to the treasurer's.
+        $table = (string)($_POST['table'] ?? '');
+        if (!AdminController::canAccess($table === 'term_documents' ? 'claims' : 'screening')) {
+            http_response_code(404); require VIEW_PATH . '/errors/404.php'; return;
+        }
         $r = Document::markInvalid((string)($_POST['table'] ?? ''), (int)($_POST['id'] ?? 0), (string)($_POST['reason'] ?? ''), admin_id());
         flash($r['ok'] ? 'warning' : 'danger', $r['ok'] ? 'Document marked invalid; its file was removed and the record kept.' : $r['error']);
         redirect($back);

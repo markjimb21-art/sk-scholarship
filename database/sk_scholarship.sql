@@ -674,7 +674,7 @@ CREATE TABLE `roles` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `role_name` (`role_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -683,7 +683,7 @@ CREATE TABLE `roles` (
 
 LOCK TABLES `roles` WRITE;
 /*!40000 ALTER TABLE `roles` DISABLE KEYS */;
-INSERT INTO `roles` VALUES (1,'admin','SK Administrator - full access','2026-09-14 17:49:44'),(4,'applicant','College student applicant','2026-09-14 17:49:44');
+INSERT INTO `roles` VALUES (1,'admin','SK Administrator - full access','2026-09-14 17:49:44'),(4,'applicant','College student applicant','2026-09-14 17:49:44'),(5,'reviewer','Screening, interviews and decisions','2026-10-01 05:43:48'),(6,'treasurer','Budget, claims, releases and renewals','2026-10-01 05:43:48');
 /*!40000 ALTER TABLE `roles` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -936,7 +936,7 @@ CREATE TABLE `system_settings` (
 
 LOCK TABLES `system_settings` WRITE;
 /*!40000 ALTER TABLE `system_settings` DISABLE KEYS */;
-INSERT INTO `system_settings` VALUES (5,'email_notifications','1','bool','Enable email notifications','2026-09-14 17:49:44'),(6,'interview_reminder_hours','24','int','Hours before interview to send reminder','2026-09-14 17:49:44'),(7,'daily_digest_enabled','1','bool','Send the daily interview digest','2026-10-01 05:32:06'),(8,'daily_digest_sent_on','','string','Last day the daily interview digest was sent','2026-10-01 05:32:06'),(9,'admin_event_emails','0','bool','Also e-mail admins about new submissions','2026-10-01 05:32:06'),(10,'interview_suggestion_window_days','60','int','Days after the application end date that interview suggestions may use','2026-10-01 05:32:06');
+INSERT INTO `system_settings` VALUES (5,'email_notifications','1','bool','Enable email notifications','2026-09-14 17:49:44'),(6,'interview_reminder_hours','24','int','Hours before interview to send reminder','2026-09-14 17:49:44'),(7,'daily_digest_enabled','1','bool','Send the daily interview digest','2026-10-01 05:43:48'),(8,'daily_digest_sent_on','','string','Last day the daily interview digest was sent','2026-10-01 05:43:48'),(9,'admin_event_emails','0','bool','Also e-mail admins about new submissions','2026-10-01 05:43:48'),(10,'interview_suggestion_window_days','60','int','Days after the application end date that interview suggestions may use','2026-10-01 05:43:48');
 /*!40000 ALTER TABLE `system_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 

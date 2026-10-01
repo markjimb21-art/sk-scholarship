@@ -21,90 +21,107 @@ require_once BASE_PATH . '/app/models/RecordHistory.php';
  */
 final class AdminController
 {
-    /** route => [controller, method]. DEFAULT DENY: anything not listed here is a 404. */
+    /** Who may open what (docs/PROCESS.md "Roles"). The admin role can open everything. */
+    private const STAFF  = ['admin', 'reviewer', 'treasurer'];   // every staff role
+    private const REVIEW = ['admin', 'reviewer'];                // applications: screening, interviews, decisions
+    private const FUNDS  = ['admin', 'treasurer'];               // budget, claims, releases, renewals, scholars
+    private const ADMIN  = ['admin'];                            // programs, users, settings, reports, analytics, audit
+
+    /** route => [controller, method, roles]. DEFAULT DENY: a route not listed, or not allowed for the role, is a 404. */
     private const ROUTES = [
         // Dashboard, records, account pages
-        'dashboard'                 => ['AdminController', 'dashboard'],
-        'notifications'             => ['AdminController', 'notifications'],
-        'applications'              => ['AdminController', 'applications'],
+        'dashboard'                 => ['AdminController', 'dashboard', self::STAFF],
+        'notifications'             => ['AdminController', 'notifications', self::STAFF],
+        'applications'              => ['AdminController', 'applications', self::REVIEW],
         // Calendar: interviews + claim/renewal windows (read-only)
-        'calendar'                  => ['CalendarController', 'index'],
-        'calendar-feed'             => ['CalendarController', 'feed'],
-        'application'               => ['ScreeningController', 'view'],
-        'documents/view'            => ['ScreeningController', 'document'],
-        'documents/invalidate'      => ['ScreeningController', 'invalidateDocument'],
+        'calendar'                  => ['CalendarController', 'index', self::STAFF],
+        'calendar-feed'             => ['CalendarController', 'feed', self::STAFF],
+        'application'               => ['ScreeningController', 'view', self::REVIEW],
+        'documents/view'            => ['ScreeningController', 'document', self::REVIEW],
+        'documents/invalidate'      => ['ScreeningController', 'invalidateDocument', self::STAFF],
         // B1 programs
-        'programs'                  => ['AdminController', 'programs'],
-        'program-save'              => ['AdminController', 'programSave'],
-        'program-toggle'            => ['AdminController', 'programToggle'],
+        'programs'                  => ['AdminController', 'programs', self::ADMIN],
+        'program-save'              => ['AdminController', 'programSave', self::ADMIN],
+        'program-toggle'            => ['AdminController', 'programToggle', self::ADMIN],
         // B2 screening
-        'screening'                 => ['ScreeningController', 'queue'],
-        'screening/decide'          => ['ScreeningController', 'decide'],
+        'screening'                 => ['ScreeningController', 'queue', self::REVIEW],
+        'screening/decide'          => ['ScreeningController', 'decide', self::REVIEW],
         // B3–B4 interviews
-        'interviews'                => ['InterviewController', 'index'],
-        'interview-schedule'        => ['InterviewController', 'schedule'],
-        'interview-schedule-save'   => ['InterviewController', 'scheduleSave'],
-        'interview-schedule-update' => ['InterviewController', 'scheduleUpdate'],
-        'interview-schedule-cancel' => ['InterviewController', 'scheduleCancel'],
-        'interview-schedule-delete' => ['InterviewController', 'scheduleDelete'],
-        'interview-assign'          => ['InterviewController', 'assign'],
-        'interview-unassign'        => ['InterviewController', 'unassign'],
-        'interview-no-show'         => ['InterviewController', 'noShow'],
-        'interview-reschedule'      => ['InterviewController', 'reschedule'],
-        'interview-reschedule-save' => ['InterviewController', 'rescheduleSave'],
-        'slot-request-decide'       => ['InterviewController', 'slotDecide'],
-        'interview-score'           => ['InterviewController', 'score'],
-        'interview-score-save'      => ['InterviewController', 'scoreSave'],
+        'interviews'                => ['InterviewController', 'index', self::REVIEW],
+        'interview-schedule'        => ['InterviewController', 'schedule', self::REVIEW],
+        'interview-schedule-save'   => ['InterviewController', 'scheduleSave', self::REVIEW],
+        'interview-schedule-update' => ['InterviewController', 'scheduleUpdate', self::REVIEW],
+        'interview-schedule-cancel' => ['InterviewController', 'scheduleCancel', self::REVIEW],
+        'interview-schedule-delete' => ['InterviewController', 'scheduleDelete', self::REVIEW],
+        'interview-assign'          => ['InterviewController', 'assign', self::REVIEW],
+        'interview-unassign'        => ['InterviewController', 'unassign', self::REVIEW],
+        'interview-no-show'         => ['InterviewController', 'noShow', self::REVIEW],
+        'interview-reschedule'      => ['InterviewController', 'reschedule', self::REVIEW],
+        'interview-reschedule-save' => ['InterviewController', 'rescheduleSave', self::REVIEW],
+        'slot-request-decide'       => ['InterviewController', 'slotDecide', self::REVIEW],
+        'interview-score'           => ['InterviewController', 'score', self::REVIEW],
+        'interview-score-save'      => ['InterviewController', 'scoreSave', self::REVIEW],
         // B5 decisions
-        'decisions'                 => ['InterviewController', 'decisions'],
-        'decisions/decide'          => ['InterviewController', 'decide'],
+        'decisions'                 => ['InterviewController', 'decisions', self::REVIEW],
+        'decisions/decide'          => ['InterviewController', 'decide', self::REVIEW],
         // B6 budget
-        'budget'                    => ['FundsController', 'budget'],
-        'budget-save'               => ['FundsController', 'budgetSave'],
-        'budget-delete'             => ['FundsController', 'budgetDelete'],
+        'budget'                    => ['FundsController', 'budget', self::FUNDS],
+        'budget-save'               => ['FundsController', 'budgetSave', self::FUNDS],
+        'budget-delete'             => ['FundsController', 'budgetDelete', self::FUNDS],
         // B7 claims
-        'claims'                    => ['FundsController', 'claims'],
-        'claims/view'               => ['FundsController', 'claimView'],
-        'claims/decide'             => ['FundsController', 'claimDecide'],
-        'term-documents/view'       => ['FundsController', 'termDocument'],
+        'claims'                    => ['FundsController', 'claims', self::FUNDS],
+        'claims/view'               => ['FundsController', 'claimView', self::FUNDS],
+        'claims/decide'             => ['FundsController', 'claimDecide', self::FUNDS],
+        'term-documents/view'       => ['FundsController', 'termDocument', self::FUNDS],
         // B8 releases
-        'releases'                  => ['FundsController', 'releases'],
-        'release-save'              => ['FundsController', 'releaseSave'],
+        'releases'                  => ['FundsController', 'releases', self::FUNDS],
+        'release-save'              => ['FundsController', 'releaseSave', self::FUNDS],
         // B9 renewals
-        'renewals'                  => ['FundsController', 'renewals'],
-        'renewals/view'             => ['FundsController', 'renewalView'],
-        'renewals/decide'           => ['FundsController', 'renewalDecide'],
+        'renewals'                  => ['FundsController', 'renewals', self::FUNDS],
+        'renewals/view'             => ['FundsController', 'renewalView', self::FUNDS],
+        'renewals/decide'           => ['FundsController', 'renewalDecide', self::FUNDS],
         // Claim (release) and renewal submission windows
-        'release-schedule'          => ['FundsController', 'releaseSchedule'],
-        'renewal-schedule'          => ['FundsController', 'renewalSchedule'],
-        'term-schedule-save'        => ['FundsController', 'termScheduleSave'],
+        'release-schedule'          => ['FundsController', 'releaseSchedule', self::FUNDS],
+        'renewal-schedule'          => ['FundsController', 'renewalSchedule', self::FUNDS],
+        'term-schedule-save'        => ['FundsController', 'termScheduleSave', self::FUNDS],
         // B10 scholars
-        'scholars'                  => ['FundsController', 'scholars'],
-        'scholar'                   => ['FundsController', 'scholar'],
-        'scholar-end'               => ['FundsController', 'scholarEnd'],
+        'scholars'                  => ['FundsController', 'scholars', self::FUNDS],
+        'scholar'                   => ['FundsController', 'scholar', self::FUNDS],
+        'scholar-end'               => ['FundsController', 'scholarEnd', self::FUNDS],
         // Reports and analytics
-        'reports'                   => ['ReportController', 'reports'],
-        'reports/generate'          => ['ReportController', 'generate'],
-        'analytics'                 => ['ReportController', 'analytics'],
+        'reports'                   => ['ReportController', 'reports', self::ADMIN],
+        'reports/generate'          => ['ReportController', 'generate', self::ADMIN],
+        'analytics'                 => ['ReportController', 'analytics', self::ADMIN],
         // Accounts, settings, audit
-        'users'                     => ['AdminController', 'users'],
-        'user-save'                 => ['AdminController', 'userSave'],
-        'user-toggle'               => ['AdminController', 'userToggle'],
-        'user-reset'                => ['AdminController', 'userReset'],
-        'settings'                  => ['AdminController', 'settings'],
-        'settings/save'             => ['AdminController', 'settingsSave'],
-        'settings/test-email'       => ['AdminController', 'settingsTestEmail'],
-        'settings/holiday-save'     => ['AdminController', 'holidaySave'],
-        'settings/holiday-delete'   => ['AdminController', 'holidayDelete'],
-        'audit-logs'                => ['AdminController', 'auditLogs'],
+        'users'                     => ['AdminController', 'users', self::ADMIN],
+        'user-save'                 => ['AdminController', 'userSave', self::ADMIN],
+        'user-toggle'               => ['AdminController', 'userToggle', self::ADMIN],
+        'user-reset'                => ['AdminController', 'userReset', self::ADMIN],
+        'settings'                  => ['AdminController', 'settings', self::ADMIN],
+        'settings/save'             => ['AdminController', 'settingsSave', self::ADMIN],
+        'settings/test-email'       => ['AdminController', 'settingsTestEmail', self::ADMIN],
+        'settings/holiday-save'     => ['AdminController', 'holidaySave', self::ADMIN],
+        'settings/holiday-delete'   => ['AdminController', 'holidayDelete', self::ADMIN],
+        'audit-logs'                => ['AdminController', 'auditLogs', self::ADMIN],
     ];
+
+    /** Staff roles that reach the admin area at all (each route then checks its own list). */
+    public const STAFF_ROLES = self::STAFF;
+
+    /** May the logged-in user (or $role) open this admin route (without the "admin/" prefix)? Used by handle(), the sidebar and pages. */
+    public static function canAccess(string $route, ?string $role = null): bool
+    {
+        $role ??= Auth::role();
+        $entry = self::ROUTES[trim($route, '/')] ?? null;
+        return $entry !== null && in_array($role, $entry[2], true);
+    }
 
     public function handle(string $action): void
     {
-        Auth::requireRole('admin');
+        Auth::requireRole(...self::STAFF);
         $route = self::ROUTES[trim($action, '/')] ?? null;
-        if ($route === null) {
-            http_response_code(404);
+        if ($route === null || !in_array(Auth::role(), $route[2], true)) {
+            http_response_code(404);   // same answer for "no such page" and "not for your role"
             require VIEW_PATH . '/errors/404.php';
             return;
         }
@@ -135,11 +152,16 @@ final class AdminController
             ['Renewals to review', $count("SELECT COUNT(*) FROM renewal_requests WHERE status = 'Submitted'"), 'admin/renewals', 'bi-arrow-repeat', 'Renewal requests with status Submitted'],
         ];
 
+        // Only the queues this staff role may open.
+        $counters = array_values(array_filter($counters, static fn($c) => self::canAccess(substr($c[2], 6))));
+
         $program = Program::selected(!empty($_GET['program_id']) ? (int)$_GET['program_id'] : null);
         $programs = Program::options();
         $slotsUsed = $program ? Program::slotsUsed((int)$program['id']) : 0;
         $budget = $program ? Budget::forProgramYear((int)$program['id'], $program['academic_year']) : null;
-        $todayInterviews = Interview::day($today);
+        $todayInterviews = self::canAccess('interviews') ? Interview::day($today) : null;
+        $showBudget = self::canAccess('budget');
+        if (!$showBudget) $budget = null;
 
         // Charts for the selected program (numbers shown in a table next to each chart).
         $charts = $program ? [
@@ -148,7 +170,7 @@ final class AdminController
             'gwa'     => Analytics::scholarsByGwaBand((int)$program['id']),
         ] : null;
 
-        render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'todayInterviews', 'charts')
+        render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'todayInterviews', 'charts', 'showBudget')
             + ['pageScripts' => [asset('js/sk-charts.js')]], 'Dashboard');
     }
 
@@ -215,7 +237,7 @@ final class AdminController
     {
         $pdo = Database::conn();
         $q = trim((string)($_GET['q'] ?? ''));
-        $role = in_array($_GET['role'] ?? '', ['admin', 'applicant'], true) ? $_GET['role'] : '';
+        $role = in_array($_GET['role'] ?? '', [...self::STAFF, 'applicant'], true) ? $_GET['role'] : '';
         $sql = "SELECT u.id, u.full_name, u.email, u.contact_number, u.is_active, u.email_verified, u.last_login, u.created_at, r.role_name
                 FROM users u JOIN roles r ON r.id = u.role_id WHERE 1=1";
         $params = [];
@@ -227,12 +249,22 @@ final class AdminController
         render('admin/users', compact('users', 'q', 'role'), 'Users');
     }
 
-    /** Create or edit an ADMIN account (applicants register themselves). */
+    /** Active admins other than $exceptId (an admin can never remove the last one). */
+    private static function otherActiveAdmins(int $exceptId): int
+    {
+        $stmt = Database::conn()->prepare("SELECT COUNT(*) FROM users u JOIN roles r ON r.id = u.role_id WHERE r.role_name = 'admin' AND u.is_active = 1 AND u.id <> ?");
+        $stmt->execute([$exceptId]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    /** Create or edit a STAFF account (admin, reviewer, treasurer); applicants register themselves. Role changes are audit-logged. */
     public function userSave(): void
     {
         require_post('admin/users');
         $pdo = Database::conn();
         $id = (int)($_POST['id'] ?? 0);
+        $roleName = (string)($_POST['role'] ?? '');
+        if (!in_array($roleName, self::STAFF, true)) { flash('danger', 'Choose a role: admin, reviewer or treasurer.'); redirect('admin/users'); }
         $name = trim((string)($_POST['full_name'] ?? ''));
         $email = strtolower(trim((string)($_POST['email'] ?? '')));
         $contact = digits_only($_POST['contact_number'] ?? '');
@@ -244,18 +276,30 @@ final class AdminController
         if ($dup->fetch()) { flash('danger', 'That e-mail is already used.'); redirect('admin/users'); }
 
         if ($id > 0) {
-            $pdo->prepare("UPDATE users SET full_name = ?, email = ?, contact_number = ? WHERE id = ?")->execute([$name, $email, $contact, $id]);
+            $cur = $pdo->prepare("SELECT r.role_name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ?");
+            $cur->execute([$id]);
+            $oldRole = $cur->fetchColumn();
+            if (!in_array($oldRole, self::STAFF, true)) { flash('danger', 'Only staff accounts are managed here.'); redirect('admin/users'); }
+            if ($oldRole !== $roleName) {
+                if ($id === admin_id()) { flash('danger', 'You cannot change your own role.'); redirect('admin/users'); }
+                if ($oldRole === 'admin' && self::otherActiveAdmins($id) === 0) { flash('danger', 'This is the last active admin — make someone else admin first.'); redirect('admin/users'); }
+            }
+            $pdo->prepare("UPDATE users SET full_name = ?, email = ?, contact_number = ?, role_id = (SELECT id FROM roles WHERE role_name = ?) WHERE id = ?")
+                ->execute([$name, $email, $contact, $roleName, $id]);
             AuditLog::write('user_updated', 'users', $id, "Updated account $email");
-            flash('success', 'Account updated.');
+            if ($oldRole !== $roleName) {
+                AuditLog::write('user_role_changed', 'users', $id, "Role of $email changed from $oldRole to $roleName", ['role' => $oldRole], ['role' => $roleName, 'by' => admin_id()]);
+            }
+            flash('success', $oldRole !== $roleName ? "Account updated; role changed to $roleName." : 'Account updated.');
         } else {
             if (strlen($password) < PASSWORD_MIN_LENGTH) { flash('danger', 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.'); redirect('admin/users'); }
             $pdo->prepare(
                 "INSERT INTO users (role_id, full_name, email, password_hash, contact_number, is_active, email_verified)
-                 VALUES ((SELECT id FROM roles WHERE role_name = 'admin'), ?, ?, ?, ?, 1, 1)"
-            )->execute([$name, $email, password_hash($password, PASSWORD_DEFAULT), $contact]);
+                 VALUES ((SELECT id FROM roles WHERE role_name = ?), ?, ?, ?, ?, 1, 1)"
+            )->execute([$roleName, $name, $email, password_hash($password, PASSWORD_DEFAULT), $contact]);
             $newId = (int)$pdo->lastInsertId();
-            AuditLog::write('user_created', 'users', $newId, "Created admin account $email");
-            flash('success', 'Admin account created.');
+            AuditLog::write('user_created', 'users', $newId, "Created $roleName account $email", null, ['role' => $roleName, 'by' => admin_id()]);
+            flash('success', ucfirst($roleName) . ' account created.');
         }
         redirect('admin/users');
     }
@@ -266,10 +310,13 @@ final class AdminController
         $id = (int)($_POST['id'] ?? 0);
         if ($id === admin_id()) { flash('danger', 'You cannot deactivate your own account.'); redirect('admin/users'); }
         $pdo = Database::conn();
-        $stmt = $pdo->prepare("SELECT is_active, email FROM users WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT u.is_active, u.email, r.role_name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ?");
         $stmt->execute([$id]);
         $row = $stmt->fetch();
         if (!$row) { flash('danger', 'User not found.'); redirect('admin/users'); }
+        if ($row['is_active'] && $row['role_name'] === 'admin' && self::otherActiveAdmins($id) === 0) {
+            flash('danger', 'This is the last active admin, so it can’t be deactivated.'); redirect('admin/users');
+        }
         $new = $row['is_active'] ? 0 : 1;
         $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ?")->execute([$new, $id]);
         AuditLog::write('user_status_changed', 'users', $id, ($new ? 'Activated' : 'Deactivated') . " {$row['email']}");

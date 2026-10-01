@@ -98,3 +98,19 @@ plus), two applicant accounts and an e-mail address you can read. Numbered steps
 4. Reports → **Profile and academic summary** → choose a program → PDF and CSV. → The file lists every profile group
    (applicants, approved, approval rate), the GWA figures, at-risk scholars, GWA trends and fund utilization. Without a
    program it is refused; a date range shows "Not applicable to this report" in the header.
+
+## 6. Role-based access
+1. Users → **Add staff**: create a Reviewer and a Treasurer. → Both appear with their role badge.
+2. Edit a staff account and change its role. → Saved; Audit Logs show "Role of … changed from … to …".
+   Try to change your own role → refused. With only one active admin, try to demote or deactivate them → refused.
+3. Log in as the **Reviewer**. → Sidebar: Dashboard, Calendar, Screening, Interviews, Decisions, Applications only;
+   dashboard shows the screening/interview counters and today's interviews, no budget card or claims counters; the
+   calendar shows interviews only.
+4. As the Reviewer open `admin/budget`, `admin/claims`, `admin/users`, `admin/settings`, `admin/reports` by URL. → "not found".
+   A forged POST to `admin/budget-save` (with a valid token) creates nothing.
+5. Log in as the **Treasurer**. → Sidebar: Dashboard, Calendar, Budget, Claim schedule, Claims, Releases, Renewal
+   schedule, Renewals, Scholars; no screening, interviews or applications; the calendar shows claim/renewal deadlines only.
+   `admin/screening`, `admin/application&id=…`, `admin/users` → "not found".
+6. As the Treasurer end a first-semester scholarship. → Ended; no redirect to the (reviewer-only) Decisions page.
+7. Deactivate a staff account. → They can no longer log in.
+8. Admin can still open every page.

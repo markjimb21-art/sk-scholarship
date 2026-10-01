@@ -217,7 +217,7 @@ final class FundsController
         $r = Scholar::end($id, (string)($_POST['reason'] ?? ''), admin_id());
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/scholar&id=' . $id); }
         flash('warning', 'Scholarship ended. The scholar was notified.');
-        if ($r['slot_freed']) {
+        if ($r['slot_freed'] && AdminController::canAccess('decisions')) {
             flash('info', 'It ended during the first semester, so a slot opened. Promote the next waitlisted applicant on the Decisions page.');
             redirect('admin/decisions&program_id=' . $r['program_id']);
         }

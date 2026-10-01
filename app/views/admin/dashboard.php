@@ -19,6 +19,7 @@
   <?php endforeach; ?>
 </div>
 
+<?php if ($todayInterviews !== null): ?>
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-header bg-white d-flex justify-content-between align-items-center">
     <h6 class="mb-0"><i class="bi bi-people me-1"></i> Interviews today — <?= e(date('l, F j')) ?></h6>
@@ -52,6 +53,7 @@
     </div>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
   <h5 class="fw-semibold mb-0">Program</h5>
@@ -80,6 +82,7 @@
       <div class="small text-muted">Scholars from this program, not counting scholars ended before a second semester opened.</div>
     </div></div>
   </div>
+  <?php if ($showBudget): ?>
   <div class="col-md-6">
     <div class="card border-0 shadow-sm h-100"><div class="card-body">
       <div class="text-muted small">Budget remaining — <?= e($program['academic_year']) ?></div>
@@ -95,6 +98,7 @@
       <?php endif; ?>
     </div></div>
   </div>
+  <?php endif; ?>
 </div>
 
 <?php require VIEW_PATH . '/admin/_dashboard_charts.php'; ?>

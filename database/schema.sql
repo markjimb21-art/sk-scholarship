@@ -499,6 +499,8 @@ CREATE TABLE system_settings (
 -- ============================================================
 INSERT INTO roles (role_name, description) VALUES
 ('admin', 'SK Administrator - full access'),
+('reviewer', 'Screening, interviews and decisions'),
+('treasurer', 'Budget, claims, releases and renewals'),
 ('applicant', 'College student applicant / scholar');
 
 INSERT INTO system_settings (setting_key, setting_value, setting_type, description) VALUES

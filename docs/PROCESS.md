@@ -3,7 +3,19 @@
 This is the source of truth for the system. Every page is one step below, every status has exactly one
 meaning, and every rule marked **(server)** is enforced in PHP; the page only mirrors it.
 
-Roles: **Admin** and **Applicant**. An applicant becomes a **Scholar** when approved (same account).
+Roles: **Applicant** (becomes a **Scholar** when approved — same account) and three staff roles:
+
+| Role | May open (`AdminController::ROUTES`, default deny — anything else is a 404) |
+|---|---|
+| **Admin** | everything: programs, all queues, reports, analytics, users, settings, audit logs |
+| **Reviewer** | dashboard, calendar, notifications · screening, applications, interviews (incl. scheduling and slot requests), decisions — **no** budget, claims, releases |
+| **Treasurer** | dashboard, calendar, notifications · budget, claim/renewal schedules, claims, releases, renewals, scholars — **no** applicant review |
+
+Every admin route lists the roles allowed to open it; the check runs on every request, including POSTs. The sidebar,
+the dashboard (counters, cards, charts) and the calendar feed show only what the role may open. Admins create staff,
+change their role and deactivate them under **Users**; a role change is audit-logged (`user_role_changed`), nobody can
+change their own role, and the last active admin can’t be demoted or deactivated. Notifications to "admins"
+(§8) go to the admin role.
 
 Routes use the existing front controller: `index.php?r=<route>` (pretty URL `/<route>`).
 Routes marked *new* don't exist yet; *renamed* ones replace an old route (see CHANGE_PLAN.md).

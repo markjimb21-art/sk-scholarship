@@ -8,6 +8,7 @@ $gwaRows = array_filter($charts['gwa']);
 ?>
 <h5 class="fw-semibold mt-4 mb-2">Charts — <?= e($program['program_name']) ?></h5>
 <div class="row g-3">
+  <?php if (AdminController::canAccess('screening')): ?>
   <div class="col-lg-6"><div class="card border-0 shadow-sm h-100"><div class="card-body">
     <h6 class="fw-semibold mb-1">Applications by status</h6>
     <p class="small text-muted mb-2">Count of this program’s applications in each status now.</p>
@@ -18,7 +19,9 @@ $gwaRows = array_filter($charts['gwa']);
       </tbody></table>
     <?php endif; ?>
   </div></div></div>
+  <?php endif; ?>
 
+  <?php if (AdminController::canAccess('budget')): ?>
   <div class="col-lg-6"><div class="card border-0 shadow-sm h-100"><div class="card-body">
     <h6 class="fw-semibold mb-1">Budget — <?= e($program['academic_year']) ?></h6>
     <p class="small text-muted mb-2">Total budget, released so far, and remaining (= total − released).</p>
@@ -29,7 +32,9 @@ $gwaRows = array_filter($charts['gwa']);
       </tbody></table>
     <?php endif; ?>
   </div></div></div>
+  <?php endif; ?>
 
+  <?php if (AdminController::canAccess('budget')): ?>
   <div class="col-lg-6"><div class="card border-0 shadow-sm h-100"><div class="card-body">
     <h6 class="fw-semibold mb-1">Releases per month</h6>
     <p class="small text-muted mb-2">Cash released to this program’s scholars, by release month.</p>
@@ -40,7 +45,9 @@ $gwaRows = array_filter($charts['gwa']);
       </tbody></table>
     <?php endif; ?>
   </div></div></div>
+  <?php endif; ?>
 
+  <?php if (AdminController::canAccess('scholars')): ?>
   <div class="col-lg-6"><div class="card border-0 shadow-sm h-100"><div class="card-body">
     <h6 class="fw-semibold mb-1">Active scholars by GWA</h6>
     <p class="small text-muted mb-2">Latest recorded semester GWA (else the application GWA); 1.00 is highest.</p>
@@ -51,6 +58,7 @@ $gwaRows = array_filter($charts['gwa']);
       </tbody></table>
     <?php endif; ?>
   </div></div></div>
+  <?php endif; ?>
 </div>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
