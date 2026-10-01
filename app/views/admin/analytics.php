@@ -177,6 +177,8 @@ $pct = static fn($r) => $r === null ? 'no data' : number_format($r * 100, 1) . '
   </div></div></div>
 </div>
 
+<?php require VIEW_PATH . '/admin/_analytics_profiles.php'; ?>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   if (!window.Chart) return;

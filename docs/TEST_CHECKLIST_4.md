@@ -72,3 +72,17 @@ plus), two applicant accounts and an e-mail address you can read. Numbered steps
     remark; the scholar can't submit until they upload a new one.
 11. Confirm in the database that no applicant, application, scholar, release or document row was deleted by any of the
     above (row counts only grow).
+
+## 4. Analytics: profiles and academic performance
+1. Application Step 1 has an optional **Sex** field ("Prefer not to say" by default). → Saved and shown on the
+   application page; blank shows "Not given".
+2. With a few submitted applications (different puroks, schools, courses, year levels, ages, incomes; some Approved),
+   open Analytics → section 5. → Each table lists applicants, approved and approval rate per group; the counts add up to
+   the number of submitted applications (drafts are not counted); ages are grouped as on the submission date.
+3. Section 6 → average GWA of applicants vs approved scholars matches the GWAs on their forms.
+4. Verify two claims for the same scholar with GWAs 2.00 then 2.75 (program minimum 2.50). → The per-scholar table
+   shows both semesters, the 2.75 in red, trend "Declining"; the scholar is in **At-risk scholars** and the count is 1.
+   A scholar going 2.00 → 1.50 shows "Improving".
+5. Section 7 → after two ₱5,000 releases with a ₱40,000 budget: released ₱10,000, release rate 25.0%, average per
+   scholar matches released ÷ scholars paid; "Released per month" lists each release month.
+6. Every number has its formula written under it; changing the A.Y. select changes sections 6 (per-scholar table) and 7.

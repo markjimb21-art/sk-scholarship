@@ -70,6 +70,19 @@ final class ReportController
                 'onTime' => Analytics::onTimeRate($pid, $ay),
                 'overdue' => Analytics::overdueCount($pid, $ay),
                 'avgDays' => Analytics::avgDaysToSubmit($pid, $ay),
+                // (5) profiles, (6) academic performance, (7) fund utilization
+                'profiles' => array_combine(array_keys(Analytics::PROFILE_DIMENSIONS),
+                    array_map(static fn($d) => Analytics::profileBreakdown($pid, $d), array_keys(Analytics::PROFILE_DIMENSIONS))),
+                'gwaVs' => Analytics::gwaApplicantsVsScholars($pid),
+                'gwaSemesters' => Analytics::gwaSemesters($pid, $ay),
+                'gwaPerScholar' => Analytics::gwaPerScholar($pid, $ay),
+                'gwaBySemester' => Analytics::avgGwaBySemester($pid),
+                'atRisk' => Analytics::atRiskScholars($pid),
+                'gwaTrend' => Analytics::gwaTrend($pid),
+                'releasedBySemester' => Analytics::releasedBySemester($pid),
+                'releasedByMonth' => Analytics::releasedByMonth($pid, $ay),
+                'releaseRate' => Analytics::releaseRate($pid, $ay),
+                'avgPerScholar' => Analytics::avgReleasedPerScholar($pid, $ay),
             ];
         }
         render('admin/analytics', compact('program', 'programs', 'years', 'data'), 'Data Analytics');

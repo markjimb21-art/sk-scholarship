@@ -159,6 +159,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
       <div class="col-md-3"><label class="small text-muted">Contact</label><div class="fw-semibold"><?= e($p['contact_number'] ?? '—') ?></div></div>
       <div class="col-md-9"><label class="small text-muted">Address</label><div class="fw-semibold"><?= e($p['complete_address'] ?? '—') ?></div></div>
       <div class="col-md-3"><label class="small text-muted">E-mail</label><div class="fw-semibold"><?= e($app['applicant']['email'] ?? '—') ?></div></div>
+      <div class="col-md-3"><label class="small text-muted">Sex</label><div class="fw-semibold"><?= e(($p['sex'] ?? '') ?: 'Not given') ?></div></div>
       <div class="col-md-3"><label class="small text-muted">Blood type</label><div class="fw-semibold"><?= e(($p['blood_type'] ?? '') ?: '—') ?></div></div>
       <div class="col-md-3"><label class="small text-muted">Religion</label><div class="fw-semibold"><?= e(($p['religion'] ?? '') ?: '—') ?></div></div>
       <div class="col-md-3"><label class="small text-muted">Citizenship</label><div class="fw-semibold"><?= e(($p['citizenship'] ?? '') ?: '—') ?></div></div>

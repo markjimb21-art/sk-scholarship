@@ -388,19 +388,20 @@ final class ApplicantController
         Database::conn()->prepare(
             "INSERT INTO applicants_personal_information
                 (applicant_id, first_name, middle_name, last_name, suffix, date_of_birth, complete_address, purok_id, contact_number,
-                 blood_type, religion, citizenship)
+                 blood_type, religion, citizenship, sex)
              VALUES (:applicant_id, :first_name, :middle_name, :last_name, :suffix, :date_of_birth, :complete_address, :purok_id, :contact_number,
-                 :blood_type, :religion, :citizenship)
+                 :blood_type, :religion, :citizenship, :sex)
              ON DUPLICATE KEY UPDATE
                 first_name = VALUES(first_name), middle_name = VALUES(middle_name), last_name = VALUES(last_name),
                 suffix = VALUES(suffix), date_of_birth = VALUES(date_of_birth), complete_address = VALUES(complete_address),
                 purok_id = VALUES(purok_id), contact_number = VALUES(contact_number),
-                blood_type = VALUES(blood_type), religion = VALUES(religion), citizenship = VALUES(citizenship)"
+                blood_type = VALUES(blood_type), religion = VALUES(religion), citizenship = VALUES(citizenship), sex = VALUES(sex)"
         )->execute([
             // Only a listed blood type is stored; anything else (including a crafted value) is saved as "not given".
             'blood_type'       => in_array($bloodType, BLOOD_TYPES, true) ? $bloodType : null,
             'religion'         => mb_substr(up($post['religion'] ?? ''), 0, 80) ?: null,
             'citizenship'      => $citizenship !== '' ? $citizenship : 'FILIPINO',
+            'sex'              => in_array($post['sex'] ?? '', SEX_OPTIONS, true) ? $post['sex'] : null,
             'applicant_id'     => $applicantId,
             'first_name'       => up($post['first_name'] ?? ''),
             'middle_name'      => up($post['middle_name'] ?? ''),

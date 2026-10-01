@@ -229,7 +229,30 @@ Base: the program's semesters of that A.Y. whose claim was submitted, joined to 
 - **Currently overdue** = scholars in `Analytics::overdue(program, A.Y., 'release')` — the same list as Claims → Missed deadline and the red deadlines on the calendar.
 - **Average time to submit** = average (submitted_at − window opens_at), in days.
 
-Charts (Chart.js, served locally): stage funnel (bar); budget Total vs Released vs Committed vs Projected need (bar); interview score bands (bar).
+### (5) Applicant and scholar profiles — per program
+Base: the program's submitted applications (not Draft) with the applicant's current profile.
+Groups: purok, school, course, year level, sex (optional field; blank = "Not given"), age on the submission date
+(`AGE_BANDS`), monthly family income (`INCOME_BANDS`).
+- **Applicants** per group = submitted applications; **Approved** = applications now Approved.
+- **Approval rate** per group = approved ÷ applicants (pending applications count as not approved yet).
+
+### (6) Academic performance — GWA, Philippine scale (1.00 highest)
+- **Average GWA of applicants / of approved scholars** = average GWA on the application form, over submitted / Approved applications.
+- **GWA per semester per scholar** = `scholar_terms.gwa`, recorded when the claim is verified (B7); filtered by A.Y.
+- **Average GWA per semester** = average of the recorded GWAs of that semester.
+- **Scholars below the minimum GWA (at risk)** = Active scholars whose latest recorded GWA is a higher number than the program's minimum GWA.
+- **GWA trend** (scholars with 2+ recorded semesters) = last − first recorded GWA: below −0.05 Improving, above +0.05 Declining, otherwise Steady.
+- **Scholars by GWA band** (dashboard) = Active scholars by latest recorded GWA, else the application GWA (`GWA_BANDS`).
+
+### (7) Fund utilization — per program + A.Y.
+- **Released**, **Committed**: as in (2).
+- **Released per semester** = sum of releases per semester (all A.Y.); **Released per month** = sum by release date for the A.Y.'s semesters.
+- **Release rate** = released ÷ total budget of the program + A.Y. (no budget → none).
+- **Average released per scholar** = released ÷ scholars who received at least one release that A.Y.
+
+All functions are in `Analytics.php`, one per number; every figure shows its formula on the page.
+
+Charts (Chart.js, served locally): stage funnel (bar); budget Total vs Released vs Committed vs Projected need (bar); interview score bands (bar); profiles (bar); average GWA per semester (line); released per month and per semester (bar).
 
 ---
 

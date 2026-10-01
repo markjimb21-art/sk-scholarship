@@ -117,6 +117,7 @@ CREATE TABLE applicants_personal_information (
     blood_type VARCHAR(5) NULL,
     religion VARCHAR(80) NULL,
     citizenship VARCHAR(50) DEFAULT 'Filipino',
+    sex ENUM('Female','Male') NULL COMMENT 'Optional; analytics only',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
     FOREIGN KEY (purok_id) REFERENCES puroks(id)

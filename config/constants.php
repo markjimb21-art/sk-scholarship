@@ -93,6 +93,7 @@ const RETURN_FLAG_FIELDS = [
         'first_name' => 'First name', 'middle_name' => 'Middle name', 'last_name' => 'Last name', 'suffix' => 'Suffix',
         'date_of_birth' => 'Date of birth', 'address_unit' => 'Address (unit / house no.)', 'purok_id' => 'Purok / subdivision',
         'contact_number' => 'Contact number', 'blood_type' => 'Blood type', 'religion' => 'Religion', 'citizenship' => 'Citizenship',
+        'sex' => 'Sex',
     ],
     'education' => [
         'school_name' => 'School', 'year_level' => 'Year level', 'year_level_other' => 'Year level (other)', 'course_name' => 'Course',
@@ -114,6 +115,17 @@ const HISTORY_FIELDS = [
     'education_records' => ['general_average' => 'GWA', 'school_name' => 'School', 'course_name' => 'Course', 'year_level' => 'Year level'],
     'family_background' => ['father_income' => "Father's income", 'mother_income' => "Mother's income", 'total_family_income' => 'Total family income'],
 ];
+
+// Optional sex on the application form (analytics only); blank = "Not given".
+const SEX_OPTIONS = ['Female', 'Male'];
+
+// Analytics bands (docs/PROCESS.md §6). label => [from (inclusive), to (exclusive)].
+const AGE_BANDS = ['17 and under' => [0, 18], '18–20' => [18, 21], '21–23' => [21, 24], '24–26' => [24, 27], '27 and over' => [27, 200]];
+// Total MONTHLY family income (₱).
+const INCOME_BANDS = ['Below ₱10,000' => [0, 10000], '₱10,000–19,999' => [10000, 20000], '₱20,000–29,999' => [20000, 30000],
+                      '₱30,000–49,999' => [30000, 50000], '₱50,000 and over' => [50000, PHP_INT_MAX]];
+// GWA on the Philippine scale (1.00 best): label => [from, to] inclusive bounds.
+const GWA_BANDS = ['1.00–1.50' => [1.00, 1.50], '1.51–2.00' => [1.51, 2.00], '2.01–2.50' => [2.01, 2.50], '2.51–3.00' => [2.51, 3.00], 'Above 3.00' => [3.01, 5.00]];
 
 // Blood types offered on the application form (blank = not given).
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];

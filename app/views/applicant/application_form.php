@@ -164,11 +164,20 @@ $program = $app ?: $openProgram;
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="col-md-5">
+          <div class="col-md-2">
+            <label class="form-label">Sex <span class="text-muted small">(optional)</span></label>
+            <select name="sex" class="form-select">
+              <option value="">Prefer not to say</option>
+              <?php foreach (SEX_OPTIONS as $sx): ?>
+                <option value="<?= e($sx) ?>" <?= ($personal['sex'] ?? '') === $sx ? 'selected' : '' ?>><?= e($sx) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="col-md-4">
             <label class="form-label">Religion</label>
             <input name="religion" class="form-control" maxlength="80" data-uppercase value="<?= e($personal['religion'] ?? '') ?>">
           </div>
-          <div class="col-md-5">
+          <div class="col-md-4">
             <label class="form-label">Citizenship</label>
             <input name="citizenship" class="form-control" maxlength="50" data-uppercase value="<?= e($personal['citizenship'] ?? 'FILIPINO') ?>">
           </div>

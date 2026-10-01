@@ -69,6 +69,7 @@ CREATE TABLE `applicants_personal_information` (
   `blood_type` varchar(5) DEFAULT NULL,
   `religion` varchar(80) DEFAULT NULL,
   `citizenship` varchar(50) DEFAULT 'Filipino',
+  `sex` enum('Female','Male') DEFAULT NULL COMMENT 'Optional; analytics only',
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `applicant_id` (`applicant_id`),
@@ -84,7 +85,7 @@ CREATE TABLE `applicants_personal_information` (
 
 LOCK TABLES `applicants_personal_information` WRITE;
 /*!40000 ALTER TABLE `applicants_personal_information` DISABLE KEYS */;
-INSERT INTO `applicants_personal_information` VALUES (1,1,'123','adf','adf','adf','2002-05-21','aadf',12,'adsffad',NULL,NULL,'Filipino','2026-09-16 07:36:08'),(17,8,'Juan','','Dela Cruz','Jr.','2001-01-01','Kung Saan Si Rene',48,'09123456789','O+','ROMAN CATHOLIC','Filipino','2026-09-25 12:18:23');
+INSERT INTO `applicants_personal_information` VALUES (1,1,'123','adf','adf','adf','2002-05-21','aadf',12,'adsffad',NULL,NULL,'Filipino',NULL,'2026-09-16 07:36:08'),(17,8,'Juan','','Dela Cruz','Jr.','2001-01-01','Kung Saan Si Rene',48,'09123456789','O+','ROMAN CATHOLIC','Filipino',NULL,'2026-09-25 12:18:23');
 /*!40000 ALTER TABLE `applicants_personal_information` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -935,7 +936,7 @@ CREATE TABLE `system_settings` (
 
 LOCK TABLES `system_settings` WRITE;
 /*!40000 ALTER TABLE `system_settings` DISABLE KEYS */;
-INSERT INTO `system_settings` VALUES (5,'email_notifications','1','bool','Enable email notifications','2026-09-14 17:49:44'),(6,'interview_reminder_hours','24','int','Hours before interview to send reminder','2026-09-14 17:49:44'),(7,'daily_digest_enabled','1','bool','Send the daily interview digest','2026-10-01 05:28:14'),(8,'daily_digest_sent_on','','string','Last day the daily interview digest was sent','2026-10-01 05:28:14'),(9,'admin_event_emails','0','bool','Also e-mail admins about new submissions','2026-10-01 05:28:14'),(10,'interview_suggestion_window_days','60','int','Days after the application end date that interview suggestions may use','2026-10-01 05:28:14');
+INSERT INTO `system_settings` VALUES (5,'email_notifications','1','bool','Enable email notifications','2026-09-14 17:49:44'),(6,'interview_reminder_hours','24','int','Hours before interview to send reminder','2026-09-14 17:49:44'),(7,'daily_digest_enabled','1','bool','Send the daily interview digest','2026-10-01 05:32:06'),(8,'daily_digest_sent_on','','string','Last day the daily interview digest was sent','2026-10-01 05:32:06'),(9,'admin_event_emails','0','bool','Also e-mail admins about new submissions','2026-10-01 05:32:06'),(10,'interview_suggestion_window_days','60','int','Days after the application end date that interview suggestions may use','2026-10-01 05:32:06');
 /*!40000 ALTER TABLE `system_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
