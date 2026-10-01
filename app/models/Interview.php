@@ -190,60 +190,107 @@ final class Interview
 
     /** Interview blocks offered as suggestions (Mon–Sat, lunch hour skipped). */
     public const SUGGESTION_BLOCKS = [['08:00', '10:00'], ['10:00', '12:00'], ['13:00', '15:00'], ['15:00', '17:00']];
-    /** Suggestions stay within this many days after the program's application end date. */
-    public const SUGGESTION_WINDOW_DAYS = 60;
+    /** Days the suggestions may reach (Settings → interview_suggestion_window_days, 7–180, default 60). */
+    public static function suggestionWindowDays(): int
+    {
+        return max(7, min(180, (int)setting('interview_suggestion_window_days', '60')));
+    }
+
+    /** Holidays in [$from, $to] as [Y-m-d => name]. */
+    public static function holidays(string $from, string $to): array
+    {
+        $stmt = Database::conn()->prepare("SELECT holiday_date, name FROM holidays WHERE holiday_date BETWEEN ? AND ? ORDER BY holiday_date");
+        $stmt->execute([$from, $to]);
+        return $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    }
 
     /**
-     * Up to $limit free interview slots for a program, soonest first — a suggestion only; the admin can pick any time.
-     * Window: from the day after application_end (screening first) — or tomorrow, if that is already past — to
-     * application_end + 60 days. Monday–Saturday, SUGGESTION_BLOCKS only. A block is skipped when it overlaps any
-     * Open interview schedule of ANY program (the admin's time is shared).
-     * Returns [['date','start','end','label']], or [] with $why set when there is nothing to suggest.
+     * Ranked interview slots for a program — a suggestion only; the admin can still pick any time. ONE function for the
+     * New-schedule form, the reschedule page and the applicant's slot picker. In order:
+     *   1. existing Open schedules of THIS program, from tomorrow, that still have free capacity (soonest first);
+     *   2. new free 2-hour blocks (SUGGESTION_BLOCKS), Monday–Saturday, from the day after application_end (or tomorrow),
+     *      skipping holidays, dates on which ANOTHER program already has an interview day, and blocks that overlap any
+     *      Open schedule.
+     * Window end = the later of application_end and today + suggestionWindowDays() (so reschedules late in the cycle still
+     * get suggestions). $withSchedules = false leaves out group 1 (e.g. for a form that creates a new schedule).
+     * Each item: ['kind' => 'schedule'|'block', 'schedule_id' => int|null, 'date','start','end' (H:i), 'venue' => ?string,
+     * 'free' => ?int, 'label']. Returns [] with $why set when there is nothing to suggest.
      */
-    public static function suggestSlots(int $programId, int $limit = 5, ?string &$why = null): array
+    public static function suggestSlots(int $programId, int $limit = 5, ?string &$why = null, bool $withSchedules = true): array
     {
         $why = null;
         $program = Program::find($programId);
         if (!$program) { $why = 'Program not found.'; return []; }
-
-        $end = new DateTimeImmutable($program['application_end']);
-        $first = $end->modify('+1 day');
+        $days = self::suggestionWindowDays();
         $tomorrow = new DateTimeImmutable('tomorrow');
-        if ($first < $tomorrow) $first = $tomorrow;
-        $last = $end->modify('+' . self::SUGGESTION_WINDOW_DAYS . ' days');
-        if ($first > $last) {
-            $why = 'No suggestions: the ' . self::SUGGESTION_WINDOW_DAYS . '-day window after the application period ('
-                . $end->format('M j, Y') . ') has passed.';
-            return [];
+        $end = new DateTimeImmutable($program['application_end']);
+        $last = max($end, new DateTimeImmutable('today'))->modify("+$days days");
+        $firstBlock = max($end->modify('+1 day'), $tomorrow);
+        $range = [$tomorrow->format('Y-m-d'), $last->format('Y-m-d')];
+        $pdo = Database::conn();
+        $out = [];
+
+        if ($withSchedules) {
+            $stmt = $pdo->prepare(
+                "SELECT s.id, s.interview_date, s.start_time, s.end_time, s.venue, s.max_slots, COUNT(ia.id) AS assigned
+                 FROM interview_schedules s LEFT JOIN interview_assignments ia ON ia.schedule_id = s.id
+                 WHERE s.program_id = ? AND s.status = 'Open' AND s.interview_date BETWEEN ? AND ?
+                 GROUP BY s.id HAVING assigned < s.max_slots ORDER BY s.interview_date, s.start_time"
+            );
+            $stmt->execute([$programId, ...$range]);
+            foreach ($stmt->fetchAll() as $s) {
+                $free = (int)$s['max_slots'] - (int)$s['assigned'];
+                $out[] = [
+                    'kind' => 'schedule', 'schedule_id' => (int)$s['id'], 'date' => $s['interview_date'],
+                    'start' => substr($s['start_time'], 0, 5), 'end' => substr($s['end_time'], 0, 5), 'venue' => $s['venue'], 'free' => $free,
+                    'label' => date('D, M j', strtotime($s['interview_date'])) . ' · ' . date('g:i', strtotime($s['start_time']))
+                        . '–' . date('g:i A', strtotime($s['end_time'])) . " · {$s['venue']} ($free open)",
+                ];
+                if (count($out) >= $limit) return $out;
+            }
         }
 
-        $stmt = Database::conn()->prepare(
-            "SELECT interview_date, start_time, end_time FROM interview_schedules
-             WHERE status = 'Open' AND interview_date BETWEEN ? AND ?"
-        );
-        $stmt->execute([$first->format('Y-m-d'), $last->format('Y-m-d')]);
+        $stmt = $pdo->prepare("SELECT interview_date, start_time, end_time, program_id FROM interview_schedules
+                               WHERE status = 'Open' AND interview_date BETWEEN ? AND ?");
+        $stmt->execute($range);
         $busy = [];
+        $otherProgramDays = [];
         foreach ($stmt->fetchAll() as $s) {
             $busy[$s['interview_date']][] = [substr($s['start_time'], 0, 5), substr($s['end_time'], 0, 5)];
+            if ((int)$s['program_id'] !== $programId) $otherProgramDays[$s['interview_date']] = true;
         }
+        $holidays = self::holidays(...$range);
 
-        $out = [];
-        for ($d = $first; $d <= $last && count($out) < $limit; $d = $d->modify('+1 day')) {
-            if ((int)$d->format('N') === 7) continue;   // Sunday
+        for ($d = $firstBlock; $d <= $last && count($out) < $limit; $d = $d->modify('+1 day')) {
             $date = $d->format('Y-m-d');
+            if ((int)$d->format('N') === 7 || isset($holidays[$date]) || isset($otherProgramDays[$date])) continue;
             foreach (self::SUGGESTION_BLOCKS as [$from, $to]) {
                 foreach ($busy[$date] ?? [] as [$bFrom, $bTo]) {
                     if ($bFrom < $to && $bTo > $from) continue 2;   // overlaps an existing schedule
                 }
                 $out[] = [
-                    'date' => $date, 'start' => $from, 'end' => $to,
-                    'label' => $d->format('D, M j') . ' · ' . date('g:i', strtotime($from)) . '–' . date('g:i A', strtotime($to)),
+                    'kind' => 'block', 'schedule_id' => null, 'date' => $date, 'start' => $from, 'end' => $to, 'venue' => null, 'free' => null,
+                    'label' => $d->format('D, M j') . ' · ' . date('g:i', strtotime($from)) . '–' . date('g:i A', strtotime($to)) . ' (new)',
                 ];
                 if (count($out) >= $limit) break;
             }
         }
-        if (!$out) $why = 'No free 2-hour block in the ' . self::SUGGESTION_WINDOW_DAYS . ' days after the application period.';
+        if (!$out) {
+            $why = $firstBlock > $last
+                ? "No suggestions: nothing free up to {$last->format('M j, Y')} ($days-day window, Settings)."
+                : "No open schedule or free 2-hour block up to {$last->format('M j, Y')} ($days-day window, Settings).";
+        }
         return $out;
+    }
+
+    /** Is $item (from suggestSlots) still one of the current top suggestions for the program? (server-side check of a pick) */
+    public static function isCurrentSuggestion(int $programId, array $item, int $limit): ?array
+    {
+        foreach (self::suggestSlots($programId, $limit) as $s) {
+            if ($s['kind'] === $item['kind'] && $s['date'] === $item['date'] && $s['start'] === $item['start']
+                && (int)$s['schedule_id'] === (int)($item['schedule_id'] ?? 0)) return $s;
+        }
+        return null;
     }
 
     /** Validates schedule input. Returns [clean data, error|null]. */
@@ -358,7 +405,7 @@ final class Interview
      * Bulk-assign Qualified applications of the schedule's program, up to its free capacity.
      * Returns ['assigned' => n, 'errors' => [code => message]].
      */
-    public static function assign(int $scheduleId, array $applicationIds, int $adminId): array
+    public static function assign(int $scheduleId, array $applicationIds, int $adminId, bool $moved = false): array
     {
         $sched = self::schedule($scheduleId);
         if (!$sched) return ['assigned' => 0, 'errors' => ['' => 'Schedule not found.']];
@@ -390,6 +437,9 @@ final class Interview
                     ->execute([$scheduleId, $appId, $rescheduleCount]);
                 AuditLog::write('interview_assigned', 'interview_assignments', (int)$pdo->lastInsertId(),
                     "Assigned {$app['application_code']} to " . self::describe($sched) . ($rescheduleCount ? ' (reschedule)' : ''));
+                // Scheduled now, so any slot the applicant asked for is settled.
+                $pdo->prepare("UPDATE slot_requests SET status = 'Cancelled', decision_note = 'Scheduled by the SK office', decided_by = ?, decided_at = NOW()
+                               WHERE application_id = ? AND status = 'Pending'")->execute([$adminId, $appId]);
                 $pdo->commit();
             } catch (DomainException $e) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
@@ -397,9 +447,10 @@ final class Interview
                 continue;
             }
             $assigned++;
-            Application::notify($appId, 'Interview scheduled',
-                'Your interview is on ' . self::describe($sched) . '. Bring a valid ID and arrive 15 minutes early.'
-                . ($rescheduleCount ? "\nThis is your one rescheduled interview — missing it ends your application." : ''), 'success');
+            Application::notify($appId, $moved ? 'Interview changed' : 'Interview scheduled',
+                ($moved ? 'Your interview was changed. New schedule: ' : 'Your interview is on ') . self::describe($sched)
+                . '. Bring a valid ID and arrive 15 minutes early.'
+                . ($rescheduleCount ? "\nThis is your one rescheduled interview — missing it ends your application." : ''), $moved ? 'warning' : 'success');
         }
         return ['assigned' => $assigned, 'errors' => $errors];
     }
@@ -430,6 +481,66 @@ final class Interview
         Application::notify((int)$a['application_id'], 'Interview cancelled',
             'Your interview on ' . self::describe($a) . ' was cancelled. We will e-mail you a new schedule.', 'danger');
         return ['ok' => true];
+    }
+
+    /**
+     * Put an application on $scheduleId from the reschedule page:
+     *   - Qualified (waiting, incl. after a first no-show): a normal assign ("Interview scheduled");
+     *   - Interview Scheduled on an upcoming attempt: the waiting attempt is removed and the new one created, and the
+     *     applicant gets ONE "Interview changed" notification (no extra no-show is counted — nobody missed anything).
+     * Capacity and the one-reschedule rule are checked by assign(). Returns ['ok'=>true] or ['ok'=>false,'error'].
+     */
+    public static function scheduleApplication(int $applicationId, int $scheduleId, int $adminId): array
+    {
+        $app = Application::find($applicationId);
+        if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
+        $current = self::assignmentByApplication($applicationId);
+        $moving = $app['status'] === 'Interview Scheduled';
+        if ($moving) {
+            if (!$current || $current['attendance'] !== 'Scheduled') return ['ok' => false, 'error' => 'This interview already has attendance recorded.'];
+            if ((int)$current['schedule_id'] === $scheduleId) return ['ok' => false, 'error' => 'The applicant is already on that schedule.'];
+            $target = self::schedule($scheduleId);
+            if (!$target || $target['status'] === 'Cancelled') return ['ok' => false, 'error' => 'Choose an open schedule.'];
+            if ((int)$target['assigned_count'] >= (int)$target['max_slots']) return ['ok' => false, 'error' => 'That schedule is full.'];
+            $pdo = Database::conn();
+            try {
+                $pdo->beginTransaction();
+                $full = self::assignment((int)$current['id']);
+                self::removeWaitingAssignment($full, $adminId, 'moved to schedule #' . $scheduleId);
+                $pdo->commit();
+            } catch (DomainException $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                return ['ok' => false, 'error' => $e->getMessage()];
+            }
+        } elseif ($app['status'] !== 'Qualified') {
+            return ['ok' => false, 'error' => 'Only a Qualified application (or one already scheduled) can be given a schedule.'];
+        }
+        $r = self::assign($scheduleId, [$applicationId], $adminId, $moving);
+        if ($r['assigned'] === 1) return ['ok' => true];
+        if ($moving) self::assign((int)$current['schedule_id'], [$applicationId], $adminId);   // put them back where they were
+        return ['ok' => false, 'error' => 'Not scheduled: ' . implode('; ', $r['errors'] ?: ['unknown error'])];
+    }
+
+    /**
+     * Create a schedule from a date/time (a suggested block or the admin's own pick) and put the application on it.
+     * Reuses an Open schedule of the program with the same date and times if there is one.
+     */
+    public static function scheduleApplicationAt(int $applicationId, array $data, int $adminId): array
+    {
+        $app = Application::find($applicationId);
+        if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
+        $stmt = Database::conn()->prepare(
+            "SELECT id FROM interview_schedules WHERE program_id = ? AND status = 'Open' AND interview_date = ?
+               AND TIME_FORMAT(start_time, '%H:%i') = ? AND TIME_FORMAT(end_time, '%H:%i') = ? LIMIT 1"
+        );
+        $stmt->execute([(int)$app['program_id'], (string)($data['interview_date'] ?? ''), substr((string)($data['start_time'] ?? ''), 0, 5), substr((string)($data['end_time'] ?? ''), 0, 5)]);
+        $scheduleId = (int)$stmt->fetchColumn();
+        if (!$scheduleId) {
+            $r = self::createSchedule((int)$app['program_id'], $data, $adminId);
+            if (!$r['ok']) return $r;
+            $scheduleId = (int)$r['id'];
+        }
+        return self::scheduleApplication($applicationId, $scheduleId, $adminId) + ['schedule_id' => $scheduleId];
     }
 
     /** B4 No-show: the first one sends the application back to Qualified (one reschedule); a second one rejects it. */

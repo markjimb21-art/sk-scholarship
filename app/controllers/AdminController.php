@@ -12,6 +12,7 @@ require_once BASE_PATH . '/app/models/Renewal.php';
 require_once BASE_PATH . '/app/models/Budget.php';
 require_once BASE_PATH . '/app/models/TermSchedule.php';
 require_once BASE_PATH . '/app/models/Analytics.php';
+require_once BASE_PATH . '/app/models/SlotRequest.php';
 
 /**
  * Admin area router + the shared admin pages. Only the admin role reaches this (public/index.php).
@@ -47,6 +48,9 @@ final class AdminController
         'interview-assign'          => ['InterviewController', 'assign'],
         'interview-unassign'        => ['InterviewController', 'unassign'],
         'interview-no-show'         => ['InterviewController', 'noShow'],
+        'interview-reschedule'      => ['InterviewController', 'reschedule'],
+        'interview-reschedule-save' => ['InterviewController', 'rescheduleSave'],
+        'slot-request-decide'       => ['InterviewController', 'slotDecide'],
         'interview-score'           => ['InterviewController', 'score'],
         'interview-score-save'      => ['InterviewController', 'scoreSave'],
         // B5 decisions
@@ -88,6 +92,8 @@ final class AdminController
         'settings'                  => ['AdminController', 'settings'],
         'settings/save'             => ['AdminController', 'settingsSave'],
         'settings/test-email'       => ['AdminController', 'settingsTestEmail'],
+        'settings/holiday-save'     => ['AdminController', 'holidaySave'],
+        'settings/holiday-delete'   => ['AdminController', 'holidayDelete'],
         'audit-logs'                => ['AdminController', 'auditLogs'],
     ];
 
@@ -120,6 +126,7 @@ final class AdminController
             ['Interviews today', $count("SELECT COUNT(*) FROM interview_assignments ia JOIN interview_schedules s ON s.id = ia.schedule_id
                                          WHERE ia.attendance = 'Scheduled' AND s.status = 'Open' AND s.interview_date = ?", [$today]),
                 'admin/interviews', 'bi-people', 'Applicants still marked Scheduled on a schedule dated today'],
+            ['Slot requests to confirm', $count("SELECT COUNT(*) FROM slot_requests WHERE status = 'Pending'"), 'admin/interviews', 'bi-hand-index', 'Interview slots applicants picked, waiting for your confirmation'],
             ['Awaiting a decision', $count("SELECT COUNT(*) FROM applications WHERE status = 'Interviewed'"), 'admin/decisions', 'bi-clipboard-check', 'Applications with status Interviewed'],
             ['Claims to verify', $count("SELECT COUNT(*) FROM scholar_terms WHERE claim_status = 'Submitted'"), 'admin/claims', 'bi-file-earmark-check', 'Semester claims with status Submitted'],
             ['Verified, to release', $count("SELECT COUNT(*) FROM scholar_terms WHERE claim_status = 'Verified'"), 'admin/releases', 'bi-cash-coin', 'Semester claims with status Verified'],
@@ -285,9 +292,13 @@ final class AdminController
             'daily_digest_enabled'     => (string)($rows['daily_digest_enabled'] ?? '1'),
             'daily_digest_sent_on'     => (string)($rows['daily_digest_sent_on'] ?? ''),
             'admin_event_emails'       => (string)($rows['admin_event_emails'] ?? '0'),
+            'interview_suggestion_window_days' => (string)Interview::suggestionWindowDays(),
         ];
         $mailStatus = Notification::mailConfigStatus();
-        render('admin/settings', compact('settings', 'mailStatus'), 'Settings');
+        $holidays = Database::conn()->query(
+            "SELECT * FROM holidays WHERE holiday_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) ORDER BY holiday_date"
+        )->fetchAll();
+        render('admin/settings', compact('settings', 'mailStatus', 'holidays'), 'Settings');
     }
 
     public function settingsSave(): void
@@ -298,6 +309,7 @@ final class AdminController
             'interview_reminder_hours' => (string)max(0, min(168, (int)($_POST['interview_reminder_hours'] ?? 24))),
             'daily_digest_enabled'     => !empty($_POST['daily_digest_enabled']) ? '1' : '0',
             'admin_event_emails'       => !empty($_POST['admin_event_emails']) ? '1' : '0',
+            'interview_suggestion_window_days' => (string)max(7, min(180, (int)($_POST['interview_suggestion_window_days'] ?? 60))),
         ];
         $stmt = Database::conn()->prepare(
             "INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
@@ -305,6 +317,44 @@ final class AdminController
         foreach ($values as $k => $v) $stmt->execute([$k, $v]);
         AuditLog::write('settings_updated', 'system_settings', null, 'Settings saved', null, $values);
         flash('success', 'Settings saved.');
+        redirect('admin/settings');
+    }
+
+    /** Add a holiday (never suggested for interviews). */
+    public function holidaySave(): void
+    {
+        require_post('admin/settings');
+        $date = trim((string)($_POST['holiday_date'] ?? ''));
+        $name = trim((string)($_POST['name'] ?? ''));
+        $d = DateTime::createFromFormat('!Y-m-d', $date);
+        if (!$d || $d->format('Y-m-d') !== $date) { flash('danger', 'Choose a valid date.'); redirect('admin/settings'); }
+        if ($name === '') { flash('danger', 'Give the holiday a name.'); redirect('admin/settings'); }
+        $pdo = Database::conn();
+        try {
+            $pdo->prepare("INSERT INTO holidays (holiday_date, name, created_by) VALUES (?, ?, ?)")->execute([$date, mb_substr($name, 0, 120), admin_id()]);
+        } catch (PDOException $e) {
+            if ((int)($e->errorInfo[1] ?? 0) !== 1062) throw $e;
+            flash('danger', 'That date is already a holiday.');
+            redirect('admin/settings');
+        }
+        AuditLog::write('holiday_added', 'holidays', (int)$pdo->lastInsertId(), "Holiday $date: $name");
+        flash('success', 'Holiday added. Interview suggestions skip it.');
+        redirect('admin/settings');
+    }
+
+    /** Remove a holiday (a setting, not a record — see "Data retention" in docs/PROCESS.md). */
+    public function holidayDelete(): void
+    {
+        require_post('admin/settings');
+        $id = (int)($_POST['id'] ?? 0);
+        $stmt = Database::conn()->prepare("SELECT * FROM holidays WHERE id = ?");
+        $stmt->execute([$id]);
+        $h = $stmt->fetch();
+        if ($h) {
+            Database::conn()->prepare("DELETE FROM holidays WHERE id = ?")->execute([$id]);
+            AuditLog::write('holiday_removed', 'holidays', $id, "Removed holiday {$h['holiday_date']}: {$h['name']}", $h);
+        }
+        flash('success', 'Holiday removed.');
         redirect('admin/settings');
     }
 

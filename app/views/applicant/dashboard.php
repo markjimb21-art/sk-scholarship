@@ -44,6 +44,42 @@ $steps = ['Apply', 'Screening', 'Interview', 'Final result', 'Claim cash', 'Rene
   </div>
 </div>
 
+<?php if ($app && $app['status'] === 'Qualified'): ?>
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body p-4">
+    <h5 class="fw-semibold mb-2"><i class="bi bi-calendar-check"></i> Pick an interview slot</h5>
+    <?php if ($slotRequest && $slotRequest['status'] === 'Pending'): ?>
+      <p class="mb-2">You asked for <strong><?= e(SlotRequest::describe($slotRequest)) ?></strong>. The SK office will confirm it — we will e-mail you.</p>
+      <form method="POST" action="<?= url('applicant/slot-request/cancel') ?>" onsubmit="return confirm('Withdraw this request?');">
+        <?= csrf_field() ?><button class="btn btn-sm btn-outline-secondary">Withdraw request</button>
+      </form>
+    <?php else: ?>
+      <?php if ($slotRequest && $slotRequest['status'] === 'Declined'): ?>
+        <div class="alert alert-warning py-2">Your last request (<?= e(SlotRequest::describe($slotRequest)) ?>) was not confirmed: <?= e($slotRequest['decision_note']) ?></div>
+      <?php endif; ?>
+      <?php if (!$slotChoices): ?>
+        <p class="text-muted mb-0">No open slot to suggest right now. The SK office will schedule you and e-mail the date, time and venue.</p>
+      <?php else: ?>
+        <p class="text-muted small mb-2">Optional: choose the time that suits you best. The SK office confirms it before it counts.</p>
+        <form method="POST" action="<?= url('applicant/slot-request') ?>">
+          <?= csrf_field() ?>
+          <?php foreach ($slotChoices as $i => $s): $v = $s['kind'] . '|' . (int)$s['schedule_id'] . '|' . $s['date'] . '|' . $s['start']; ?>
+            <div class="form-check mb-1">
+              <input class="form-check-input" type="radio" name="slot" id="slot<?= $i ?>" value="<?= e($v) ?>" <?= $i === 0 ? 'checked' : '' ?> required>
+              <label class="form-check-label" for="slot<?= $i ?>">
+                <?= e(date('l, F j, Y', strtotime($s['date']))) ?>, <?= e(date('g:i A', strtotime($s['start'])) . ' – ' . date('g:i A', strtotime($s['end']))) ?>
+                <?= $s['venue'] ? '<span class="text-muted">at ' . e($s['venue']) . '</span>' : '' ?>
+              </label>
+            </div>
+          <?php endforeach; ?>
+          <button class="btn btn-primary btn-sm mt-2">Request this slot</button>
+        </form>
+      <?php endif; ?>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php if ($pastApplications): ?>
 <h5 class="fw-semibold mb-3">Past applications</h5>
 <div class="card border-0 shadow-sm">

@@ -18,8 +18,10 @@ final class InterviewController
         $schedules = $program ? Interview::schedulesByProgram((int)$program['id']) : [];
         $waiting = $program ? Interview::qualifiedWithoutSchedule((int)$program['id']) : [];
         $noSuggestionReason = null;
-        $suggestions = $program ? Interview::suggestSlots((int)$program['id'], 5, $noSuggestionReason) : [];
-        render('admin/interviews', compact('program', 'programs', 'schedules', 'waiting', 'suggestions', 'noSuggestionReason'), 'Interviews');
+        // The New-schedule form suggests free blocks only; existing schedules with room are listed beside it.
+        $suggestions = $program ? Interview::suggestSlots((int)$program['id'], 5, $noSuggestionReason, false) : [];
+        $slotRequests = $program ? SlotRequest::pending((int)$program['id']) : [];
+        render('admin/interviews', compact('program', 'programs', 'schedules', 'waiting', 'suggestions', 'noSuggestionReason', 'slotRequests'), 'Interviews');
     }
 
     /** One schedule: assigned applicants with attendance/score actions, and bulk-assign within capacity. */
@@ -94,6 +96,65 @@ final class InterviewController
         $r = Interview::unassign((int)($_POST['assignment_id'] ?? 0), admin_id());
         flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? 'Applicant removed from this schedule and notified.' : $r['error']);
         redirect('admin/interview-schedule&id=' . $scheduleId);
+    }
+
+    /* ---------------- Scheduling page with suggestions (§3a) ---------------- */
+
+    /** GET application_id (or id = an interview assignment): suggestions, a free date/time picker, and any slot request. */
+    public function reschedule(): void
+    {
+        $appId = (int)($_GET['application_id'] ?? 0);
+        if (!$appId && !empty($_GET['id'])) $appId = (int)(Interview::assignment((int)$_GET['id'])['application_id'] ?? 0);
+        $app = $appId ? Application::withDetails($appId) : null;
+        if (!$app) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
+        $currentAssignment = Interview::assignmentByApplication($appId);
+        $stmt = Database::conn()->prepare("SELECT COUNT(*) FROM interview_assignments WHERE application_id = ? AND attendance = 'No-show'");
+        $stmt->execute([$appId]);
+        $missed = (int)$stmt->fetchColumn();
+        $why = null;
+        $suggestions = Interview::suggestSlots((int)$app['program_id'], 8, $why);
+        if (($currentAssignment['attendance'] ?? '') === 'Scheduled') {   // don't suggest the schedule they are already on
+            $suggestions = array_values(array_filter($suggestions, static fn($s) => (int)$s['schedule_id'] !== (int)$currentAssignment['schedule_id']));
+        }
+        $pending = SlotRequest::pendingFor($appId);
+        $stmt = Database::conn()->prepare("SELECT venue FROM interview_schedules WHERE program_id = ? ORDER BY id DESC LIMIT 1");
+        $stmt->execute([(int)$app['program_id']]);
+        $defaultVenue = (string)($stmt->fetchColumn() ?: '');
+        $schedulable = in_array($app['status'], ['Qualified', 'Interview Scheduled'], true)
+            && !($app['status'] === 'Interview Scheduled' && ($currentAssignment['attendance'] ?? '') !== 'Scheduled');
+        render('admin/interview_reschedule', compact('app', 'currentAssignment', 'missed', 'suggestions', 'why', 'pending', 'defaultVenue', 'schedulable'),
+            'Schedule interview · ' . ($app['applicant']['full_name'] ?? ''));
+    }
+
+    /** POST application_id + mode: 'schedule' (schedule_id) or 'new' (interview_date, start_time, end_time, venue, max_slots). */
+    public function rescheduleSave(): void
+    {
+        $appId = (int)($_POST['application_id'] ?? 0);
+        $back = 'admin/interview-reschedule&application_id=' . $appId;
+        require_post($back);
+        $r = ($_POST['mode'] ?? '') === 'schedule'
+            ? Interview::scheduleApplication($appId, (int)($_POST['schedule_id'] ?? 0), admin_id())
+            : Interview::scheduleApplicationAt($appId, $_POST, admin_id());
+        if (!$r['ok']) { flash('danger', $r['error']); redirect($back); }
+        flash('success', 'Interview scheduled. The applicant was notified.');
+        $a = Interview::assignmentByApplication($appId);
+        redirect('admin/interview-schedule&id=' . (int)($a['schedule_id'] ?? 0));
+    }
+
+    /** POST request_id + decision confirm (venue, max_slots for a new block) | decline (note). */
+    public function slotDecide(): void
+    {
+        $req = SlotRequest::find((int)($_POST['request_id'] ?? 0));
+        $back = 'admin/interview-reschedule&application_id=' . (int)($req['application_id'] ?? 0);
+        require_post($back);
+        if (!$req) { flash('danger', 'Request not found.'); redirect('admin/interviews'); }
+        $r = ($_POST['decision'] ?? '') === 'confirm'
+            ? SlotRequest::confirm((int)$req['id'], trim((string)($_POST['venue'] ?? '')), max(1, (int)($_POST['max_slots'] ?? 10)), admin_id())
+            : SlotRequest::decline((int)$req['id'], (string)($_POST['note'] ?? ''), admin_id());
+        flash($r['ok'] ? 'success' : 'danger', $r['ok']
+            ? (($_POST['decision'] ?? '') === 'confirm' ? 'Slot confirmed — the applicant is scheduled and was notified.' : 'Request declined. The applicant was notified.')
+            : $r['error']);
+        redirect($back);
     }
 
     /** B4 No-show (1st: back to waiting list with one reschedule; 2nd: rejected). */

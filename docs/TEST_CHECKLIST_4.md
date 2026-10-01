@@ -22,3 +22,30 @@ plus), two applicant accounts and an e-mail address you can read. Numbered steps
     turned off in Settings." Turn it back on.
 11. Turn on "Also e-mail admins about new submissions" (with e-mail on). → The next submission notification is also
     e-mailed to the admins.
+
+## 2. Interview scheduling page and suggestions
+1. Settings → Holidays: add a holiday on the next working day. Settings → "Interview suggestions — days ahead": enter 3
+   and save. → It is stored as 7 (minimum); set it back to 60.
+2. Create a second program with an interview schedule on another day. Interviews (first program) → New schedule chips.
+   → No chip falls on the holiday, on Sunday, or on the other program's interview day.
+3. Create a first-program schedule with capacity 2 on a later day. As a Qualified applicant, open the dashboard.
+   → "Pick an interview slot" lists 3 choices; the existing schedule (with its venue) is first.
+4. Pick it and press **Request this slot**. → "Slot requested"; the application is still Qualified; admins get
+   "Interview slot requested"; the dashboard counter "Slot requests to confirm" shows 1 and the Interviews page lists it.
+5. Press Request again (or re-send the form). → Refused: a request is already pending.
+6. Admin → Review → **Confirm**. → The application is "Interview scheduled" on that schedule; the applicant gets
+   "Interview scheduled"; the request shows Confirmed.
+7. Second applicant picks a **new** block → admin Confirm with a venue and capacity. → A schedule is created at that
+   date/time/venue and the applicant is assigned to it.
+8. Third applicant picks the capacity-2 schedule; fill it before confirming (assign someone else). Confirm. → Refused
+   "schedule is full"; the request is Declined and the applicant gets "Interview slot not confirmed — pick another".
+9. Scheduling page (Interviews → waiting list → **Schedule**, or a schedule's row → **Reschedule**): suggestions are
+   ranked (existing schedules with places left first) and the applicant's own current schedule is not offered.
+10. On a scheduled applicant press **Assign here** on another schedule. → The applicant is moved (still one attempt,
+    no no-show counted) and gets one "Interview changed". Moving onto a full schedule is refused and nothing changes.
+11. Use the date/time picker with your own date, times, venue and capacity. → The applicant is scheduled there.
+12. Edit a schedule's venue. → Every applicant on it gets "Interview changed".
+13. Mark an applicant No-show (first time). → They are Qualified again, can pick a slot on their dashboard, and the
+    admins' "First no-show" notification links to the scheduling page. A second no-show still rejects the application.
+14. Security: a crafted request for a slot that isn't one of the applicant's 3 suggestions, or one without the CSRF
+    token, is refused; an applicant opening `admin/interview-reschedule` gets "not found".

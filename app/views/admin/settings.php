@@ -15,6 +15,10 @@
         <input type="number" min="0" max="168" name="interview_reminder_hours" class="form-control" value="<?= e($settings['interview_reminder_hours']) ?>">
         <div class="form-text">Used by <code>bin/send_reminders.php</code> (see README). 0 turns interview reminders off.</div>
 
+        <label class="form-label mt-3">Interview suggestions — days ahead</label>
+        <input type="number" min="7" max="180" name="interview_suggestion_window_days" class="form-control" value="<?= e($settings['interview_suggestion_window_days']) ?>">
+        <div class="form-text">Suggested interview slots reach this many days past the later of the application end date and today (7–180).</div>
+
         <div class="form-check form-switch mt-3">
           <input class="form-check-input" type="checkbox" name="daily_digest_enabled" value="1" id="digestOn" <?= $settings['daily_digest_enabled'] === '1' ? 'checked' : '' ?>>
           <label class="form-check-label" for="digestOn">Daily interview digest</label>
@@ -34,6 +38,28 @@
   </div>
 
   <div class="col-lg-6">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-calendar-x me-1"></i> Holidays (no interview suggestions)</h6></div>
+      <ul class="list-group list-group-flush small">
+        <?php if (!$holidays): ?><li class="list-group-item text-muted">No upcoming holidays.</li><?php endif; ?>
+        <?php foreach ($holidays as $h): ?>
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            <span><strong><?= e(date('D, M j, Y', strtotime($h['holiday_date']))) ?></strong> — <?= e($h['name']) ?></span>
+            <form method="POST" action="<?= url('admin/settings/holiday-delete') ?>" onsubmit="return confirm('Remove this holiday?');">
+              <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
+              <button class="btn btn-sm btn-outline-danger" aria-label="Remove <?= e($h['name']) ?>"><i class="bi bi-x-lg"></i></button>
+            </form>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+      <form method="POST" action="<?= url('admin/settings/holiday-save') ?>" class="card-body d-flex gap-2 flex-wrap">
+        <?= csrf_field() ?>
+        <input type="date" name="holiday_date" class="form-control form-control-sm" style="max-width:11rem" required aria-label="Holiday date">
+        <input name="name" class="form-control form-control-sm flex-grow-1" maxlength="120" placeholder="e.g. Bonifacio Day" required aria-label="Holiday name">
+        <button class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg"></i> Add</button>
+      </form>
+    </div>
+
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-send me-1"></i> Send test e-mail</h6></div>
       <div class="card-body">

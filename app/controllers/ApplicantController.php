@@ -11,6 +11,7 @@ require_once BASE_PATH . '/app/models/Term.php';
 require_once BASE_PATH . '/app/models/Renewal.php';
 require_once BASE_PATH . '/app/models/Budget.php';
 require_once BASE_PATH . '/app/models/TermSchedule.php';
+require_once BASE_PATH . '/app/models/SlotRequest.php';
 
 /** Applicant / scholar side of docs/PROCESS.md (A1 is in AuthController). */
 final class ApplicantController
@@ -30,6 +31,8 @@ final class ApplicantController
             case 'renewal/upload':       $this->uploadTermDocument('renewal'); break;
             case 'renewal/submit':       $this->submitRenewal(); break;           // A9
             case 'term-documents/view':  $this->viewTermDocument(); break;
+            case 'slot-request':         $this->requestSlot(); break;             // A4 pick a suggested interview slot
+            case 'slot-request/cancel':  $this->cancelSlot(); break;
             case 'notifications':        $this->notifications(); break;
             case 'profile':              $this->profile(); break;
             default:
@@ -57,6 +60,13 @@ final class ApplicantController
 
         $journey = $this->journey($app, $openProgram, $interview, $scholar, $term, $renewal);
         $pastApplications = Application::pastForApplicant((int)$applicant['id'], $app);
+
+        // A4: while waiting for a schedule (also after a first no-show), up to 3 suggested slots to pick from.
+        $slotRequest = $app ? SlotRequest::latestFor((int)$app['id']) : null;
+        $slotChoices = [];
+        if ($app && $app['status'] === 'Qualified' && !($slotRequest && $slotRequest['status'] === 'Pending')) {
+            $slotChoices = Interview::suggestSlots((int)$app['program_id'], SlotRequest::APPLICANT_CHOICES);
+        }
 
         $pageTitle = 'My Dashboard';
         require VIEW_PATH . '/layouts/header.php';
@@ -591,6 +601,31 @@ final class ApplicantController
         $doc = Term::document((int)($_GET['id'] ?? 0));
         if (!$doc || (int)$doc['applicant_id'] !== (int)$this->applicant()['id']) { http_response_code(404); die('Document not found.'); }
         Document::send($doc['file_path'], $doc['original_filename'], $doc['type'], 'term_documents', (int)$doc['id'], isset($_GET['download']));
+    }
+
+    /* ================= A4: INTERVIEW SLOT REQUEST ================= */
+
+    /** POST kind, schedule_id, date, start: one of the applicant's current suggestions (checked again on the server). */
+    private function requestSlot(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('applicant/dashboard');
+        verify_csrf();
+        $app = Application::currentForApplicant((int)$this->applicant()['id']);
+        if (!$app) { flash('danger', 'Please start your application first.'); redirect('applicant/dashboard'); }
+        [$kind, $scheduleId, $date, $start] = array_pad(explode('|', (string)($_POST['slot'] ?? '')), 4, '');
+        $r = SlotRequest::create($app, ['kind' => $kind, 'schedule_id' => (int)$scheduleId, 'date' => $date, 'start' => $start], (int)Auth::user()['id']);
+        flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? 'Slot requested. The SK office will confirm it — we will e-mail you.' : $r['error']);
+        redirect('applicant/dashboard');
+    }
+
+    private function cancelSlot(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('applicant/dashboard');
+        verify_csrf();
+        $app = Application::currentForApplicant((int)$this->applicant()['id']);
+        $r = $app ? SlotRequest::cancel((int)$app['id'], (int)Auth::user()['id']) : ['ok' => false, 'error' => 'Nothing to cancel.'];
+        flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? 'Slot request withdrawn. You can pick another slot.' : $r['error']);
+        redirect('applicant/dashboard');
     }
 
     /* ================= ACCOUNT ================= */

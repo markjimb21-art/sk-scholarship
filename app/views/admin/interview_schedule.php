@@ -55,6 +55,7 @@ $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] 
                     <button class="btn btn-sm btn-outline-danger">No-show</button>
                   </form>
                 <?php else: ?>
+                  <a class="btn btn-sm btn-outline-primary" href="<?= url('admin/interview-reschedule&id=' . (int)$a['id']) ?>">Reschedule</a>
                   <form method="POST" action="<?= url('admin/interview-unassign') ?>" class="d-inline" onsubmit="return confirm('Remove this applicant from the schedule? They are notified.');">
                     <?= csrf_field() ?><input type="hidden" name="assignment_id" value="<?= (int)$a['id'] ?>"><input type="hidden" name="schedule_id" value="<?= (int)$schedule['id'] ?>">
                     <button class="btn btn-sm btn-outline-secondary">Remove</button>

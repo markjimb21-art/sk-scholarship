@@ -390,6 +390,26 @@ INSERT INTO `family_background` VALUES (1,1,'13123',123,'12313','12313','123',12
 UNLOCK TABLES;
 
 --
+-- Table structure for table `holidays`
+--
+
+DROP TABLE IF EXISTS `holidays`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `holidays` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `holiday_date` date NOT NULL,
+  `name` varchar(120) NOT NULL,
+  `created_by` int(10) unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_holiday_date` (`holiday_date`),
+  KEY `fk_holidays_created_by` (`created_by`),
+  CONSTRAINT `fk_holidays_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `interview_assignments`
 --
 
@@ -804,6 +824,36 @@ INSERT INTO `schools` VALUES (1,'Carlos Hilado Memorial State University','Talis
 UNLOCK TABLES;
 
 --
+-- Table structure for table `slot_requests`
+--
+
+DROP TABLE IF EXISTS `slot_requests`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `slot_requests` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `application_id` int(10) unsigned NOT NULL,
+  `schedule_id` int(10) unsigned DEFAULT NULL COMMENT 'Existing Open schedule picked (NULL = a free block)',
+  `proposed_date` date NOT NULL,
+  `proposed_start` time NOT NULL,
+  `proposed_end` time NOT NULL,
+  `status` enum('Pending','Confirmed','Declined','Cancelled') NOT NULL DEFAULT 'Pending',
+  `decision_note` varchar(255) DEFAULT NULL,
+  `decided_by` int(10) unsigned DEFAULT NULL,
+  `decided_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_slot_app_status` (`application_id`,`status`),
+  KEY `idx_slot_status` (`status`),
+  KEY `fk_slot_schedule` (`schedule_id`),
+  KEY `fk_slot_decided_by` (`decided_by`),
+  CONSTRAINT `fk_slot_application` FOREIGN KEY (`application_id`) REFERENCES `applications` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_slot_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `interview_schedules` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_slot_decided_by` FOREIGN KEY (`decided_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `system_settings`
 --
 
@@ -819,7 +869,7 @@ CREATE TABLE `system_settings` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `setting_key` (`setting_key`)
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -828,7 +878,7 @@ CREATE TABLE `system_settings` (
 
 LOCK TABLES `system_settings` WRITE;
 /*!40000 ALTER TABLE `system_settings` DISABLE KEYS */;
-INSERT INTO `system_settings` VALUES (5,'email_notifications','1','bool','Enable email notifications','2026-09-14 17:49:44'),(6,'interview_reminder_hours','24','int','Hours before interview to send reminder','2026-09-14 17:49:44'),(7,'daily_digest_enabled','1','bool','Send the daily interview digest','2026-10-01 00:00:00'),(8,'daily_digest_sent_on','','string','Last day the daily interview digest was sent','2026-10-01 00:00:00'),(9,'admin_event_emails','0','bool','Also e-mail admins about new submissions','2026-10-01 00:00:00');
+INSERT INTO `system_settings` VALUES (5,'email_notifications','1','bool','Enable email notifications','2026-09-14 17:49:44'),(6,'interview_reminder_hours','24','int','Hours before interview to send reminder','2026-09-14 17:49:44'),(7,'daily_digest_enabled','1','bool','Send the daily interview digest','2026-10-01 00:00:00'),(8,'daily_digest_sent_on','','string','Last day the daily interview digest was sent','2026-10-01 00:00:00'),(9,'admin_event_emails','0','bool','Also e-mail admins about new submissions','2026-10-01 00:00:00',(10,'interview_suggestion_window_days','60','int','Days after the application end date that interview suggestions may use','2026-10-01 00:00:00');
 /*!40000 ALTER TABLE `system_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 

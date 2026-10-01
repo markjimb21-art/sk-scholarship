@@ -262,6 +262,37 @@ CREATE TABLE interview_evaluations (
     FOREIGN KEY (interviewer_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Dates never suggested for interviews (Settings → Holidays).
+CREATE TABLE holidays (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    holiday_date DATE NOT NULL,
+    name VARCHAR(120) NOT NULL,
+    created_by INT UNSIGNED NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_holiday_date (holiday_date),
+    CONSTRAINT fk_holidays_created_by FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- An applicant's pick of a suggested interview slot; an admin confirms (assign) or declines it.
+CREATE TABLE slot_requests (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    application_id INT UNSIGNED NOT NULL,
+    schedule_id INT UNSIGNED NULL COMMENT 'Existing Open schedule picked (NULL = a free block)',
+    proposed_date DATE NOT NULL,
+    proposed_start TIME NOT NULL,
+    proposed_end TIME NOT NULL,
+    status ENUM('Pending','Confirmed','Declined','Cancelled') NOT NULL DEFAULT 'Pending',
+    decision_note VARCHAR(255) NULL,
+    decided_by INT UNSIGNED NULL,
+    decided_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_slot_app_status (application_id, status),
+    INDEX idx_slot_status (status),
+    CONSTRAINT fk_slot_application FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
+    CONSTRAINT fk_slot_schedule FOREIGN KEY (schedule_id) REFERENCES interview_schedules(id) ON DELETE SET NULL,
+    CONSTRAINT fk_slot_decided_by FOREIGN KEY (decided_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ---------- SCHOLARS, SEMESTERS, CLAIMS, RENEWALS (A7-A9, B7-B10) ----------
 CREATE TABLE scholars (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -449,7 +480,8 @@ INSERT INTO system_settings (setting_key, setting_value, setting_type, descripti
 ('interview_reminder_hours', '24', 'int', 'Hours before interview to send reminder'),
 ('daily_digest_enabled', '1', 'bool', 'Send the daily interview digest'),
 ('daily_digest_sent_on', '', 'string', 'Last day the daily interview digest was sent'),
-('admin_event_emails', '0', 'bool', 'Also e-mail admins about new submissions');
+('admin_event_emails', '0', 'bool', 'Also e-mail admins about new submissions'),
+('interview_suggestion_window_days', '60', 'int', 'Days after the application end date that interview suggestions may use');
 
 -- Puroks / subdivisions of Barangay Estefania (address step)
 INSERT INTO `puroks` VALUES (1,'Arao'),(2,'Arabay 1'),(3,'Arabay 2'),(4,'Bagong Silang'),(5,'Bethany Court'),(6,'Buena Royale'),(7,'Camelot Residences'),(8,'Camelot Village'),(9,'Camingawan Proper'),(10,'Capitol Hills Subdivision'),(11,'Celine Homes Subdivision'),(12,'City Ville Subdivision'),(13,'Country Homes Subdivision Phase 1'),(14,'Country Homes Subdivision Phase 2'),(15,'Country Homes Subdivision Phase 3'),(16,'East Homes 1'),(17,'East Homes 2'),(18,'East Homes 3'),(19,'Elsa'),(20,'Escuerdo'),(21,'Estefania Proper'),(22,'Flora'),(23,'Fortune Towne - B'),(24,'Fortune Towne Subdivision'),(25,'Goldah'),(26,'Glenwood Residences'),(27,'Greensville 1 Subdivision'),(28,'Greensville 4 Subdivision'),(29,'Jesusa Heights Subdivision'),(30,'Kaburihan'),(31,'Kasoy'),(32,'La Herencia'),(33,'Lopues Village'),(34,'Luisville Subdivision'),(35,'Mayang'),(36,'Meadows of Camelot'),(37,'Pag-asa'),(38,'Paho 1'),(39,'Paho 2'),(40,'Paraiso'),(41,'Pedring'),(42,'Pequiño'),(43,'Providence Negros'),(44,'Sagrado 2'),(45,'Sambag'),(46,'Sunshine Valley Subdivision'),(47,'The Palisades'),(48,'Villa Alexandra 1'),(49,'Villa Alexandra 2'),(50,'Villa Angeles'),(51,'Villa Estefania'),(52,'Villa Felicidad'),(53,'Villa Soledad'),(54,'Villa Villeta'),(55,'Villamar');

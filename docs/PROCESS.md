@@ -76,7 +76,7 @@ Scheduled | Attended | No-show.
 | A1 | Register → 6-digit e-mail code → login. Forgot password uses the same OTP. | `register`, `verify-otp`, `resend-otp`, `login`, `forgot-password`, `verify-reset-otp`, `reset-password` | — |
 | A2 | Multi-step form: Personal (incl. blood type, religion, citizenship), Education, Family, Documents (Certificate of Residency, Form 138 / Grades, Enrollment Form, School ID, 2x2 Photo), Review & Submit. Autosaves a draft. **(server)** Only while a program is open and inside its dates; Submit only when complete. | `applicant/application`, `applicant/application/autosave`, `applicant/documents/upload`, `applicant/documents/view`, `applicant/application/submit` | Draft → Submitted |
 | A3 | Waits for screening. If Returned: the remarks are shown on the dashboard and at the top of the form; the form becomes editable; resubmit. | `applicant/dashboard`, `applicant/application` | Submitted / Returned / Rejected / Qualified |
-| A4 | Waits for a schedule; then sees date, time and venue (in-app + e-mail) and gets a reminder e-mail 24 h before. | `applicant/dashboard` ("What you need to do next" box) | Qualified → Interview Scheduled |
+| A4 | Waits for a schedule — and may **pick one of 3 suggested slots** (§3a), which the SK office confirms; then sees date, time and venue (in-app + e-mail), a reminder before, and "Your interview is today" on the day. | `applicant/dashboard` ("Pick an interview slot" box), `applicant/slot-request`, `applicant/slot-request/cancel` | Qualified → Interview Scheduled (only by the admin's confirm/assign) |
 | A5 | Attends. A first no-show goes back to "waiting for a new schedule" (one reschedule); a second no-show is Rejected. | `applicant/dashboard` | Interview Scheduled → Interviewed / Qualified / Rejected |
 | A6 | Waits for the final result. | `applicant/dashboard` | Interviewed → Approved / Waitlisted / Rejected |
 | A7 | Approved → Scholar; Semester 1 opens automatically. | `applicant/scholarship` *(rebuilt)* | Approved; term = Waiting for Requirements |
@@ -105,6 +105,32 @@ Other applicant pages kept: `applicant/notifications` (inbox), `applicant/profil
 | B3 | `admin/interviews` *renamed from admin/interview-scheduling*, `admin/interview-schedule-save`, `-update`, `-cancel`, `-delete`, `admin/interview-schedule&id=` *renamed from interview-schedule-detail*, `admin/interview-assign` (bulk), `admin/interview-unassign` | Create a schedule (date, start/end, venue, capacity); bulk-assign Qualified applicants. Assign, edit (date/time/venue) and cancel notify the applicants. | capacity; only Qualified; delete only when empty; cancel sends everyone back to Qualified |
 | B4 | `admin/interview-schedule&id=` (attendance column), `admin/interview-no-show` *new*, `admin/interview-score&id=` (saving a score marks Attended) *renamed from interview-evaluate*, `admin/interview-score-save` *renamed* | Mark Attended / No-show; score attendees with the rubric + remarks. | rubric bounds from the one constant; one reschedule |
 | B5 | `admin/decisions&program_id=` *new*, `admin/decisions/decide` *new* | Ranking of Interviewed (and Waitlisted) applicants: score, GWA, family income, eligibility result; "Slots: X approved / Y total". Approve / Waitlist / Reject (reason). "Promote next waitlisted?" prompt when a first-semester scholar ends. | approve blocked when X ≥ Y |
+
+### 3a. Interview scheduling page and suggestions
+
+`admin/interview-reschedule&application_id=` (also `&id=` an interview assignment) — reached from "Schedule" on the
+Interviews page's waiting list, "Reschedule" on a schedule's applicant row, a slot-request notification, and the
+first-no-show notification. It shows the applicant's pending slot request (Confirm / Decline), a ranked list of
+suggestions, and a free date/time picker (`admin/interview-reschedule-save`, `admin/slot-request-decide`).
+
+**Suggestions — `Interview::suggestSlots()`, one function for the New-schedule form, this page and the applicant:**
+1. Existing **Open** schedules of the program, from tomorrow, that still have free capacity (soonest first) — not on the
+   New-schedule form, and not the schedule the applicant is already on.
+2. New free **2-hour blocks** (8–10, 10–12, 1–3, 3–5), Monday–Saturday, from the day after the application end date (or
+   tomorrow), skipping **holidays** (Settings → Holidays), dates on which **another program** already has an interview
+   day, and blocks overlapping any Open schedule.
+3. Window end = the later of the application end date and today + `interview_suggestion_window_days` (Settings, 7–180,
+   default 60).
+
+**Rules (server):**
+- Applicant slot requests (`slot_requests`): only while the application is Qualified (also after a first no-show); only
+  one Pending request; the pick must be one of the applicant's **current** top 3 suggestions; CSRF on every POST.
+- Only the admin's **Confirm** schedules the applicant — through the existing `assign` transition, which enforces
+  capacity and the one-reschedule rule. A free block becomes a schedule at the venue/capacity the admin confirms (or the
+  program's Open schedule at that exact time). If it can't be used any more, the request is **Declined** with the reason
+  and the applicant is asked to pick again. Any assignment closes a pending request.
+- Moving an upcoming interview to another schedule removes the waiting attempt and creates the new one (no no-show is
+  counted) and sends one **"Interview changed"**; editing a schedule's date/time/venue also sends "Interview changed".
 
 **Eligibility check (B2, also shown in B5)** — computed on the server from the application; each row is Pass / Fail / Not provided:
 1. Age on the submission date ≤ program maximum age.
@@ -149,7 +175,7 @@ before any second semester was opened (their slot is free again — that's when 
 
 A School ID or Enrollment Form uploaded during a claim or renewal becomes the applicant's **current** version (`is_current`). Older versions — in `documents` or `term_documents` — are marked superseded (`superseded_at`), never deleted, and audit-logged (`Document::supersede`). The application view and scholar view show the current version (`Document::current`) and a **Document history** list (`Document::history`). A claim or renewal review always shows what was submitted for it.
 
-**Suggestions (never filled in without a click):** B3 "New schedule" offers up to 5 free 2-hour slots (Mon–Sat, 8–12 and 1–5, from the day after the application end date to +60 days, skipping any open interview schedule of any program) — `Interview::suggestSlots`. B6 offers a total budget = slots × amount per semester × 2 — `Budget::suggestedTotal`.
+**Suggestions (never filled in without a click):** B3 "New schedule" offers up to 5 free 2-hour slots, and the scheduling page and applicant dashboard rank existing schedules first — rules in §3a (`Interview::suggestSlots`). B6 offers a total budget = slots × amount per semester × 2 — `Budget::suggestedTotal`.
 
 ---
 

@@ -59,7 +59,8 @@
                         data-slot-start="<?= e($s['start']) ?>" data-slot-end="<?= e($s['end']) ?>"><?= e($s['label']) ?></button>
               <?php endforeach; ?>
             </div>
-            <div class="form-text">Free 2-hour blocks after the application period, not overlapping any open interview schedule. A suggestion only — you can pick any date and time.</div>
+            <div class="form-text">Free 2-hour blocks after the application period: Monday–Saturday, no holidays (Settings), no day another program already
+              interviews on, not overlapping any open schedule. A suggestion only — you can pick any date and time.</div>
           <?php else: ?>
             <div class="form-text"><?= e($noSuggestionReason ?? 'No suggestions.') ?> Pick a date and time below.</div>
           <?php endif; ?>
@@ -75,6 +76,22 @@
       </form>
     </div>
 
+    <?php if ($slotRequests): ?>
+    <div class="card border-0 shadow-sm mb-3 border-start border-4 border-primary">
+      <div class="card-header bg-white d-flex justify-content-between">
+        <h6 class="mb-0">Slot requests to confirm</h6><span class="badge bg-primary"><?= count($slotRequests) ?></span>
+      </div>
+      <ul class="list-group list-group-flush small">
+        <?php foreach ($slotRequests as $sr): ?>
+          <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+            <span><strong><?= e($sr['full_name']) ?></strong><br><span class="text-muted"><?= e(SlotRequest::describe($sr)) ?></span></span>
+            <a class="btn btn-sm btn-primary" href="<?= url('admin/interview-reschedule&application_id=' . (int)$sr['application_id']) ?>">Review</a>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+    </div>
+    <?php endif; ?>
+
     <div class="card border-0 shadow-sm">
       <div class="card-header bg-white d-flex justify-content-between">
         <h6 class="mb-0">Qualified, waiting for a schedule</h6><span class="badge bg-primary"><?= count($waiting) ?></span>
@@ -82,9 +99,10 @@
       <ul class="list-group list-group-flush small">
         <?php if (!$waiting): ?><li class="list-group-item text-muted">Nobody is waiting.</li><?php endif; ?>
         <?php foreach ($waiting as $w): ?>
-          <li class="list-group-item">
-            <a href="<?= url('admin/application&id=' . (int)$w['id']) ?>"><?= e($w['full_name']) ?></a>
-            <?= (int)$w['missed_before'] ? '<span class="badge bg-warning ms-1">missed once — last chance</span>' : '' ?>
+          <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+            <span><a href="<?= url('admin/application&id=' . (int)$w['id']) ?>"><?= e($w['full_name']) ?></a>
+              <?= (int)$w['missed_before'] ? '<span class="badge bg-warning ms-1">missed once — last chance</span>' : '' ?></span>
+            <a class="btn btn-sm btn-outline-primary" href="<?= url('admin/interview-reschedule&application_id=' . (int)$w['id']) ?>">Schedule</a>
           </li>
         <?php endforeach; ?>
       </ul>
