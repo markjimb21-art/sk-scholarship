@@ -141,7 +141,15 @@ final class AdminController
         $budget = $program ? Budget::forProgramYear((int)$program['id'], $program['academic_year']) : null;
         $todayInterviews = Interview::day($today);
 
-        render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'todayInterviews'), 'Dashboard');
+        // Charts for the selected program (numbers shown in a table next to each chart).
+        $charts = $program ? [
+            'status'  => Analytics::stageCounts((int)$program['id']),
+            'months'  => Analytics::releasedByMonth((int)$program['id']),
+            'gwa'     => Analytics::scholarsByGwaBand((int)$program['id']),
+        ] : null;
+
+        render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'todayInterviews', 'charts')
+            + ['pageScripts' => [asset('js/sk-charts.js')]], 'Dashboard');
     }
 
     public function notifications(): void

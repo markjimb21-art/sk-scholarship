@@ -16,7 +16,7 @@ $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
         <?php if (!$rows): ?>
           <p class="text-muted small mb-0">No submitted applications yet.</p>
         <?php else: ?>
-          <div style="height:<?= max(120, 26 * count($rows) + 50) ?>px"><canvas id="profile_<?= e($dim) ?>" role="img" aria-label="Applicants and approved by <?= e(lcfirst($label)) ?>"></canvas></div>
+          <div style="height:<?= max(150, 46 * count($rows) + 70) ?>px"><canvas id="profile_<?= e($dim) ?>" role="img" aria-label="Applicants and approved by <?= e(lcfirst($label)) ?>"></canvas></div>
           <table class="table table-sm small align-middle mb-0 mt-2">
             <thead><tr><th><?= e($label) ?></th><th class="text-end">Applicants</th><th class="text-end">Approved</th><th class="text-end">Approval rate</th></tr></thead>
             <tbody>
@@ -106,7 +106,7 @@ $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
 <h5 class="fw-semibold mb-2 mt-4">7. Fund utilization — A.Y. <?= e($data['ay']) ?></h5>
 <div class="row g-3">
   <div class="col-sm-6 col-lg-3"><div class="card border-0 shadow-sm h-100"><div class="card-body">
-    <div class="small text-muted">Released</div><div class="fs-4 fw-bold"><?= e($peso($data['budget']['released'] ?? 0)) ?></div>
+    <div class="small text-muted">Released</div><div class="fs-4 fw-bold"><?= e($peso($aps['total'])) ?></div>
     <div class="small text-muted">= sum of releases for this program’s semesters of this A.Y.</div></div></div></div>
   <div class="col-sm-6 col-lg-3"><div class="card border-0 shadow-sm h-100"><div class="card-body">
     <div class="small text-muted">Committed</div><div class="fs-4 fw-bold"><?= e($peso($data['committed'])) ?></div>
@@ -139,3 +139,25 @@ $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
     <?php endif; ?>
   </div></div></div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (!window.SKCharts) return;
+  // (5) applicants (blue) vs approved (orange) per group — same colours in every profile chart.
+  var profiles = <?= js_json(array_map(static fn($rows) => ['labels' => array_column($rows, 'group'), 'applicants' => array_column($rows, 'applicants'), 'approved' => array_column($rows, 'approved')], $data['profiles'])) ?>;
+  Object.keys(profiles).forEach(function (dim) {
+    var p = profiles[dim];
+    if (!p.labels.length) return;
+    SKCharts.bar('profile_' + dim, p.labels, [{ label: 'Applicants', data: p.applicants }, { label: 'Approved', data: p.approved }],
+      { horizontal: true, integer: true, xTitle: 'Applications' });
+  });
+  // (6) average GWA per semester; lower is better, so the axis is reversed (better = higher on the chart).
+  SKCharts.line('gwaTrendChart', <?= js_json(array_keys($data['gwaBySemester'])) ?>,
+    [{ label: 'Average GWA', data: <?= js_json(array_map(static fn($g) => round($g['avg'], 2), array_values($data['gwaBySemester']))) ?> }],
+    { reverse: true, yMin: 1, xTitle: 'Semester', yTitle: 'Average GWA (axis reversed: higher = better)' });
+  // (7) fund utilization over time
+  SKCharts.bar('releasedMonthChart', <?= js_json(array_map(static fn($m) => date('M Y', strtotime($m . '-01')), array_keys($data['releasedByMonth']))) ?>,
+    [{ label: 'Released', data: <?= js_json(array_values($data['releasedByMonth'])) ?> }], { money: true, xTitle: 'Release month', yTitle: 'Pesos' });
+  SKCharts.bar('releasedSemChart', <?= js_json(array_keys($data['releasedBySemester'])) ?>,
+    [{ label: 'Released', data: <?= js_json(array_values($data['releasedBySemester'])) ?> }], { money: true, xTitle: 'Semester', yTitle: 'Pesos' });
+});
+</script>

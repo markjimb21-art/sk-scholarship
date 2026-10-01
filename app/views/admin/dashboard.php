@@ -96,4 +96,6 @@
     </div></div>
   </div>
 </div>
+
+<?php require VIEW_PATH . '/admin/_dashboard_charts.php'; ?>
 <?php endif; ?>

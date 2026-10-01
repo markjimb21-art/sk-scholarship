@@ -86,3 +86,15 @@ plus), two applicant accounts and an e-mail address you can read. Numbered steps
 5. Section 7 → after two ₱5,000 releases with a ₱40,000 budget: released ₱10,000, release rate 25.0%, average per
    scholar matches released ÷ scholars paid; "Released per month" lists each release month.
 6. Every number has its formula written under it; changing the A.Y. select changes sections 6 (per-scholar table) and 7.
+
+## 5. Dashboards and charts
+1. Admin dashboard → pick a program. → Four charts appear below the program cards: **Applications by status**,
+   **Budget** (total / released / remaining), **Releases per month**, **Active scholars by GWA**; each has its numbers in a
+   table under it and labelled axes. A program with no data shows a short "No … yet" message instead of an empty chart.
+2. Analytics → sections 5–7 each show charts with the same numbers in tables: profile bars (Applicants blue, Approved
+   orange, with a legend), **Average GWA per semester** (line; the axis is reversed so a better GWA is higher, as the
+   axis title says), the **At-risk scholars** table, and **Released per month / per semester** bars.
+3. The browser's developer tools → Network: Chart.js and `js/sk-charts.js` load from the site (`assets/…`), nothing from a CDN.
+4. Reports → **Profile and academic summary** → choose a program → PDF and CSV. → The file lists every profile group
+   (applicants, approved, approval rate), the GWA figures, at-risk scholars, GWA trends and fund utilization. Without a
+   program it is refused; a date range shows "Not applicable to this report" in the header.

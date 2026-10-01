@@ -85,7 +85,7 @@ final class ReportController
                 'avgPerScholar' => Analytics::avgReleasedPerScholar($pid, $ay),
             ];
         }
-        render('admin/analytics', compact('program', 'programs', 'years', 'data'), 'Data Analytics');
+        render('admin/analytics', compact('program', 'programs', 'years', 'data') + ['pageScripts' => [asset('js/sk-charts.js')]], 'Data Analytics');
     }
 
     private static function streamCsv(array $report): void

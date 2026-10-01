@@ -18,6 +18,7 @@ final class Report
         'budget'     => ['Budget utilization', 'Budget, released, remaining and committed per program and academic year', 'b.program_id', 'r.release_date'],
         'claims'     => ['Claims & renewals status', 'Status of every semester claim and renewal request', 's.program_id', 'x.created_at'],
         'summary'    => ['Program summary', 'One page of the key numbers of one program', 'a.program_id', 'a.submitted_at'],
+        'profile_academic' => ['Profile and academic summary', 'Applicant profiles, academic performance (GWA, at-risk) and fund utilization of one program', 'a.program_id', null],
     ];
 
     /**
@@ -138,6 +139,9 @@ final class Report
             case 'summary':
                 return self::summary($programId, $from, $to, $title);
 
+            case 'profile_academic':
+                return self::profileAcademic($programId, $from, $to, $title);
+
             default:
                 throw new InvalidArgumentException('Unknown report.');
         }
@@ -211,6 +215,49 @@ final class Report
 
         return ['title' => $title . ' — ' . $program['program_name'], 'headers' => ['Figure', 'Value'], 'rows' => $rows,
                 'meta' => self::meta($pid, $from, $to, true, '')];
+    }
+
+    /**
+     * Report 9 — the analytics of docs/PROCESS.md §6 (5)–(7) for one program as rows: profile breakdowns (applicants,
+     * approved, approval rate), academic performance (GWA, at-risk scholars, trend) and fund utilization for the
+     * program's academic year. Uses the same Analytics functions as the analytics page. Date filter: not applicable.
+     */
+    private static function profileAcademic(?int $programId, ?string $from, ?string $to, string $title): array
+    {
+        $program = $programId ? Program::find($programId) : null;
+        if (!$program) throw new InvalidArgumentException('Choose a program for the Profile and academic summary.');
+        $pid = (int)$program['id'];
+        $ay = $program['academic_year'];
+        $pct = static fn($r) => $r === null ? '—' : number_format($r * 100, 1) . '%';
+        $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
+        $peso = static fn($v) => $v === null ? '—' : '₱' . number_format((float)$v, 2);
+        $rows = [];
+        foreach (Analytics::PROFILE_DIMENSIONS as $dim => $label) {
+            foreach (Analytics::profileBreakdown($pid, $dim) as $r) {
+                $rows[] = ["Profile — $label", $r['group'], $r['applicants'], $r['approved'], $pct($r['rate'])];
+            }
+        }
+        $gv = Analytics::gwaApplicantsVsScholars($pid);
+        $rows[] = ['Academic', 'Average GWA of applicants', $gv['applicants']['n'], '', $gwa($gv['applicants']['avg'])];
+        $rows[] = ['Academic', 'Average GWA of approved scholars', $gv['scholars']['n'], '', $gwa($gv['scholars']['avg'])];
+        foreach (Analytics::avgGwaBySemester($pid) as $sem => $g) $rows[] = ['Academic — average GWA per semester', $sem, $g['n'], '', $gwa($g['avg'])];
+        $atRisk = Analytics::atRiskScholars($pid);
+        $rows[] = ['Academic', 'Scholars below the minimum GWA (' . $gwa($program['min_gpa']) . ')', count($atRisk), '', ''];
+        foreach ($atRisk as $s) $rows[] = ['Academic — at risk', "{$s['full_name']} ({$s['scholar_code']})", $s['semester'], '', $gwa($s['gwa'])];
+        foreach (Analytics::gwaTrend($pid) as $s) {
+            $rows[] = ['Academic — GWA trend', "{$s['full_name']} ({$s['scholar_code']})", $gwa($s['first']) . ' → ' . $gwa($s['last']), '', $s['trend']];
+        }
+        $aps = Analytics::avgReleasedPerScholar($pid, $ay);
+        $rows[] = ["Funds ($ay)", 'Released', '', '', $peso(Budget::actualReleased($pid, $ay))];
+        $rows[] = ["Funds ($ay)", 'Committed', '', '', $peso(Analytics::committed($pid, $ay))];
+        $rows[] = ["Funds ($ay)", 'Release rate (released ÷ total budget)', '', '', $pct(Analytics::releaseRate($pid, $ay))];
+        $rows[] = ["Funds ($ay)", 'Average released per scholar', $aps['scholars'], '', $peso($aps['avg'])];
+        foreach (Analytics::releasedByMonth($pid, $ay) as $m => $v) $rows[] = ["Funds ($ay) — released per month", $m, '', '', $peso($v)];
+        foreach (Analytics::releasedBySemester($pid) as $sem => $v) $rows[] = ['Funds — released per semester', $sem, '', '', $peso($v)];
+
+        return ['title' => $title . ' — ' . $program['program_name'],
+                'headers' => ['Section', 'Item', 'Applicants / count', 'Approved', 'Rate / value'], 'rows' => $rows,
+                'meta' => self::meta($pid, $from, $to, false, '') + ['Academic year (funds)' => $ay]];
     }
 
     private static function meta(?int $programId, ?string $from, ?string $to, bool $dateApplied, string $status): array

@@ -7,7 +7,8 @@
 // Which date the From/To filter applies to, per report (same columns as Report::CATALOG).
 $dateLabels = ['applicant_list' => 'submission date', 'interviews' => 'interview date', 'ranking' => 'scoring date',
                'scholars' => 'approval date', 'releases' => 'release date', 'budget' => 'release date',
-               'claims' => 'date the claim/renewal was created', 'summary' => 'submission and release dates'];
+               'claims' => 'date the claim/renewal was created', 'summary' => 'submission and release dates',
+               'profile_academic' => 'not applicable (current data)'];
 ?>
 <div class="row g-3">
   <?php $n = 0; foreach ($reports as $key => [$title, $desc]): $n++; ?>
@@ -70,7 +71,7 @@ document.getElementById('genModal').addEventListener('show.bs.modal', function (
   document.getElementById('genReportType').value = type;
   document.getElementById('genTitle').textContent = e.relatedTarget.dataset.title;
   document.getElementById('statusRow').classList.toggle('d-none', type !== 'applicant_list');
-  var needsProgram = type === 'summary';
+  var needsProgram = type === 'summary' || type === 'profile_academic';
   document.getElementById('programRequired').classList.toggle('d-none', !needsProgram);
   document.getElementById('genProgram').required = needsProgram;
 });
