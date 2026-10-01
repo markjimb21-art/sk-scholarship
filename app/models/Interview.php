@@ -141,6 +141,38 @@ final class Interview
         return (int)$schedule['assigned_count'] >= (int)$schedule['max_slots'] ? 'Full' : 'Open';
     }
 
+    /**
+     * Interviews on one day (Open schedules), earliest first, each with its attempts:
+     * [schedule fields + program_name, 'attempts' => [[id, attendance, reschedule_count, application_id, application_code,
+     * app_status, user_id, full_name]], 'unmarked' => attempts still Scheduled]. Used by the dashboard and the daily digest.
+     */
+    public static function day(string $date): array
+    {
+        $pdo = Database::conn();
+        $stmt = $pdo->prepare(
+            "SELECT s.*, sp.program_name FROM interview_schedules s JOIN scholarship_programs sp ON sp.id = s.program_id
+             WHERE s.interview_date = ? AND s.status = 'Open' ORDER BY s.start_time, s.id"
+        );
+        $stmt->execute([$date]);
+        $schedules = $stmt->fetchAll();
+        $attempts = $pdo->prepare(
+            "SELECT ia.id, ia.attendance, ia.reschedule_count, a.id AS application_id, a.application_code, a.status AS app_status,
+                    u.id AS user_id, u.full_name
+             FROM interview_assignments ia
+             JOIN applications a ON a.id = ia.application_id
+             JOIN applicants ap ON ap.id = a.applicant_id
+             JOIN users u ON u.id = ap.user_id
+             WHERE ia.schedule_id = ? ORDER BY u.full_name"
+        );
+        foreach ($schedules as &$s) {
+            $attempts->execute([(int)$s['id']]);
+            $s['attempts'] = $attempts->fetchAll();
+            $s['unmarked'] = count(array_filter($s['attempts'], static fn($x) => $x['attendance'] === 'Scheduled'));
+        }
+        unset($s);
+        return $schedules;
+    }
+
     /** Schedules dated in [$from, $to] with program name and assigned count (calendar), optionally of one program. */
     public static function schedulesInRange(string $from, string $to, ?int $programId = null): array
     {
@@ -433,6 +465,9 @@ final class Interview
         } else {
             Application::notify((int)$a['application_id'], 'You missed your interview',
                 'You missed your interview on ' . self::describe($a) . '. You get ONE new schedule — we will e-mail it to you. Missing it ends your application.', 'warning');
+            Notification::adminEvent('First no-show — reschedule needed',
+                "{$a['full_name']} ({$a['application_code']}) missed the interview on " . self::describe($a) . ' and needs their one new schedule.',
+                'admin/interview-reschedule&application_id=' . (int)$a['application_id']);
         }
         return ['ok' => true, 'final' => $final];
     }

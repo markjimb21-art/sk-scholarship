@@ -203,6 +203,9 @@ final class Renewal
         AuditLog::write('renewal_submit', 'renewal_requests', $id,
             "Renewal requested for {$target['academic_year']} {$target['semester']}",
             ['status' => $req['status'] ?? null], ['status' => 'Submitted', 'by' => $userId]);
+        Notification::adminEvent($req ? 'Renewal resubmitted' : 'Renewal submitted',
+            "{$term['full_name']} ({$term['scholar_code']}) — renewal for {$target['academic_year']} {$target['semester']} is waiting for review.",
+            'admin/renewals/view&id=' . $id);
         return ['ok' => true];
     }
 }

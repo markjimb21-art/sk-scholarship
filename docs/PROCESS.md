@@ -249,6 +249,22 @@ Below them, for the selected program: slots used / total, and budget remaining f
 | Claim / Renewal deadline changed | window deadline changed or reopened |
 | Claim / Renewal window cancelled | window cancelled |
 | Claim / Renewal reminder (48 h before the deadline) | `bin/send_reminders.php` (idempotent via `term_schedules.deadline_reminder_sent_at`) |
+| Your interview is today (time, venue, application code, arrive 15 minutes early) | daily digest in `bin/send_reminders.php`, first run of the day (Settings → Daily interview digest) |
+
+**Notifications to admins** — `Notification::sendToAdmins()` writes to every *active* user with the admin role.
+In-app always; e-mailed only when Settings → "Also e-mail admins about new submissions" is on (the digest is e-mailed
+whenever e-mail is on). Each links to the item in its queue.
+
+| Event | Trigger (server) |
+|---|---|
+| New application submitted / Application resubmitted | A2 submit / A3 resubmit (`Application::submit`) |
+| Claim submitted | A8 (`Term::submitClaim`) |
+| Renewal submitted / resubmitted | A9 (`Renewal::submit`) |
+| First no-show — reschedule needed | B4 first no-show (`Interview::markNoShow`) |
+| Interview slot requested | applicant picks a suggested slot (§3a) |
+| Interviews today: N schedule(s) — time, venue, applicants, how many not yet marked | daily digest, first run of the day; idempotent via `system_settings.daily_digest_sent_on` (claimed before sending, given back on failure) |
+
+The admin dashboard also lists today's interviews (time, venue, program, applicants, how many not yet marked).
 
 Every status change is also written to the audit log (`AuditLog::write`).
 

@@ -231,6 +231,9 @@ final class Application
         } catch (DomainException $e) {
             return ['ok' => false, 'error' => $e->getMessage()];
         }
+        Notification::adminEvent($resubmission ? 'Application resubmitted' : 'New application submitted',
+            "{$app['application_code']} — {$app['program_name']}" . ($resubmission ? ' (after correction)' : '') . ' is waiting for screening.',
+            'admin/application&id=' . $applicationId);
         return ['ok' => true, 'resubmitted' => $resubmission];
     }
 

@@ -25,6 +25,32 @@ final class Notification
         }
     }
 
+    /**
+     * In-app notification (and e-mail when $sendEmail and e-mail is on in Settings) to every ACTIVE user with the
+     * admin role. Returns how many admins were notified.
+     */
+    public static function sendToAdmins(string $title, string $message, string $type = 'info', ?string $link = null, bool $sendEmail = false): int
+    {
+        $ids = Database::conn()->query(
+            "SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id WHERE r.role_name = 'admin' AND u.is_active = 1"
+        )->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($ids as $id) self::send((int)$id, $title, $message, $type, $link, $sendEmail);
+        return count($ids);
+    }
+
+    /**
+     * Something new is waiting in an admin queue (submission, resubmission, no-show, reschedule request): in-app to every
+     * admin; also e-mailed when Settings → "E-mail admins about new submissions" is on. Never breaks the caller's action.
+     */
+    public static function adminEvent(string $title, string $message, string $route): void
+    {
+        try {
+            self::sendToAdmins($title, $message, 'info', url($route), setting('admin_event_emails', '0') === '1');
+        } catch (Throwable $e) {
+            error_log('Admin notification failed: ' . $e->getMessage());
+        }
+    }
+
     private static function emailEnabled(): bool {
         $stmt = Database::conn()->query("SELECT setting_value FROM system_settings WHERE setting_key='email_notifications'");
         return (bool)($stmt->fetchColumn() ?? 0);

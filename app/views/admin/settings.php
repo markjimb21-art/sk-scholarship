@@ -14,6 +14,20 @@
         <label class="form-label">Interview reminder — hours before the interview</label>
         <input type="number" min="0" max="168" name="interview_reminder_hours" class="form-control" value="<?= e($settings['interview_reminder_hours']) ?>">
         <div class="form-text">Used by <code>bin/send_reminders.php</code> (see README). 0 turns interview reminders off.</div>
+
+        <div class="form-check form-switch mt-3">
+          <input class="form-check-input" type="checkbox" name="daily_digest_enabled" value="1" id="digestOn" <?= $settings['daily_digest_enabled'] === '1' ? 'checked' : '' ?>>
+          <label class="form-check-label" for="digestOn">Daily interview digest</label>
+          <div class="form-text">On the first run of <code>bin/send_reminders.php</code> each day: "Your interview is today" to each applicant
+            interviewed today, and one list of today's interviews to the admins.
+            Last sent: <?= $settings['daily_digest_sent_on'] !== '' ? e(date('M d, Y', strtotime($settings['daily_digest_sent_on']))) : 'never' ?>.</div>
+        </div>
+        <div class="form-check form-switch mt-3">
+          <input class="form-check-input" type="checkbox" name="admin_event_emails" value="1" id="adminEvents" <?= $settings['admin_event_emails'] === '1' ? 'checked' : '' ?>>
+          <label class="form-check-label" for="adminEvents">Also e-mail admins about new submissions</label>
+          <div class="form-text">Admins always get an in-app notification when an application, claim or renewal is submitted, a first no-show is
+            recorded, or an applicant requests an interview slot. Turn this on to e-mail them too.</div>
+        </div>
       </div>
       <div class="card-footer bg-white"><button class="btn btn-primary"><i class="bi bi-save"></i> Save settings</button></div>
     </form>

@@ -819,7 +819,7 @@ CREATE TABLE `system_settings` (
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `setting_key` (`setting_key`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -828,7 +828,7 @@ CREATE TABLE `system_settings` (
 
 LOCK TABLES `system_settings` WRITE;
 /*!40000 ALTER TABLE `system_settings` DISABLE KEYS */;
-INSERT INTO `system_settings` VALUES (5,'email_notifications','1','bool','Enable email notifications','2026-09-14 17:49:44'),(6,'interview_reminder_hours','24','int','Hours before interview to send reminder','2026-09-14 17:49:44');
+INSERT INTO `system_settings` VALUES (5,'email_notifications','1','bool','Enable email notifications','2026-09-14 17:49:44'),(6,'interview_reminder_hours','24','int','Hours before interview to send reminder','2026-09-14 17:49:44'),(7,'daily_digest_enabled','1','bool','Send the daily interview digest','2026-10-01 00:00:00'),(8,'daily_digest_sent_on','','string','Last day the daily interview digest was sent','2026-10-01 00:00:00'),(9,'admin_event_emails','0','bool','Also e-mail admins about new submissions','2026-10-01 00:00:00');
 /*!40000 ALTER TABLE `system_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 

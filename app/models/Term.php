@@ -204,6 +204,8 @@ final class Term
             return ['ok' => false, 'error' => 'Upload both your School ID and Grades first.'];
         }
         self::changeClaimStatus($term, 'submit', $userId, ['submitted_at' => date('Y-m-d H:i:s')]);
+        Notification::adminEvent('Claim submitted', "{$term['full_name']} ({$term['scholar_code']}) — {$term['academic_year']} {$term['semester']} claim is waiting for verification.",
+            'admin/claims/view&id=' . (int)$term['id']);
         return ['ok' => true];
     }
 

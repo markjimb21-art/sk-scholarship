@@ -92,6 +92,14 @@ function require_post(string $back): void {
     verify_csrf();
 }
 
+/** One system_settings value (or $default when the row is missing). Read fresh each call: settings are few and small. */
+function setting(string $key, ?string $default = null): ?string {
+    $stmt = Database::conn()->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1");
+    $stmt->execute([$key]);
+    $v = $stmt->fetchColumn();
+    return $v === false || $v === null ? $default : (string)$v;
+}
+
 /** Current admin's user id. */
 function admin_id(): int {
     return (int)(Auth::user()['id'] ?? 0);

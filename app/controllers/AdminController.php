@@ -130,8 +130,9 @@ final class AdminController
         $programs = Program::options();
         $slotsUsed = $program ? Program::slotsUsed((int)$program['id']) : 0;
         $budget = $program ? Budget::forProgramYear((int)$program['id'], $program['academic_year']) : null;
+        $todayInterviews = Interview::day($today);
 
-        render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget'), 'Dashboard');
+        render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'todayInterviews'), 'Dashboard');
     }
 
     public function notifications(): void
@@ -281,6 +282,9 @@ final class AdminController
         $settings = [
             'email_notifications'      => (string)($rows['email_notifications'] ?? '1'),
             'interview_reminder_hours' => (string)($rows['interview_reminder_hours'] ?? '24'),
+            'daily_digest_enabled'     => (string)($rows['daily_digest_enabled'] ?? '1'),
+            'daily_digest_sent_on'     => (string)($rows['daily_digest_sent_on'] ?? ''),
+            'admin_event_emails'       => (string)($rows['admin_event_emails'] ?? '0'),
         ];
         $mailStatus = Notification::mailConfigStatus();
         render('admin/settings', compact('settings', 'mailStatus'), 'Settings');
@@ -292,6 +296,8 @@ final class AdminController
         $values = [
             'email_notifications'      => !empty($_POST['email_notifications']) ? '1' : '0',
             'interview_reminder_hours' => (string)max(0, min(168, (int)($_POST['interview_reminder_hours'] ?? 24))),
+            'daily_digest_enabled'     => !empty($_POST['daily_digest_enabled']) ? '1' : '0',
+            'admin_event_emails'       => !empty($_POST['admin_event_emails']) ? '1' : '0',
         ];
         $stmt = Database::conn()->prepare(
             "INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"

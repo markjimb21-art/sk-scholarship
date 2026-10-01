@@ -10,6 +10,8 @@ declare(strict_types=1);
  *    not cancelled, when the interview starts within the next `interview_reminder_hours` hours (setting; 0 = off).
  * 2. Deadline reminders: one per open claim/renewal window whose deadline is within TERM_SCHEDULE_REMINDER_HOURS (48),
  *    sent to every scholar of that window who hasn't submitted yet.
+ * 3. Daily digest (first run of each day, Settings toggle): "Your interview is today" to each applicant interviewed today,
+ *    and one list of today's interviews to the admins (idempotent via system_settings.daily_digest_sent_on).
  *
  * Idempotent: each row is CLAIMED (reminder_sent_at / deadline_reminder_sent_at set) before its notification is sent,
  * and only unclaimed rows are picked up, so re-running the script — or two overlapping runs — never sends the same
@@ -112,6 +114,55 @@ try {
         }
     }
     out("Deadline reminders sent: $windows window(s), $scholars scholar(s) (deadline within " . TERM_SCHEDULE_REMINDER_HOURS . ' hours).');
+
+    // Daily digest (Settings → "Daily interview digest"): on the FIRST run of each day, every applicant interviewed today
+    // gets "Your interview is today", and the admins get one list of today's interviews. Idempotent: the day is claimed in
+    // system_settings.daily_digest_sent_on before anything is sent; a failure gives the day back so the next run retries.
+    $today = date('Y-m-d');
+    if (setting('daily_digest_enabled', '1') !== '1') {
+        out('Daily digest is turned off in Settings.');
+    } else {
+        $pdo->prepare("INSERT IGNORE INTO system_settings (setting_key, setting_value, setting_type, description)
+                       VALUES ('daily_digest_sent_on', '', 'string', 'Last day the daily interview digest was sent')")->execute();
+        $previous = (string)setting('daily_digest_sent_on', '');
+        $claimDay = $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'daily_digest_sent_on' AND setting_value = ?");
+        $claimDay->execute([$today, $previous]);
+        if ($previous === $today || $claimDay->rowCount() !== 1) {
+            out('Daily digest already sent today.');
+        } else {
+            try {
+                $day = Interview::day($today);
+                $applicants = 0;
+                $lines = [];
+                foreach ($day as $s) {
+                    $time = date('g:i A', strtotime($s['start_time'])) . '–' . date('g:i A', strtotime($s['end_time']));
+                    $names = [];
+                    foreach ($s['attempts'] as $at) {
+                        $names[] = $at['full_name'] . ($at['attendance'] === 'Scheduled' ? '' : " ({$at['attendance']})");
+                        if ($at['attendance'] !== 'Scheduled' || $at['app_status'] !== 'Interview Scheduled') continue;
+                        Notification::send((int)$at['user_id'], 'Your interview is today',
+                            "Your scholarship interview is today, $time at {$s['venue']}.\nApplication code: {$at['application_code']}. "
+                            . 'Bring a valid ID and arrive 15 minutes early.'
+                            . ((int)$at['reschedule_count'] ? "\nThis is your rescheduled interview — missing it ends your application." : ''),
+                            'info', url('applicant/dashboard'), sendEmail: true);
+                        $applicants++;
+                    }
+                    $lines[] = "• $time at {$s['venue']} ({$s['program_name']}): " . ($names ? implode(', ', $names) : 'nobody assigned')
+                        . " — {$s['unmarked']} not yet marked";
+                }
+                if ($day) {
+                    Notification::sendToAdmins('Interviews today: ' . count($day) . ' schedule(s)',
+                        "Interviews on " . date('l, F j, Y') . ":\n" . implode("\n", $lines), 'info', url('admin/dashboard'), sendEmail: true);
+                }
+                AuditLog::write('daily_digest_sent', 'system_settings', null,
+                    "Daily digest for $today: " . count($day) . " schedule(s), $applicants applicant(s) notified");
+                out("Daily digest sent: " . count($day) . " schedule(s), $applicants applicant(s).");
+            } catch (Throwable $e) {
+                $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'daily_digest_sent_on'")->execute([$previous]);
+                out('FAILED daily digest: ' . $e->getMessage());
+            }
+        }
+    }
     exit(0);
 } catch (Throwable $e) {
     error_log('send_reminders failed: ' . $e->getMessage());

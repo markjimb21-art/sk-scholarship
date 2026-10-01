@@ -446,7 +446,10 @@ INSERT INTO roles (role_name, description) VALUES
 
 INSERT INTO system_settings (setting_key, setting_value, setting_type, description) VALUES
 ('email_notifications', '1', 'bool', 'Enable email notifications'),
-('interview_reminder_hours', '24', 'int', 'Hours before interview to send reminder');
+('interview_reminder_hours', '24', 'int', 'Hours before interview to send reminder'),
+('daily_digest_enabled', '1', 'bool', 'Send the daily interview digest'),
+('daily_digest_sent_on', '', 'string', 'Last day the daily interview digest was sent'),
+('admin_event_emails', '0', 'bool', 'Also e-mail admins about new submissions');
 
 -- Puroks / subdivisions of Barangay Estefania (address step)
 INSERT INTO `puroks` VALUES (1,'Arao'),(2,'Arabay 1'),(3,'Arabay 2'),(4,'Bagong Silang'),(5,'Bethany Court'),(6,'Buena Royale'),(7,'Camelot Residences'),(8,'Camelot Village'),(9,'Camingawan Proper'),(10,'Capitol Hills Subdivision'),(11,'Celine Homes Subdivision'),(12,'City Ville Subdivision'),(13,'Country Homes Subdivision Phase 1'),(14,'Country Homes Subdivision Phase 2'),(15,'Country Homes Subdivision Phase 3'),(16,'East Homes 1'),(17,'East Homes 2'),(18,'East Homes 3'),(19,'Elsa'),(20,'Escuerdo'),(21,'Estefania Proper'),(22,'Flora'),(23,'Fortune Towne - B'),(24,'Fortune Towne Subdivision'),(25,'Goldah'),(26,'Glenwood Residences'),(27,'Greensville 1 Subdivision'),(28,'Greensville 4 Subdivision'),(29,'Jesusa Heights Subdivision'),(30,'Kaburihan'),(31,'Kasoy'),(32,'La Herencia'),(33,'Lopues Village'),(34,'Luisville Subdivision'),(35,'Mayang'),(36,'Meadows of Camelot'),(37,'Pag-asa'),(38,'Paho 1'),(39,'Paho 2'),(40,'Paraiso'),(41,'Pedring'),(42,'Pequiño'),(43,'Providence Negros'),(44,'Sagrado 2'),(45,'Sambag'),(46,'Sunshine Valley Subdivision'),(47,'The Palisades'),(48,'Villa Alexandra 1'),(49,'Villa Alexandra 2'),(50,'Villa Angeles'),(51,'Villa Estefania'),(52,'Villa Felicidad'),(53,'Villa Soledad'),(54,'Villa Villeta'),(55,'Villamar');
