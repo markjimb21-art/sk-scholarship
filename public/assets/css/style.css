@@ -82,6 +82,8 @@ body { background: var(--sk-bg); font-family: system-ui, -apple-system, "Segoe U
 
 /* Doc status pills */
 .doc-pill { font-size: .72rem; padding: .25rem .6rem; border-radius: 999px; font-weight: 600; }
+.review-table th.w-40 { width: 40%; }
+.review-table td { word-break: break-word; }
 .doc-Submitted { background:#dbeafe; color:#1d4ed8; }
 .doc-Verified { background:#dcfce7; color:#15803d; }
 .doc-Not-Submitted { background:#e2e8f0; color:#475569; }

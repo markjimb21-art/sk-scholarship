@@ -102,7 +102,11 @@ document.addEventListener('DOMContentLoaded', () => {
     wizard.querySelectorAll('[data-prev]').forEach(btn => {
       btn.addEventListener('click', () => { current = visibleStep(); if (current > 0) show(current - 1); });
     });
-    show(0);
+    // "Edit" links on the Review step jump straight to a section.
+    wizard.querySelectorAll('[data-goto]').forEach(btn => {
+      btn.addEventListener('click', () => show(parseInt(btn.dataset.goto, 10) || 0));
+    });
+    show(visibleStep()); // step I, or the step application-autosave.js restored after a refresh
   }
 
   // Notifications auto-mark on page

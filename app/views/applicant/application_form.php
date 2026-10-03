@@ -383,8 +383,8 @@ $program = $app ?: $openProgram;
         <div class="alert alert-info">
           <i class="bi bi-info-circle me-1"></i>
           Drag a file into each box below (or click to choose one). Each file is <strong>saved automatically</strong> as soon as you
-          choose it; <strong>Next</strong> finishes any file still saving. Accepted: <strong>PDF, JPG, PNG</strong> (max 5MB each).
-          All 5 documents are required.
+          choose it, so a power interruption or an accidental refresh will not lose it; <strong>Next</strong> finishes any file still
+          saving. Accepted: <strong>PDF, JPG, PNG</strong> (max 5MB each). All 5 documents are required.
         </div>
         <div class="row g-3 mb-3" id="wizardDocuments">
           <?php foreach (DOCUMENT_TYPES as $dt):
@@ -484,38 +484,131 @@ $program = $app ?: $openProgram;
           <p class="mb-1"><strong>Application Code:</strong> <?= e($app['application_code'] ?? 'Assigned when you start') ?></p>
         </div>
 
-        <div class="row g-3 mb-3">
-          <div class="col-md-4">
+<?php
+        // Review of everything entered in steps I–IV. Rendered from the saved data here; application-review.js refreshes
+        // it from the form itself each time this step is opened, so it always matches what is on screen.
+        $show = static fn($v): string => ($v === null || trim((string)$v) === '') ? '—' : (string)$v;
+        $money = static fn($v): string => ($v === null || $v === '') ? '—' : '₱' . number_format((float)$v, 2);
+        $unit = static fn($v, string $u): string => ($v === null || $v === '') ? '—' : rtrim(rtrim(number_format((float)$v, 1), '0'), '.') . " $u";
+        $yesNo = static fn($flag, $details): string => !empty($flag) ? 'Yes' . (trim((string)$details) !== '' ? ' — ' . $details : '') : 'No';
+        $purokName = '';
+        foreach ($puroks as $p) { if ((int)$p['id'] === (int)($personal['purok_id'] ?? 0)) $purokName = $p['purok_name']; }
+        $yearLevel = ($education['year_level'] ?? '') === 'Other' && trim((string)($education['year_level_other'] ?? '')) !== ''
+            ? $education['year_level_other'] : ($education['year_level'] ?? '');
+        $reviewSections = [
+          ['I. Personal Information', 0, [
+            'Full name'        => ['@full_name', implode(' ', array_filter([$personal['first_name'] ?? '', $personal['middle_name'] ?? '', $personal['last_name'] ?? '', $personal['suffix'] ?? ''], static fn($x) => trim((string)$x) !== ''))],
+            'Date of birth'    => ['date_of_birth|date', !empty($personal['date_of_birth']) ? date('M d, Y', strtotime($personal['date_of_birth'])) : ''],
+            'Age'              => ['@age', !empty($personal['date_of_birth']) ? (string)(int)calculate_age($personal['date_of_birth']) : ''],
+            'Sex'              => ['sex', $personal['sex'] ?? ''],
+            'Complete address' => ['@address', implode(' / ', array_filter([$personal['address_unit'] ?? '', $purokName], static fn($x) => trim((string)$x) !== '')) . ($purokName !== '' ? ' / ' . ADDRESS_BARANGAY . ' / ' . ADDRESS_CITY : '')],
+            'Contact number'   => ['contact_number', $personal['contact_number'] ?? ''],
+            'Email'            => ['', Auth::user()['email']],
+            'Height'           => ['height_cm|cm', $unit($personal['height_cm'] ?? null, 'cm')],
+            'Weight'           => ['weight_kg|kg', $unit($personal['weight_kg'] ?? null, 'kg')],
+            'Blood type'       => ['blood_type', $personal['blood_type'] ?? ''],
+            'Religion'         => ['religion', $personal['religion'] ?? ''],
+            'Citizenship'      => ['citizenship', $personal['citizenship'] ?? ''],
+          ]],
+          ['II. Education', 1, [
+            'School'               => ['school_name', $education['school_name'] ?? ''],
+            'Year level'           => ['@year_level', $yearLevel],
+            'Course'               => ['course_name', $education['course_name'] ?? ''],
+            'Major'                => ['major', $education['major'] ?? ''],
+            'GWA'                  => ['general_average', isset($education['general_average']) ? number_format((float)$education['general_average'], 2) : ''],
+            'Previous scholarship' => ['previous_scholarship|yesno', $yesNo($education['previous_scholarship'] ?? 0, $education['previous_scholarship_details'] ?? '')],
+            'Current scholarship'  => ['current_scholarship|yesno', $yesNo($education['current_scholarship'] ?? 0, $education['current_scholarship_details'] ?? '')],
+          ]],
+        ];
+        $parentRows = static function (string $who) use ($family, $money): array {
+          return [
+            'Name'           => ["{$who}_name", $family["{$who}_name"] ?? ''],
+            'Age'            => ["{$who}_age", (string)($family["{$who}_age"] ?? '')],
+            'Occupation'     => ["{$who}_occupation", $family["{$who}_occupation"] ?? ''],
+            'Status'         => ["{$who}_status", $family["{$who}_status"] ?? ''],
+            'Address'        => ["{$who}_address", $family["{$who}_address"] ?? ''],
+            'Contact number' => ["{$who}_contact", $family["{$who}_contact"] ?? ''],
+            'Monthly income' => ["{$who}_income|money", $money($family["{$who}_income"] ?? null)],
+          ];
+        };
+        $reviewTable = static function (array $rows) use ($show): void {
+          echo '<table class="table table-sm mb-0 review-table"><tbody>';
+          foreach ($rows as $label => [$key, $value]) {
+            echo '<tr><th class="text-muted fw-normal w-40">' . e($label) . '</th><td class="fw-semibold"'
+               . ($key !== '' ? ' data-review="' . e($key) . '"' : '') . '>' . e($show($value)) . '</td></tr>';
+          }
+          echo '</tbody></table>';
+        };
+        $editLink = static function (int $step) use ($editable): string {
+          return $editable ? '<button type="button" class="btn btn-link btn-sm p-0" data-goto="' . $step . '"><i class="bi bi-pencil"></i> Edit</button>' : '';
+        };
+        ?>
+        <div class="row g-3 mb-3" id="applicationReview">
+          <?php foreach ($reviewSections as [$title, $stepIndex, $rows]): ?>
+          <div class="col-lg-6">
             <div class="border rounded p-3 h-100">
-              <div class="text-muted small">Personal Information</div>
-              <div class="fw-semibold"><?= e(trim(($personal['first_name'] ?? '') . ' ' . ($personal['last_name'] ?? ''))) ?: 'Not yet provided' ?></div>
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-semibold text-primary mb-0"><?= e($title) ?></h6><?= $editLink($stepIndex) ?>
+              </div>
+              <?php $reviewTable($rows); ?>
             </div>
           </div>
-          <div class="col-md-4">
-            <div class="border rounded p-3 h-100">
-              <div class="text-muted small">Education</div>
-              <div class="fw-semibold"><?= e($education['school_name'] ?? 'Not yet provided') ?><?= !empty($education['course_name']) ? ' · ' . e($education['course_name']) : '' ?></div>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="border rounded p-3 h-100">
-              <div class="text-muted small">Family Background</div>
-              <div class="fw-semibold">Total income: ₱<?= e(number_format((float)($family['total_family_income'] ?? 0), 2)) ?></div>
-            </div>
-          </div>
+          <?php endforeach; ?>
+
           <div class="col-12">
             <div class="border rounded p-3">
-              <div class="text-muted small mb-1">Required Documents</div>
-              <div class="fw-semibold"><?= $docsUploaded ?> of <?= count(DOCUMENT_TYPES) ?> uploaded</div>
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-semibold text-primary mb-0">III. Family Background</h6><?= $editLink(2) ?>
+              </div>
+              <div class="row g-3">
+                <div class="col-lg-6"><div class="small text-muted mb-1">Father</div><?php $reviewTable($parentRows('father')); ?></div>
+                <div class="col-lg-6"><div class="small text-muted mb-1">Mother</div><?php $reviewTable($parentRows('mother')); ?></div>
+                <div class="col-lg-6">
+                  <?php $reviewTable([
+                    'Total family income' => ['@total_income', $money($family['total_family_income'] ?? 0)],
+                    'Family size'         => ['family_size', (string)($family['family_size'] ?? '')],
+                  ]); ?>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <div class="border rounded p-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fw-semibold text-primary mb-0">IV. Required Documents
+                  <span class="badge bg-light text-dark border ms-1" data-review-doc-count><?= $docsUploaded ?> of <?= count(DOCUMENT_TYPES) ?> uploaded</span>
+                </h6><?= $editLink(3) ?>
+              </div>
+              <table class="table table-sm mb-0 review-table"><tbody>
+                <?php foreach (DOCUMENT_TYPES as $dt):
+                  $doc = $docByType[$dt] ?? null;
+                  $ok = $doc && $doc['file_path'] && $doc['status'] !== 'Invalid'; ?>
+                  <tr data-review-doc="<?= e($dt) ?>">
+                    <th class="text-muted fw-normal w-40"><?= e($dt) ?></th>
+                    <td>
+                      <span class="fw-semibold <?= $ok ? 'text-success' : 'text-danger' ?>" data-review-doc-status>
+                        <i class="bi <?= $ok ? 'bi-check-circle-fill' : 'bi-x-circle-fill' ?>"></i>
+                        <?= e($ok ? ($docLabels[$doc['status']] ?? $doc['status']) : 'Missing') ?>
+                      </span>
+                      <span class="small text-muted ms-1" data-review-doc-file><?= $ok ? e($doc['original_filename']) : '' ?></span>
+                      <?php if ($ok): ?><a class="small ms-1" href="<?= e(url('applicant/documents/view&id=' . (int)$doc['id'])) ?>" target="_blank" rel="noopener" data-review-doc-link>View</a><?php endif; ?>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody></table>
             </div>
           </div>
         </div>
 
-        <?php if ($editable && $completeness && !$completeness['complete']): ?>
-        <div class="alert alert-light border small">
-          <strong>Still missing when this page was loaded:</strong>
-          <ul class="mb-1"><?php foreach ($completeness['missing'] as $m): ?><li><?= e($m) ?></li><?php endforeach; ?></ul>
-          The same check runs again when you press Submit.
+        <?php if ($editable && $completeness): ?>
+        <div class="alert <?= $completeness['complete'] ? 'alert-success' : 'alert-light border' ?> small" id="reviewMissing">
+          <div data-review-missing-list class="<?= $completeness['complete'] ? 'd-none' : '' ?>">
+            <strong>Still missing:</strong>
+            <ul class="mb-1"><?php foreach ($completeness['missing'] as $m): ?><li><?= e($m) ?></li><?php endforeach; ?></ul>
+            The same check runs again when you press Submit.
+          </div>
+          <div data-review-complete class="<?= $completeness['complete'] ? '' : 'd-none' ?>"><i class="bi bi-check-circle-fill"></i> Everything required is filled in and all documents are saved.</div>
         </div>
         <?php endif; ?>
 

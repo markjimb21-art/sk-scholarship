@@ -148,6 +148,19 @@ plus), two applicant accounts and an e-mail address you can read. Numbered steps
 4. Turn the network off (browser developer tools → Offline), choose the last file. → The card says "Not saved".
    Turn the network on and press **Next: Review**. → The button shows "Saving documents…", the file is saved, and the
    form moves on to Review.
-5. Choose a replacement file and press Next straight away. → Next waits ("Saving documents…") until the file is saved,
+5. Turn the network off again, choose a replacement file, turn the network on and **reload** the page (as after a
+   power interruption). → The file is sent again by itself and becomes the current one; nothing is lost.
+6. Choose a replacement file and press Next straight away. → Next waits ("Saving documents…") until the file is saved,
    then moves on. The old file is kept as an earlier version (admin → Document history).
-6. Reload the page while on step IV, then press Next. → It goes to Review (not back to Education).
+7. Reload the page while on step IV. → The form reopens on step IV; Next goes to Review (not back to Education).
+
+## 11. Review & Submit shows everything (application step V)
+1. Fill steps I–IV and press Next on step IV. → Review lists every field of I. Personal Information (full name, date
+   of birth, age, sex, complete address, contact, e-mail, height, weight, blood type, religion, citizenship),
+   II. Education, III. Family Background (father, mother, total income, family size) and IV. Required Documents
+   (status, file name and View link for each of the 5). Blank optional fields show "—".
+2. Without reloading, press **Edit** on Education, change the major, press Next until Review. → The new major shows.
+3. Documents uploaded during this visit are counted ("5 of 5 uploaded"), not the count from when the page loaded.
+4. When everything is complete, a green "Everything required is filled in…" note shows; otherwise a "Still missing"
+   list names what is missing and changes as you fix it.
+5. After submitting, open the application again. → The same review shows, read-only, with no Edit links.

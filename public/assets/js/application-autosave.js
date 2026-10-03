@@ -253,6 +253,11 @@
       if (i >= 0) { try { localStorage.setItem(stepStorageKey(), String(Math.max(i - 1, 0))); } catch (e) {} }
     });
   });
+  wizard.querySelectorAll('[data-goto]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      try { localStorage.setItem(stepStorageKey(), String(parseInt(btn.dataset.goto, 10) || 0)); } catch (e) {}
+    });
+  });
   try {
     const saved = parseInt(localStorage.getItem(stepStorageKey()) || '0', 10);
     if (saved > 0 && saved < formSteps.length) showStep(saved);
@@ -265,6 +270,30 @@
   let uploadQueue = Promise.resolve(); // uploads run one at a time, in the order the files were chosen
   const docsWarning = document.getElementById('docsIncompleteWarning');
   const docCards = wizard.querySelectorAll('[data-doc-card]');
+
+  /* A chosen file not saved yet is also kept in this browser (IndexedDB), so a power interruption or an accidental
+     refresh mid-upload does not lose it: it is sent again when the page opens next. Removed once the server has it. */
+  function pendingDb(mode, work) {
+    return new Promise((resolve) => {
+      try {
+        const req = indexedDB.open('sk_application_pending_documents', 1);
+        req.onupgradeneeded = () => req.result.createObjectStore('files');
+        req.onerror = () => resolve(undefined);
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction('files', mode);
+          const r = work(tx.objectStore('files'));
+          tx.oncomplete = () => { db.close(); resolve(r && r.result); };
+          tx.onerror = tx.onabort = () => { db.close(); resolve(undefined); };
+        };
+      } catch (e) { resolve(undefined); } // IndexedDB unavailable (private mode etc.): uploads still work, just not kept
+    });
+  }
+  function pendingKey(docType) { return `${userId}::${docType}`; }
+  function keepPending(docType, file) {
+    return pendingDb('readwrite', (s) => s.put({ blob: file, name: file.name, type: file.type }, pendingKey(docType)));
+  }
+  function forgetPending(docType) { return pendingDb('readwrite', (s) => s.delete(pendingKey(docType))); }
 
   function cardFor(docType) {
     return wizard.querySelector(`[data-doc-card][data-doc-type="${CSS.escape(docType)}"]`);
@@ -336,6 +365,7 @@
             return false;
           }
           delete pendingFiles[docType];
+          forgetPending(docType);
           clearDocError(card);
           updateDocCard(card, res.document);
           setIndicator('saved', 'Documents saved');
@@ -367,6 +397,7 @@
     }
     const docType = card.dataset.docType;
     pendingFiles[docType] = file;
+    keepPending(docType, file);
     showPreview(card, file);
     const filenameEl = card.querySelector('[data-doc-filename]');
     const filesizeEl = card.querySelector('[data-doc-filesize]');
@@ -377,6 +408,21 @@
     card.querySelector('.card')?.classList.remove('border-danger');
     uploadDoc(docType); // auto-save: there is no separate upload button
   }
+
+  // Re-send any file that was chosen but not saved before the page was closed or reloaded.
+  docCards.forEach((card) => {
+    if (!card.querySelector('[data-doc-file]')) return; // this document cannot be changed now
+    const docType = card.dataset.docType;
+    pendingDb('readonly', (s) => s.get(pendingKey(docType))).then((rec) => {
+      if (!rec || !rec.blob || pendingFiles[docType]) return;
+      selectFile(card, new File([rec.blob], rec.name, { type: rec.type }));
+    });
+  });
+
+  // Leaving while a document is still uploading: warn (the file is kept and re-sent on return anyway).
+  window.addEventListener('beforeunload', (e) => {
+    if (Object.keys(pendingFiles).length) { e.preventDefault(); e.returnValue = ''; }
+  });
 
   docCards.forEach((card) => {
     const dropzone = card.querySelector('[data-doc-dropzone]');

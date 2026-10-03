@@ -237,7 +237,7 @@ final class ApplicantController
         $courses = $pdo->query("SELECT course_name FROM courses WHERE is_active = 1 ORDER BY course_name")->fetchAll();
 
         $pageTitle = 'My Application';
-        $pageScripts = [asset('js/application-autosave.js')];
+        $pageScripts = [asset('js/application-autosave.js'), asset('js/application-review.js')];
         require VIEW_PATH . '/layouts/header.php';
         require VIEW_PATH . '/applicant/application_form.php';
         require VIEW_PATH . '/layouts/footer.php';
