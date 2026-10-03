@@ -138,3 +138,16 @@ plus), two applicant accounts and an e-mail address you can read. Numbered steps
    shows them under the name.
 4. Return the application with only **Weight** ticked. → The applicant can change the weight; the height field is
    locked and stays as submitted.
+
+## 10. Documents step saves itself (application step IV)
+1. Open step IV. → There is no "Upload Documents" button; the note says each file is saved automatically.
+2. Choose (or drag in) a file for one document. → The card shows "Saving…", then "Uploaded" with a View link, and the
+   page's save indicator says "Documents saved". Reload the page → the document is still there.
+3. With one document still missing, press **Next: Review**. → You stay on step IV, a warning appears, and the missing
+   card is outlined in red.
+4. Turn the network off (browser developer tools → Offline), choose the last file. → The card says "Not saved".
+   Turn the network on and press **Next: Review**. → The button shows "Saving documents…", the file is saved, and the
+   form moves on to Review.
+5. Choose a replacement file and press Next straight away. → Next waits ("Saving documents…") until the file is saved,
+   then moves on. The old file is kept as an earlier version (admin → Document history).
+6. Reload the page while on step IV, then press Next. → It goes to Review (not back to Education).

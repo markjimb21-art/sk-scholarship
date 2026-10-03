@@ -1,6 +1,6 @@
 /**
  * Scholarship application wizard: debounced local + server autosave, offline handling,
- * accidental-reload recovery, and AJAX document uploads for Step 4.
+ * accidental-reload recovery, and Step 4 documents that save themselves as soon as they are chosen.
  *
  * Local storage is a per-applicant, per-application convenience cache only — never the
  * source of truth. The server (and its `updated_at` timestamp) always wins ties.
@@ -258,14 +258,21 @@
     if (saved > 0 && saved < formSteps.length) showStep(saved);
   } catch (e) {}
 
-  /* ---------------- Step 4: drag-and-drop selection + single "Upload Documents" button ---------------- */
+  /* ---------------- Step 4: documents auto-save — each file uploads as soon as it is chosen ---------------- */
   const MAX_SIZE = 5 * 1024 * 1024;
   const ALLOWED_EXT = ['pdf', 'jpg', 'jpeg', 'png'];
-  const pendingFiles = {}; // { [docType]: File } — selected but not yet uploaded
-  const uploadAllBtn = document.getElementById('uploadAllDocsBtn');
+  const pendingFiles = {}; // { [docType]: File } — chosen but not saved yet (uploading, or failed and waiting for a retry)
+  let uploadQueue = Promise.resolve(); // uploads run one at a time, in the order the files were chosen
   const docsWarning = document.getElementById('docsIncompleteWarning');
   const docCards = wizard.querySelectorAll('[data-doc-card]');
 
+  function cardFor(docType) {
+    return wizard.querySelector(`[data-doc-card][data-doc-type="${CSS.escape(docType)}"]`);
+  }
+  function setPill(card, text, status) {
+    const pill = card.querySelector('[data-doc-status-pill]');
+    if (pill) { pill.textContent = text; pill.className = 'doc-pill doc-' + status; }
+  }
   function showDocError(card, msg) {
     const el = card.querySelector('[data-doc-error]');
     if (!el) return;
@@ -277,13 +284,9 @@
     if (el) el.classList.add('d-none');
   }
 
-  function refreshUploadButton() {
-    if (!uploadAllBtn) return;
-    uploadAllBtn.disabled = Object.keys(pendingFiles).length === 0;
-  }
-
-  function allRequiredDocsPresent() {
-    return Array.from(docCards).every((card) => card.dataset.docHasFile === '1' || pendingFiles[card.dataset.docType]);
+  /** Only documents actually SAVED on the server count — a file still uploading, or one that failed, does not. */
+  function allRequiredDocsSaved() {
+    return Array.from(docCards).every((card) => card.dataset.docHasFile === '1');
   }
 
   function showPreview(card, file) {
@@ -303,6 +306,52 @@
       if (img) img.classList.add('d-none');
       if (icon) icon.style.display = '';
     }
+  }
+
+  /** Upload one document now (queued behind any upload already running). Resolves true when it is saved. */
+  function uploadDoc(docType) {
+    const run = () => {
+      const file = pendingFiles[docType];
+      const card = cardFor(docType);
+      if (!file || !card) return Promise.resolve(true);
+      setPill(card, 'Saving…', 'Submitted');
+      setIndicator('saving', 'Saving documents…');
+      const body = new FormData();
+      body.append('document_type', docType);
+      body.append('file', file);
+      body.append('_csrf', csrfToken);
+      return fetch(uploadUrl, {
+        method: 'POST',
+        body,
+        credentials: 'same-origin',
+        headers: { 'X-CSRF-Token': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          if (pendingFiles[docType] !== file) return true; // a newer file was chosen meanwhile; its own upload follows
+          if (!res.success) {
+            setPill(card, 'Not saved', 'Not-Submitted');
+            showDocError(card, (res.message || 'Upload failed.') + ' Choose the file again to retry.');
+            setIndicator('error', 'A document was not saved');
+            return false;
+          }
+          delete pendingFiles[docType];
+          clearDocError(card);
+          updateDocCard(card, res.document);
+          setIndicator('saved', 'Documents saved');
+          if (allRequiredDocsSaved() && docsWarning) docsWarning.classList.add('d-none');
+          return true;
+        })
+        .catch(() => {
+          setPill(card, 'Not saved', 'Not-Submitted');
+          showDocError(card, 'Upload failed — check your connection. It is tried again when you click Next.');
+          setIndicator('error', 'A document was not saved');
+          return false;
+        });
+    };
+    const p = uploadQueue.then(run);
+    uploadQueue = p.then(() => undefined, () => undefined);
+    return p;
   }
 
   function selectFile(card, file) {
@@ -325,10 +374,8 @@
     if (filenameEl) filenameEl.textContent = file.name;
     if (filesizeEl) filesizeEl.textContent = ' · ' + (file.size / 1024 / 1024).toFixed(2) + ' MB';
     if (meta) meta.style.display = '';
-    const pill = card.querySelector('[data-doc-status-pill]');
-    if (pill) { pill.textContent = 'Selected'; pill.className = 'doc-pill doc-Submitted'; }
-    card.classList.remove('border-danger');
-    refreshUploadButton();
+    card.querySelector('.card')?.classList.remove('border-danger');
+    uploadDoc(docType); // auto-save: there is no separate upload button
   }
 
   docCards.forEach((card) => {
@@ -342,6 +389,7 @@
     });
     fileInput.addEventListener('change', () => {
       if (fileInput.files[0]) selectFile(card, fileInput.files[0]);
+      fileInput.value = ''; // choosing the same file again (to retry) still fires "change"
     });
     ['dragenter', 'dragover'].forEach((evt) => {
       dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add('doc-dragover'); });
@@ -355,59 +403,9 @@
     });
   });
 
-  if (uploadAllBtn) {
-    uploadAllBtn.addEventListener('click', () => {
-      const entries = Object.entries(pendingFiles);
-      if (entries.length === 0) return;
-
-      uploadAllBtn.disabled = true;
-      const originalText = uploadAllBtn.innerHTML;
-      uploadAllBtn.innerHTML = 'Uploading…';
-
-      const uploadOne = ([docType, file]) => {
-        const card = wizard.querySelector(`[data-doc-card][data-doc-type="${CSS.escape(docType)}"]`);
-        const body = new FormData();
-        body.append('document_type', docType);
-        body.append('file', file);
-        body.append('_csrf', csrfToken);
-        return fetch(uploadUrl, {
-          method: 'POST',
-          body,
-          credentials: 'same-origin',
-          headers: { 'X-CSRF-Token': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
-        })
-          .then((r) => r.json())
-          .then((res) => {
-            if (!res.success) {
-              if (card) showDocError(card, res.message || 'Upload failed.');
-              return;
-            }
-            delete pendingFiles[docType];
-            if (card) updateDocCard(card, res.document);
-          })
-          .catch(() => {
-            if (card) showDocError(card, 'Upload failed — please check your connection and try again.');
-          });
-      };
-
-      // Sequential uploads keep this simple and avoid overwhelming slow connections.
-      entries.reduce((chain, entry) => chain.then(() => uploadOne(entry)), Promise.resolve())
-        .then(() => {
-          uploadAllBtn.innerHTML = originalText;
-          refreshUploadButton();
-          if (allRequiredDocsPresent() && docsWarning) docsWarning.classList.add('d-none');
-        });
-    });
-  }
-
   function updateDocCard(card, doc) {
     card.dataset.docHasFile = '1';
-    const pill = card.querySelector('[data-doc-status-pill]');
-    if (pill) {
-      pill.textContent = doc.status_label || doc.status;
-      pill.className = 'doc-pill doc-' + doc.status.replace(/ /g, '-') + '';
-      pill.setAttribute('data-doc-status-pill', '');
-    }
+    setPill(card, doc.status_label || doc.status, doc.status.replace(/ /g, '-'));
     const meta = card.querySelector('[data-doc-meta]');
     const filenameEl = card.querySelector('[data-doc-filename]');
     if (meta && filenameEl) {
@@ -428,22 +426,38 @@
     if (remarks) remarks.style.display = 'none';
   }
 
-  // Block "Next: Review" until all 5 required documents are uploaded (server also enforces this on submit).
+  // "Next: Review": first finish (or retry) any document still being saved, then continue only when all 5 are saved.
+  // The server checks completeness again on Submit.
+  let passThrough = false;
   wizard.querySelectorAll('[data-next][data-requires-documents]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
-      if (!allRequiredDocsPresent()) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+      if (passThrough) { passThrough = false; return; } // our own re-click after saving: let it through
+      const unsaved = Object.keys(pendingFiles);
+      if (unsaved.length === 0 && allRequiredDocsSaved()) {
+        if (docsWarning) docsWarning.classList.add('d-none');
+        return; // everything saved: normal Next
+      }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const label = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = 'Saving documents…';
+      // Retry every file that is still unsaved (uploads are queued, so this also waits for any running one).
+      Promise.all(unsaved.map((t) => uploadDoc(t))).then(() => uploadQueue).then(() => {
+        btn.disabled = false;
+        btn.innerHTML = label;
+        if (allRequiredDocsSaved()) {
+          if (docsWarning) docsWarning.classList.add('d-none');
+          passThrough = true;
+          btn.click();
+          return;
+        }
         if (docsWarning) docsWarning.classList.remove('d-none');
         docCards.forEach((card) => {
-          const missing = card.dataset.docHasFile !== '1' && !pendingFiles[card.dataset.docType];
-          card.querySelector('.card')?.classList.toggle('border-danger', missing);
+          card.querySelector('.card')?.classList.toggle('border-danger', card.dataset.docHasFile !== '1');
         });
-      } else if (docsWarning) {
-        docsWarning.classList.add('d-none');
-      }
+      });
     }, true); // capture phase: must run before app.js's own [data-next] handler
   });
 
-  refreshUploadButton();
 })();

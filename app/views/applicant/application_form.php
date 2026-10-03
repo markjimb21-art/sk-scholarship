@@ -382,8 +382,9 @@ $program = $app ?: $openProgram;
         <h5 class="fw-semibold mb-3">IV. Required Documents</h5>
         <div class="alert alert-info">
           <i class="bi bi-info-circle me-1"></i>
-          Drag a file into each box below (or click to choose one), then click <strong>Upload Documents</strong> once.
-          Accepted: <strong>PDF, JPG, PNG</strong> (max 5MB each). All 5 documents are required.
+          Drag a file into each box below (or click to choose one). Each file is <strong>saved automatically</strong> as soon as you
+          choose it; <strong>Next</strong> finishes any file still saving. Accepted: <strong>PDF, JPG, PNG</strong> (max 5MB each).
+          All 5 documents are required.
         </div>
         <div class="row g-3 mb-3" id="wizardDocuments">
           <?php foreach (DOCUMENT_TYPES as $dt):
@@ -450,16 +451,8 @@ $program = $app ?: $openProgram;
           <?php endforeach; ?>
         </div>
 
-        <?php if ($editable): ?>
-        <div class="d-flex justify-content-end mb-3">
-          <button type="button" class="btn btn-success" id="uploadAllDocsBtn" disabled>
-            <i class="bi bi-cloud-upload"></i> Upload Documents
-          </button>
-        </div>
-        <?php endif; ?>
-
         <div class="alert alert-warning d-none" id="docsIncompleteWarning">
-          Please upload all required documents before continuing.
+          Please add all required documents before continuing (the ones not saved yet are outlined in red).
         </div>
 
         <div class="d-flex justify-content-between mt-4">

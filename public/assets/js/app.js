@@ -70,9 +70,16 @@ document.addEventListener('DOMContentLoaded', () => {
       window.scrollTo({top: 0, behavior: 'smooth'});
     };
 
+    // The step on screen can be restored after a reload (application-autosave.js), so read it from the page.
+    const visibleStep = () => {
+      const i = Array.from(steps).findIndex(s => s.classList.contains('active'));
+      return i >= 0 ? i : current;
+    };
+
     wizard.querySelectorAll('[data-next]').forEach(btn => {
   btn.addEventListener('click', (e) => {
     e.preventDefault();
+    current = visibleStep();
     const step = steps[current];
     // Only validate fields that are BOTH required AND visible AND non-disabled
     const required = step.querySelectorAll('input[required], select[required], textarea[required]');
@@ -93,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
     wizard.querySelectorAll('[data-prev]').forEach(btn => {
-      btn.addEventListener('click', () => current > 0 && show(current - 1));
+      btn.addEventListener('click', () => { current = visibleStep(); if (current > 0) show(current - 1); });
     });
     show(0);
   }
