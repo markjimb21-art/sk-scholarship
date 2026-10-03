@@ -1,5 +1,5 @@
 -- SK Scholarship — full database dump (schema + sample data)
--- Matches docs/PROCESS.md: includes every migration up to the 2026_10_01_*.sql files.
+-- Matches docs/PROCESS.md: includes every migration up to the 2026_10_*.sql files.
 -- Fresh install:  mysql -u root sk_scholarship < database/sk_scholarship.sql
 -- Existing database: do NOT import this; run the files in database/migrations/ instead.
 
@@ -66,6 +66,8 @@ CREATE TABLE `applicants_personal_information` (
   `complete_address` text NOT NULL,
   `purok_id` int(10) unsigned DEFAULT NULL,
   `contact_number` varchar(20) NOT NULL,
+  `height_cm` decimal(5,2) DEFAULT NULL,
+  `weight_kg` decimal(5,2) DEFAULT NULL,
   `blood_type` varchar(5) DEFAULT NULL,
   `religion` varchar(80) DEFAULT NULL,
   `citizenship` varchar(50) DEFAULT 'Filipino',
@@ -85,7 +87,7 @@ CREATE TABLE `applicants_personal_information` (
 
 LOCK TABLES `applicants_personal_information` WRITE;
 /*!40000 ALTER TABLE `applicants_personal_information` DISABLE KEYS */;
-INSERT INTO `applicants_personal_information` VALUES (1,1,'123','adf','adf','adf','2002-05-21','aadf',12,'adsffad',NULL,NULL,'Filipino',NULL,'2026-09-16 07:36:08'),(17,8,'Juan','','Dela Cruz','Jr.','2001-01-01','Kung Saan Si Rene',48,'09123456789','O+','ROMAN CATHOLIC','Filipino',NULL,'2026-09-25 12:18:23');
+INSERT INTO `applicants_personal_information` VALUES (1,1,'123','adf','adf','adf','2002-05-21','aadf',12,'adsffad',NULL,NULL,NULL,NULL,'Filipino',NULL,'2026-09-16 07:36:08'),(17,8,'Juan','','Dela Cruz','Jr.','2001-01-01','Kung Saan Si Rene',48,'09123456789',NULL,NULL,'O+','ROMAN CATHOLIC','Filipino',NULL,'2026-09-25 12:18:23');
 /*!40000 ALTER TABLE `applicants_personal_information` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -683,7 +685,7 @@ CREATE TABLE `roles` (
 
 LOCK TABLES `roles` WRITE;
 /*!40000 ALTER TABLE `roles` DISABLE KEYS */;
-INSERT INTO `roles` VALUES (1,'admin','SK Administrator - full access','2026-09-14 17:49:44'),(4,'applicant','College student applicant','2026-09-14 17:49:44'),(5,'reviewer','Screening, interviews and decisions','2026-10-01 05:43:48'),(6,'treasurer','Budget, claims, releases and renewals','2026-10-01 05:43:48');
+INSERT INTO `roles` VALUES (1,'admin','SK Administrator - full access','2026-09-14 17:49:44'),(4,'applicant','College student applicant','2026-09-14 17:49:44'),(5,'reviewer','Screening, interviews and decisions','2026-10-03 18:07:22'),(6,'treasurer','Budget, claims, releases and renewals','2026-10-03 18:07:22');
 /*!40000 ALTER TABLE `roles` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -936,7 +938,7 @@ CREATE TABLE `system_settings` (
 
 LOCK TABLES `system_settings` WRITE;
 /*!40000 ALTER TABLE `system_settings` DISABLE KEYS */;
-INSERT INTO `system_settings` VALUES (5,'email_notifications','1','bool','Enable email notifications','2026-09-14 17:49:44'),(6,'interview_reminder_hours','24','int','Hours before interview to send reminder','2026-09-14 17:49:44'),(7,'daily_digest_enabled','1','bool','Send the daily interview digest','2026-10-01 05:43:48'),(8,'daily_digest_sent_on','','string','Last day the daily interview digest was sent','2026-10-01 05:43:48'),(9,'admin_event_emails','0','bool','Also e-mail admins about new submissions','2026-10-01 05:43:48'),(10,'interview_suggestion_window_days','60','int','Days after the application end date that interview suggestions may use','2026-10-01 05:43:48');
+INSERT INTO `system_settings` VALUES (5,'email_notifications','1','bool','Enable email notifications','2026-09-14 17:49:44'),(6,'interview_reminder_hours','24','int','Hours before interview to send reminder','2026-09-14 17:49:44'),(7,'daily_digest_enabled','1','bool','Send the daily interview digest','2026-10-03 18:07:22'),(8,'daily_digest_sent_on','','string','Last day the daily interview digest was sent','2026-10-03 18:07:22'),(9,'admin_event_emails','0','bool','Also e-mail admins about new submissions','2026-10-03 18:07:22'),(10,'interview_suggestion_window_days','60','int','Days after the application end date that interview suggestions may use','2026-10-03 18:07:22');
 /*!40000 ALTER TABLE `system_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 

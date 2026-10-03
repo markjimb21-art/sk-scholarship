@@ -114,6 +114,8 @@ CREATE TABLE applicants_personal_information (
     complete_address TEXT NOT NULL,
     purok_id INT UNSIGNED NULL,
     contact_number VARCHAR(20) NOT NULL,
+    height_cm DECIMAL(5,2) NULL,
+    weight_kg DECIMAL(5,2) NULL,
     blood_type VARCHAR(5) NULL,
     religion VARCHAR(80) NULL,
     citizenship VARCHAR(50) DEFAULT 'Filipino',

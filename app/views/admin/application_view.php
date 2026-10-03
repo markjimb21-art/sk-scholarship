@@ -160,6 +160,8 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
       <div class="col-md-9"><label class="small text-muted">Address</label><div class="fw-semibold"><?= e($p['complete_address'] ?? '—') ?></div></div>
       <div class="col-md-3"><label class="small text-muted">E-mail</label><div class="fw-semibold"><?= e($app['applicant']['email'] ?? '—') ?></div></div>
       <div class="col-md-3"><label class="small text-muted">Sex</label><div class="fw-semibold"><?= e(($p['sex'] ?? '') ?: 'Not given') ?></div></div>
+      <div class="col-md-3"><label class="small text-muted">Height</label><div class="fw-semibold"><?= isset($p['height_cm']) && $p['height_cm'] !== '' ? e(rtrim(rtrim(number_format((float)$p['height_cm'], 1), '0'), '.')) . ' cm' : '—' ?></div></div>
+      <div class="col-md-3"><label class="small text-muted">Weight</label><div class="fw-semibold"><?= isset($p['weight_kg']) && $p['weight_kg'] !== '' ? e(rtrim(rtrim(number_format((float)$p['weight_kg'], 1), '0'), '.')) . ' kg' : '—' ?></div></div>
       <div class="col-md-3"><label class="small text-muted">Blood type</label><div class="fw-semibold"><?= e(($p['blood_type'] ?? '') ?: '—') ?></div></div>
       <div class="col-md-3"><label class="small text-muted">Religion</label><div class="fw-semibold"><?= e(($p['religion'] ?? '') ?: '—') ?></div></div>
       <div class="col-md-3"><label class="small text-muted">Citizenship</label><div class="fw-semibold"><?= e(($p['citizenship'] ?? '') ?: '—') ?></div></div>

@@ -9,7 +9,7 @@ final class Scholar
         $stmt = Database::conn()->prepare(
             "SELECT s.*, sp.program_name, sp.academic_year AS program_year, sp.amount_per_semester, sp.min_gpa,
                     u.id AS user_id, u.full_name, u.email, u.contact_number, a.application_code,
-                    pi.date_of_birth, pi.blood_type, pi.religion, pi.citizenship
+                    pi.date_of_birth, pi.height_cm, pi.weight_kg, pi.blood_type, pi.religion, pi.citizenship
              FROM scholars s
              JOIN scholarship_programs sp ON sp.id = s.program_id
              JOIN applicants ap ON ap.id = s.applicant_id

@@ -128,3 +128,13 @@ plus), two applicant accounts and an e-mail address you can read. Numbered steps
    migrations → no errors; the result matches `database/sk_scholarship.sql` and `database/schema.sql`.
 3. Every new POST (slot request, slot decision, reschedule, holidays, document invalidation, user role change) without
    a CSRF token is refused.
+
+## 9. Height and weight (application step I)
+1. Run `2026_10_04_restore_height_weight.sql`. Application → Personal Information has **Height (cm)** and **Weight (kg)**
+   next to Blood Type. Enter 165.4 and 52, go to the next step and back. → Both are kept.
+2. Leave them blank. → Allowed (optional). Enter 9999 or letters → saved as blank (accepted range: height 50–250 cm,
+   weight 20–300 kg; one decimal).
+3. Submit; as admin open the application → Personal tab shows "Height 165.4 cm" and "Weight 52 kg"; the scholar page
+   shows them under the name.
+4. Return the application with only **Weight** ticked. → The applicant can change the weight; the height field is
+   locked and stays as submitted.

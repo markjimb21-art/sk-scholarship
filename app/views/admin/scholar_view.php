@@ -11,6 +11,8 @@
     <p class="text-muted small mb-0">
       Born <?= $scholar['date_of_birth'] ? e(date('M d, Y', strtotime($scholar['date_of_birth']))) : '—' ?>
       · <?= e(($scholar['contact_number'] ?? '') ?: '—') ?>
+      · Height <?= !empty($scholar['height_cm']) ? e(rtrim(rtrim(number_format((float)$scholar['height_cm'], 1), '0'), '.')) . ' cm' : '—' ?>
+      · Weight <?= !empty($scholar['weight_kg']) ? e(rtrim(rtrim(number_format((float)$scholar['weight_kg'], 1), '0'), '.')) . ' kg' : '—' ?>
       · Blood type <?= e(($scholar['blood_type'] ?? '') ?: '—') ?>
       · Religion <?= e(($scholar['religion'] ?? '') ?: '—') ?>
       · Citizenship <?= e(($scholar['citizenship'] ?? '') ?: '—') ?>

@@ -155,6 +155,14 @@ $program = $app ?: $openProgram;
             <div class="form-text">Automatically linked to your registered email.</div>
           </div>
 
+          <div class="col-md-3">
+            <label class="form-label">Height (cm)</label>
+            <input type="number" step="0.1" min="50" max="250" name="height_cm" class="form-control" inputmode="decimal" value="<?= e((string)($personal['height_cm'] ?? '')) ?>">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Weight (kg)</label>
+            <input type="number" step="0.1" min="20" max="300" name="weight_kg" class="form-control" inputmode="decimal" value="<?= e((string)($personal['weight_kg'] ?? '')) ?>">
+          </div>
           <div class="col-md-2">
             <label class="form-label">Blood Type</label>
             <select name="blood_type" class="form-select">

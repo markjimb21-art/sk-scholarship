@@ -92,7 +92,7 @@ const RETURN_FLAG_FIELDS = [
     'personal' => [
         'first_name' => 'First name', 'middle_name' => 'Middle name', 'last_name' => 'Last name', 'suffix' => 'Suffix',
         'date_of_birth' => 'Date of birth', 'address_unit' => 'Address (unit / house no.)', 'purok_id' => 'Purok / subdivision',
-        'contact_number' => 'Contact number', 'blood_type' => 'Blood type', 'religion' => 'Religion', 'citizenship' => 'Citizenship',
+        'contact_number' => 'Contact number', 'height_cm' => 'Height', 'weight_kg' => 'Weight', 'blood_type' => 'Blood type', 'religion' => 'Religion', 'citizenship' => 'Citizenship',
         'sex' => 'Sex',
     ],
     'education' => [
