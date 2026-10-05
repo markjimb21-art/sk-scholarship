@@ -9,10 +9,12 @@
   .fc .fc-daygrid-day.cal-day-flash { box-shadow: inset 0 0 0 3px #0d6efd; }
   /* Bootstrap styles every <a>; FullCalendar's day numbers and weekday headers are links. */
   .fc a.fc-daygrid-day-number, .fc a.fc-col-header-cell-cushion { color: inherit; text-decoration: none; }
-  /* Long "<Program> — Claim deadline" titles wrap instead of being cut off. */
-  .fc .fc-daygrid-block-event .fc-event-main-frame { flex-wrap: wrap; }
-  .fc .fc-daygrid-event .fc-event-title, .fc .fc-daygrid-event .fc-event-time { white-space: normal; overflow: visible; }
+  /* Every event is ONE line (full text in the hover tooltip), so a busy week never makes its row taller than the others. */
+  .fc .fc-daygrid-block-event .fc-event-main-frame { flex-wrap: nowrap; min-width: 0; }
+  .fc .fc-daygrid-event .fc-event-time { white-space: nowrap; flex: none; }
+  .fc .fc-daygrid-event .fc-event-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; }
   .fc .fc-daygrid-event { font-size: .75rem; line-height: 1.25; }
+  .fc .fc-daygrid-more-link { font-size: .72rem; font-weight: 600; }
   .fc-ev-cancelled .fc-event-title { text-decoration: line-through; }
   .fc-ev-planned { border-style: dashed !important; border-width: 2px !important; }
   .fc-ev-overdue { font-weight: 700; }
@@ -73,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var select = document.getElementById('calProgram'), listEl = document.getElementById('calList');
   var selectedId = null;
   var mounted = {};   // event id -> Set of rendered elements
+  var MONTH_HEIGHT = 640;
 
   var calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
     initialView: 'dayGridMonth',
@@ -80,7 +83,15 @@ document.addEventListener('DOMContentLoaded', function () {
     buttonText: { today: 'Today', month: 'Month', week: 'Week' },
     eventDisplay: 'block',
     displayEventEnd: true,
-    dayMaxEvents: 4,
+    // Month: fixed overall height; a day shows as many events as fit its row and puts the rest behind "+N more", so every week row stays the same height.
+    // Week is a single row, so it keeps all its events and grows to fit them (see datesSet).
+    height: MONTH_HEIGHT,
+    dayMaxEvents: true,
+    views: { dayGridWeek: { dayMaxEvents: false } },
+    datesSet: function (info) {
+      var h = info.view.type === 'dayGridMonth' ? MONTH_HEIGHT : 'auto';
+      if (calendar.getOption('height') !== h) calendar.setOption('height', h);
+    },
     events: { url: <?= js_json(url('admin/calendar-feed')) ?>, extraParams: function () { return { program_id: select.value }; } },
     eventDidMount: function (info) {
       var id = info.event.id;
