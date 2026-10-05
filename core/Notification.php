@@ -142,7 +142,7 @@ final class Notification
         $appTagline = 'Educational Assistance for College Students';
         $subtitle = htmlspecialchars(APP_SUBTITLE, ENT_QUOTES, 'UTF-8');
         return <<<HTML
-<!doctype html><html><body style="margin:0;padding:0;background:#F5F7FB;font-family:Verdana,Arial,Helvetica,sans-serif;color:#1A1F2B;">
+<!doctype html><html><body style="margin:0;padding:0;background:#F5F7FB;font-family:'Segoe UI',Arial,sans-serif;color:#1A1F2B;">
 <div style="max-width:600px;margin:0 auto;padding:24px 12px;">
   <div style="background:#082B66;color:#ffffff;padding:22px 26px;border-radius:10px 10px 0 0;border-bottom:5px solid #F6C90E;">
     <div style="font-size:24px;font-weight:bold;line-height:1.2;color:#ffffff;">{$appName}</div>

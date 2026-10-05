@@ -93,3 +93,11 @@ created before this change). Numbered steps; "→" is what you should see. Use a
    on blue) — never as text and never behind text. The calendar's "today" cell is pale blue with a yellow bar on top.
 4. Red is used only for errors and destructive buttons (delete, reject, end scholarship).
 5. Every field has a visible label above it, including the search boxes and dropdowns at the top of the admin lists.
+
+## 8. Font (system font, aligned numbers)
+1. On Windows the whole site (headings, text, fields, tables) is in Segoe UI; on an iPhone/Mac it is San Francisco;
+   on Android, Roboto. Nothing is downloaded for fonts (developer tools → Network → filter "font": only the icon font).
+2. Admin → Budget, Releases, Claims, Dashboard, Analytics: zeros are plain (no slash) in every ₱ amount, and amounts in
+   the same column line up digit by digit.
+3. Charts (Dashboard, Analytics) and the Calendar use the same font as the rest of the page.
+4. A test e-mail uses Segoe UI where available (Arial elsewhere); PDF reports keep DejaVu Sans so the ₱ sign prints.

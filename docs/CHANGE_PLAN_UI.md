@@ -71,7 +71,7 @@ these tokens, so the existing `btn-primary`, `text-muted`, `alert-*` and `badge 
 | `--border-field` | `#6B7486` | form field borders (visible edge) |
 | `--focus-ring` | `3px solid var(--brand-blue-dark)`, 2px offset (yellow on the sidebar) | every interactive element |
 | Badge pairs | success `#14532D`/`#DCF2E4`, warning `#6B4300`/`#FFF1C7`, danger `#9B111B`/`#FDE4E5`, info `#083A87`/`#E1ECFB`, neutral `#2F3645`/`#E7EAF0`, primary `#FFF`/`#0B4DB3` | status badges (the word is always shown: `APP_STATUS_LABELS` already does that) |
-| Type | Body, forms, tables: `"Atkinson Hyperlegible", system-ui, sans-serif`. Headings, the system name and big numbers: `"Montserrat"` 700 (800 for the name and landing title), the poster's bold geometric style (revised after review); root 18px (1.125rem), line-height 1.6; `.small` = 0.875rem → 15.75px; h1–h6 bold, 2.0/1.6/1.35/1.2/1.1/1rem | everywhere |
+| Type | One system-font stack for headings and text: `"Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif` (`--font-ui`; native font on Windows / iPhone / Mac / Android, nothing downloaded, plain zeros). Numbers in tables, stat figures and the calendar use `tabular-nums` so ₱ amounts line up. Root 18px (1.125rem), line-height 1.6; `.small` = 0.875rem → 15.75px; h1–h6 bold, 2.0/1.6/1.35/1.2/1.1/1rem. *(Revised: the first self-hosted font's slashed zero cluttered peso amounts.)* | everywhere |
 | Text-size scale | `html[data-text-size]` = 100% / 115% / 130% | A / A+ / A++ control |
 | Measure | `--measure: 70ch` on paragraphs and alerts in long-text areas | readability |
 | Target | `--target-min: 44px` (min-height/min-width) | buttons, sidebar links, table action links, checkboxes (via label padding), eye toggle |
@@ -129,7 +129,7 @@ constant, so the two can't drift.
 
 **New**
 - `public/assets/img/sk-logo.png` (512×512, from Image 1, white background kept, since it is the seal's own background), `barangay-seal.png` (Image 2), `favicon-32.png`, `apple-touch-icon.png` (180×180). Resized with PHP GD.
-- `public/assets/fonts/atkinson-hyperlegible-{400,700}-{normal,italic}.woff2` + `OFL.txt` (SIL Open Font License, from the `@fontsource/atkinson-hyperlegible` package).
+- No web fonts: the site uses each platform's own UI font (see §2 Type). Segoe UI can't be bundled, and system fonts load instantly.
 - `public/assets/vendor/bootstrap/` (css + js + LICENSE), `public/assets/vendor/bootstrap-icons/` (css + fonts + LICENSE) (U2).
 - `public/assets/js/ui.js`: shared, loaded on every page:
   - `skPasswordToggle()`, the one eye-toggle function;

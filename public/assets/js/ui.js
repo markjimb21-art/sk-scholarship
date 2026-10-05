@@ -128,9 +128,10 @@
     });
   });
 
-  /* ---------- Charts use the site font, never below 15px (pages draw their charts after this runs) ---------- */
+  /* ---------- Charts use the site font (the --font-ui stack in style.css), never below 15px ----------
+     Pages draw their charts after this runs. */
   if (window.Chart && window.Chart.defaults) {
-    window.Chart.defaults.font.family = '"Atkinson Hyperlegible", system-ui, sans-serif';
+    window.Chart.defaults.font.family = getComputedStyle(document.documentElement).getPropertyValue('--font-ui').trim() || 'system-ui, sans-serif';
     window.Chart.defaults.font.size = 15;
     window.Chart.defaults.color = '#454E5F';
   }

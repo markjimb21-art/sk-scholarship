@@ -2,21 +2,8 @@
    Every color is a token below; Bootstrap's own variables point at the tokens, so existing Bootstrap classes in the
    views (btn-primary, text-muted, badge bg-*, alert-*) pick up the design without changing the views. */
 
-/* ---------- Font: Atkinson Hyperlegible (SIL OFL, fonts/OFL.txt), self-hosted ---------- */
-@font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 400; font-display: swap;
-  src: url("../fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2"); }
-@font-face { font-family: "Atkinson Hyperlegible"; font-style: italic; font-weight: 400; font-display: swap;
-  src: url("../fonts/atkinson-hyperlegible-latin-400-italic.woff2") format("woff2"); }
-@font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 700; font-display: swap;
-  src: url("../fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2"); }
-@font-face { font-family: "Atkinson Hyperlegible"; font-style: italic; font-weight: 700; font-display: swap;
-  src: url("../fonts/atkinson-hyperlegible-latin-700-italic.woff2") format("woff2"); }
-
-/* Headings: Montserrat (SIL OFL, fonts/OFL-Montserrat.txt) — the bold geometric style of the EduKabataan poster. */
-@font-face { font-family: "Montserrat"; font-style: normal; font-weight: 700; font-display: swap;
-  src: url("../fonts/montserrat-latin-700-normal.woff2") format("woff2"); }
-@font-face { font-family: "Montserrat"; font-style: normal; font-weight: 800; font-display: swap;
-  src: url("../fonts/montserrat-latin-800-normal.woff2") format("woff2"); }
+/* ---------- Font: each platform's own UI font (Segoe UI on Windows, San Francisco on iPhone/Mac, Roboto on
+   Android). Nothing is downloaded: Segoe UI can't be bundled, and system fonts load instantly. Plain (unslashed) zeros. */
 
 /* ---------- Tokens (contrast ratios in docs/CHANGE_PLAN_UI.md) ---------- */
 :root {
@@ -49,11 +36,10 @@
   --measure: 70ch;
   --sidebar-w: clamp(260px, 15rem, 340px);
   --radius: .6rem;
-  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; /* text, forms, tables */
-  --font-heading: "Montserrat", "Atkinson Hyperlegible", system-ui, sans-serif;                  /* headings, brand, big numbers */
+  --font-ui: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; /* one stack for headings and text */
 
   /* Bootstrap 5.3 variables → tokens */
-  --bs-body-font-family: var(--font-body);
+  --bs-body-font-family: var(--font-ui);
   --bs-body-font-size: 1rem;
   --bs-body-line-height: 1.6;
   --bs-body-color: var(--text);
@@ -85,12 +71,11 @@ html { font-size: 112.5%; -webkit-text-size-adjust: 100%; }
 html[data-text-size="115"] { font-size: 129.375%; }
 html[data-text-size="130"] { font-size: 146.25%; }
 body { background: var(--surface-page); color: var(--text); font-family: var(--bs-body-font-family); line-height: 1.6; }
-h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 { font-family: var(--font-heading); font-weight: 700; color: var(--text); line-height: 1.25; letter-spacing: -.005em; }
-.display-1, .display-2, .display-3, .display-4, .display-5, .display-6 { font-family: var(--font-heading); }
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 { font-family: var(--font-ui); font-weight: 700; color: var(--text); line-height: 1.25; letter-spacing: -.005em; }
 /* The poster weight (800) for the system name and the landing title. */
 .brand-title, .brand-name, .landing-hero h1 { font-weight: 800 !important; letter-spacing: -.01em; }
-/* Heading font for short display text only — long text stays in the body font. */
-.brand-title, .brand-name, .sidebar-section, .kpi-value, .navbar-brand, .modal-title, .card-header h5, .card-header h6 { font-family: var(--font-heading); }
+/* Numbers line up digit by digit (₱ amounts in columns, stat figures, the calendar). Plain zeros — no slashed-zero. */
+.table, .table td, .table th, .review-table td, .kpi-value, .fw-bold[class*="fs-"], .fc { font-variant-numeric: tabular-nums; }
 h1, .h1 { font-size: 2rem; } h2, .h2 { font-size: 1.6rem; } h3, .h3 { font-size: 1.35rem; }
 h4, .h4 { font-size: 1.2rem; } h5, .h5 { font-size: 1.1rem; } h6, .h6 { font-size: 1rem; }
 .fw-semibold { font-weight: 700 !important; }
@@ -104,7 +89,9 @@ p { max-width: var(--measure); }
 a { color: var(--brand-blue); text-underline-offset: .15em; }
 a:hover { color: var(--brand-blue-dark); }
 img, svg, video { max-width: 100%; }
-.app-content { overflow-wrap: anywhere; }
+.app-content { overflow-wrap: break-word; }   /* long e-mails and codes wrap; words (and button labels) are never split */
+/* Page header rows (title + main action): the action drops below the title instead of being squeezed. */
+.app-content > .d-flex.justify-content-between { flex-wrap: wrap; gap: .75rem; }
 
 /* ---------- Focus: always visible, 3px, high contrast ---------- */
 :focus-visible { outline: var(--focus-width) solid var(--focus-color) !important; outline-offset: 2px; }
