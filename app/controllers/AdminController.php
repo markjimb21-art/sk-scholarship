@@ -292,7 +292,8 @@ final class AdminController
             }
             flash('success', $oldRole !== $roleName ? "Account updated; role changed to $roleName." : 'Account updated.');
         } else {
-            if (strlen($password) < PASSWORD_MIN_LENGTH) { flash('danger', 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.'); redirect('admin/users'); }
+            if ($problems = password_problems($password)) { flash('danger', password_rule_message($problems)); redirect('admin/users'); }
+            if ($password !== (string)($_POST['password_confirm'] ?? '')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
             $pdo->prepare(
                 "INSERT INTO users (role_id, full_name, email, password_hash, contact_number, is_active, email_verified)
                  VALUES ((SELECT id FROM roles WHERE role_name = ?), ?, ?, ?, ?, 1, 1)"
@@ -329,7 +330,8 @@ final class AdminController
         require_post('admin/users');
         $id = (int)($_POST['id'] ?? 0);
         $password = (string)($_POST['new_password'] ?? '');
-        if (strlen($password) < PASSWORD_MIN_LENGTH) { flash('danger', 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.'); redirect('admin/users'); }
+        if ($problems = password_problems($password)) { flash('danger', password_rule_message($problems)); redirect('admin/users'); }
+        if ($password !== (string)($_POST['new_password_confirm'] ?? '')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
         Database::conn()->prepare("UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?")
             ->execute([password_hash($password, PASSWORD_DEFAULT), $id]);
         AuditLog::write('user_password_reset', 'users', $id, 'Admin reset the password');

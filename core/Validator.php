@@ -31,6 +31,14 @@ final class Validator
         return $this;
     }
 
+    /** The shared new-password rule (password_problems()); the message names exactly what is missing. */
+    public function strongPassword(string $field): self {
+        if (isset($this->data[$field]) && (string)$this->data[$field] !== '' && ($p = password_problems((string)$this->data[$field]))) {
+            $this->errors[$field] = password_rule_message($p);
+        }
+        return $this;
+    }
+
     public function numeric(string $field, ?string $label = null): self {
         $label ??= ucfirst(str_replace('_', ' ', $field));
         if (!empty($this->data[$field]) && !is_numeric($this->data[$field])) {

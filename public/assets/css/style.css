@@ -50,7 +50,7 @@
   --bs-body-line-height: 1.6;
   --bs-body-color: var(--text);
   --bs-body-color-rgb: 26, 31, 43;
-  --bs-body-bg: var(--surface-page);
+  --bs-body-bg: var(--surface-card);   /* cards, fields, menus, modals; the page itself is --surface-page (body rule) */
   --bs-emphasis-color: var(--text);
   --bs-secondary-color: var(--text-muted);
   --bs-secondary-rgb: 69, 78, 95;
@@ -373,7 +373,7 @@ hr { border-color: var(--border-soft); opacity: 1; }
 .landing-hero .lead { font-size: 1.2rem; }
 .landing-hero .hero-accent { width: 5rem; height: 6px; background: var(--brand-yellow); border-radius: 3px; margin: 1rem 0 1.25rem; }
 .landing-hero .btn-light { --bs-btn-color: var(--brand-blue-dark); --bs-btn-bg: #fff; --bs-btn-border-color: #fff; }
-.landing-hero .feature { background: rgba(255, 255, 255, .1); border-radius: var(--radius); padding: 1rem 1.1rem; height: 100%; }
+.landing-hero .feature { background: rgba(255, 255, 255, .1); border-radius: var(--radius); padding: .55rem 1rem; }
 .landing-hero .feature i { color: var(--brand-yellow); font-size: 1.6rem; }
 
 /* ---------- Responsive ---------- */

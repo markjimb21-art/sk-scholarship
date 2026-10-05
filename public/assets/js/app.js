@@ -3,7 +3,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggle = document.getElementById('toggleSidebar');
   const sidebar = document.getElementById('appSidebar');
   if (toggle && sidebar) {
-    toggle.addEventListener('click', () => sidebar.classList.toggle('show'));
+    toggle.addEventListener('click', () => {
+      const open = sidebar.classList.toggle('show');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.setAttribute('aria-label', open ? 'Close the menu' : 'Open the menu');
+    });
   }
 
   // Auto age calculation

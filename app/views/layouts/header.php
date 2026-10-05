@@ -7,50 +7,48 @@ $pageTitle = $pageTitle ?? 'Dashboard';
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<?php require VIEW_PATH . '/layouts/head_assets.php'; ?>
 <title><?= e($pageTitle) ?> · <?= e(APP_NAME_SHORT) ?></title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-<link href="<?= asset('css/style.css') ?>" rel="stylesheet">
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to main content</a>
 <div class="app-wrapper">
   <?php require VIEW_PATH . '/layouts/sidebar.php'; ?>
 
   <div class="app-main">
-    <nav class="navbar navbar-expand-lg app-navbar sticky-top">
-      <div class="container-fluid">
-        <button class="btn btn-link d-lg-none" id="toggleSidebar"><i class="bi bi-list fs-4"></i></button>
-        <span class="navbar-brand mb-0 h6 d-none d-sm-inline"><?= e($pageTitle) ?></span>
-        <div class="ms-auto d-flex align-items-center gap-3">
-          <a href="<?= url($roleName === 'applicant' ? 'applicant/notifications' : 'admin/notifications') ?>" class="position-relative text-dark">
-            <i class="bi bi-bell fs-5"></i>
+    <nav class="navbar app-navbar sticky-top" aria-label="Top bar">
+      <div class="container-fluid gap-2 flex-nowrap">
+        <button type="button" class="btn btn-link d-lg-none p-0" id="toggleSidebar" aria-label="Open the menu" aria-controls="appSidebar" aria-expanded="false">
+          <i class="bi bi-list fs-3" aria-hidden="true"></i>
+        </button>
+        <span class="navbar-brand mb-0 h6 d-none d-sm-inline text-truncate"><?= e($pageTitle) ?></span>
+        <div class="ms-auto d-flex align-items-center gap-2 gap-sm-3">
+          <span class="d-none d-md-inline-flex"><?php require VIEW_PATH . '/layouts/text_size.php'; ?></span>
+          <a href="<?= url($roleName === 'applicant' ? 'applicant/notifications' : 'admin/notifications') ?>" class="position-relative nav-icon-btn"
+             aria-label="Notifications<?= $unread > 0 ? ' — ' . (int)$unread . ' unread' : '' ?>">
+            <i class="bi bi-bell fs-4" aria-hidden="true"></i>
             <?php if ($unread > 0): ?>
-              <span class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill">
+              <span class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill" aria-hidden="true">
                 <?= $unread > 99 ? '99+' : $unread ?>
               </span>
             <?php endif; ?>
           </a>
           <div class="dropdown">
-            <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
-              <div class="avatar-circle"><?= strtoupper(substr($user['full_name'] ?? 'U', 0, 1)) ?></div>
-              <span class="ms-2 d-none d-md-inline small"><?= e($user['full_name'] ?? '') ?></span>
+            <a href="#" class="d-flex align-items-center text-decoration-none dropdown-toggle nav-icon-btn" data-bs-toggle="dropdown" aria-expanded="false"
+               aria-label="Account menu for <?= e($user['full_name'] ?? '') ?>">
+              <span class="avatar-circle" aria-hidden="true"><?= e(strtoupper(substr($user['full_name'] ?? 'U', 0, 1))) ?></span>
+              <span class="ms-2 d-none d-md-inline"><?= e($user['full_name'] ?? '') ?></span>
             </a>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><span class="dropdown-item-text small text-muted"><?= e(ucfirst($roleName)) ?></span></li>
+              <li><span class="dropdown-item-text"><?= e(ucfirst($roleName)) ?></span></li>
+              <li class="d-md-none px-3 py-2"><?php require VIEW_PATH . '/layouts/text_size.php'; ?></li>
               <li><hr class="dropdown-divider"></li>
-              <li><a class="dropdown-item" href="<?= url('logout') ?>"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+              <li><a class="dropdown-item" href="<?= url('logout') ?>"><i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Sign out</a></li>
             </ul>
           </div>
         </div>
       </div>
     </nav>
 
-    <main class="app-content">
-      <?php foreach (get_flashes() as $f): ?>
-        <div class="alert alert-<?= e($f['type']) ?> alert-dismissible fade show">
-          <?= e($f['message']) ?>
-          <button class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-      <?php endforeach; ?>
+    <main class="app-content" id="main" tabindex="-1">
+      <?php $flashDismissible = true; require VIEW_PATH . '/layouts/flashes.php'; ?>

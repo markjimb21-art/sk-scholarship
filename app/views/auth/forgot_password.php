@@ -1,27 +1,21 @@
-<!doctype html><html><head>
-<meta charset="utf-8"><title>Forgot Password</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head><body style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8); min-height:100vh;">
-<div class="container py-5">
-  <div class="row justify-content-center"><div class="col-md-5">
-    <div class="card shadow-lg border-0 rounded-4">
-      <div class="card-body p-4 p-md-5">
-        <h4 class="fw-bold mb-3">Forgot Password</h4>
-        <p class="text-muted small">Enter your registered email and we'll send you a 6-digit verification code.</p>
-        <?php foreach (get_flashes() as $f): ?>
-          <div class="alert alert-<?= e($f['type']) ?> py-2 small"><?= e($f['message']) ?></div>
-        <?php endforeach; ?>
-        <form method="POST" action="<?= url('forgot-password') ?>">
-          <?= csrf_field() ?>
-          <div class="mb-3">
-            <label class="form-label">Email</label>
-            <input type="email" name="email" class="form-control" required autofocus>
-          </div>
-          <button class="btn btn-primary w-100">Send Verification Code</button>
-        </form>
-        <p class="text-center small mt-3"><a href="<?= url('login') ?>">Back to login</a></p>
-      </div>
+<?php
+$pageTitle = 'Forgot Password';
+$authHeading = 'Forgot your password?';
+require VIEW_PATH . '/layouts/auth_head.php';
+?>
+<div class="auth-card">
+  <?php require VIEW_PATH . '/layouts/auth_brand.php'; ?>
+  <p class="text-center">Enter the email you registered with and we'll send you a 6-digit verification code.</p>
+  <?php require VIEW_PATH . '/layouts/flashes.php'; ?>
+  <form method="POST" action="<?= url('forgot-password') ?>">
+    <?= csrf_field() ?>
+    <div class="mb-4">
+      <label class="form-label" for="email">Email address</label>
+      <input type="email" name="email" id="email" class="form-control" required autofocus autocomplete="email">
     </div>
-  </div></div>
+    <button type="submit" class="btn btn-primary btn-lg w-100">Send Verification Code</button>
+  </form>
+  <hr class="my-4">
+  <div class="auth-links"><p class="mb-0"><a href="<?= url('login') ?>">Back to sign in</a></p></div>
 </div>
-</body></html>
+<?php require VIEW_PATH . '/layouts/auth_foot.php'; ?>

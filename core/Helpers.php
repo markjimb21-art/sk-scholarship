@@ -109,3 +109,58 @@ function setting(string $key, ?string $default = null): ?string {
 function admin_id(): int {
     return (int)(Auth::user()['id'] ?? 0);
 }
+
+/* ---------- Password rule (docs/CHANGE_PLAN_UI.md §3): used wherever a password is CREATED or CHANGED, never at login ---------- */
+
+/** What a new password is missing, as plain phrases; [] means it is fine. */
+function password_problems(string $password): array {
+    $problems = [];
+    if (mb_strlen($password) < PASSWORD_MIN_LENGTH) $problems[] = 'at least ' . PASSWORD_MIN_LENGTH . ' characters';
+    if (strpbrk($password, PASSWORD_SPECIAL_CHARS) === false) $problems[] = 'at least 1 special character (e.g. ! @ # $ %)';
+    return $problems;
+}
+
+/** One friendly sentence naming exactly which parts failed, e.g. "Your password needs at least 1 special character (e.g. ! @ # $ %)." */
+function password_rule_message(array $problems): string {
+    return 'Your password needs ' . implode(' and ', $problems) . '.';
+}
+
+/** Live checklist under a new-password field (ui.js ticks it as the user types; the words carry the meaning, not color). */
+function password_checklist(string $inputId): string {
+    $item = static fn(string $rule, string $label): string =>
+        '<li data-rule="' . $rule . '"><i aria-hidden="true"></i><span>' . e($label) . '</span><span class="visually-hidden" data-state> — not yet</span></li>';
+    return '<ul class="pw-checklist" id="' . e($inputId) . '-rules" aria-live="polite">'
+        . $item('length', 'At least ' . PASSWORD_MIN_LENGTH . ' characters')
+        . $item('special', 'At least 1 special character (e.g. ! @ # $ %)')
+        . '</ul>';
+}
+
+/** "Passwords match" line under a confirm-password field. */
+function password_match_check(string $confirmId): string {
+    return '<ul class="pw-checklist" id="' . e($confirmId) . '-match" aria-live="polite"><li data-rule="match"><i aria-hidden="true"></i>'
+        . '<span>Passwords match</span><span class="visually-hidden" data-state> — not yet</span></li></ul>';
+}
+
+/** Attributes for a new-password input: the rule for ui.js + described by its checklist. */
+function password_input_attrs(string $inputId): string {
+    return 'id="' . e($inputId) . '" data-pw-rules data-pw-min="' . PASSWORD_MIN_LENGTH . '" data-pw-special="' . e(PASSWORD_SPECIAL_CHARS)
+        . '" aria-describedby="' . e($inputId) . '-rules ' . e($inputId) . '-error" autocomplete="new-password"';
+}
+
+/* ---------- Inline field errors: red text + icon right under the field, linked by aria-describedby, announced ---------- */
+
+/** Field errors from the last POST (set by a controller in $_SESSION['_field_errors']); read once per request. */
+function field_errors(): array {
+    static $errors = null;
+    if ($errors === null) { $errors = $_SESSION['_field_errors'] ?? []; unset($_SESSION['_field_errors']); }
+    return $errors;
+}
+
+/** ' is-invalid' when the field has an error (append to the input's class list). */
+function field_invalid(string $field): string { return isset(field_errors()[$field]) ? ' is-invalid' : ''; }
+
+/** The error line for a field, with id "<id>-error". Always rendered (hidden when empty) so ui.js can fill it in too. */
+function field_error(string $field, string $id): string {
+    $msg = field_errors()[$field] ?? '';
+    return '<div class="field-error" id="' . e($id) . '-error" role="alert"' . ($msg === '' ? ' hidden' : '') . '>' . e($msg) . '</div>';
+}

@@ -1,64 +1,48 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Register · <?= e(APP_NAME_SHORT) ?></title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-<link href="<?= asset('css/style.css') ?>" rel="stylesheet">
-</head>
-<body style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8); min-height:100vh;">
-<div class="container py-5">
-  <div class="row justify-content-center">
-    <div class="col-md-6 col-lg-5">
-      <div class="card shadow-lg border-0 rounded-4">
-        <div class="card-body p-4 p-md-5">
-          <div class="text-center mb-4">
-            <i class="bi bi-person-plus-fill text-primary" style="font-size:2.5rem;"></i>
-            <h4 class="fw-bold mt-2 mb-0">Create Account</h4>
-            <p class="text-muted small">College students of Barangay Estefania</p>
-          </div>
+<?php
+$pageTitle = 'Register';
+$authHeading = 'Create your account';
+require VIEW_PATH . '/layouts/auth_head.php';
+?>
+<div class="auth-card">
+  <?php require VIEW_PATH . '/layouts/auth_brand.php'; ?>
+  <p class="text-center">For college students who live in Barangay Estefania.</p>
+  <?php require VIEW_PATH . '/layouts/flashes.php'; ?>
 
-          <?php foreach (get_flashes() as $f): ?>
-            <div class="alert alert-<?= e($f['type']) ?> py-2 small"><?= e($f['message']) ?></div>
-          <?php endforeach; ?>
-
-          <form method="POST" action="<?= url('register') ?>" novalidate>
-            <?= csrf_field() ?>
-            <div class="mb-3">
-              <label class="form-label">Full Name</label>
-              <input type="text" name="full_name" class="form-control" required
-                     value="<?= e(old('full_name')) ?>">
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Email Address</label>
-              <input type="email" name="email" class="form-control" required
-                     value="<?= e(old('email')) ?>">
-              <div class="form-text">This will be your login and the email on your application.</div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Password</label>
-              <input type="password" name="password" class="form-control" required minlength="<?= PASSWORD_MIN_LENGTH ?>">
-              <div class="form-text">Minimum <?= PASSWORD_MIN_LENGTH ?> characters.</div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Confirm Password</label>
-              <input type="password" name="confirm_password" class="form-control" required>
-            </div>
-            <button class="btn btn-primary w-100 py-2 fw-semibold">
-              <i class="bi bi-check2-circle me-1"></i> Create Account
-            </button>
-          </form>
-
-          <hr class="my-4">
-          <p class="text-center small mb-0">
-            Already registered? <a href="<?= url('login') ?>">Sign In</a>
-          </p>
-        </div>
-      </div>
+  <form method="POST" action="<?= url('register') ?>" novalidate>
+    <?= csrf_field() ?>
+    <div class="mb-3">
+      <label class="form-label" for="full_name">Full name</label>
+      <input type="text" name="full_name" id="full_name" class="form-control<?= field_invalid('full_name') ?>" required autocomplete="name"
+             value="<?= e(old('full_name')) ?>" aria-describedby="full_name-error">
+      <?= field_error('full_name', 'full_name') ?>
     </div>
-  </div>
+    <div class="mb-3">
+      <label class="form-label" for="email">Email address</label>
+      <input type="email" name="email" id="email" class="form-control<?= field_invalid('email') ?>" required autocomplete="email"
+             value="<?= e(old('email')) ?>" aria-describedby="email-help email-error">
+      <div class="form-text" id="email-help">This will be your login and the email on your application.</div>
+      <?= field_error('email', 'email') ?>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="password">Password</label>
+      <input type="password" name="password" class="form-control<?= field_invalid('password') ?>" required <?= password_input_attrs('password') ?>>
+      <?= password_checklist('password') ?>
+      <?= field_error('password', 'password') ?>
+    </div>
+    <div class="mb-4">
+      <label class="form-label" for="confirm_password">Confirm password</label>
+      <input type="password" name="confirm_password" id="confirm_password" data-pw-confirm-for="password" required autocomplete="new-password"
+             class="form-control<?= field_invalid('confirm_password') ?>" aria-describedby="confirm_password-match confirm_password-error">
+      <?= password_match_check('confirm_password') ?>
+      <?= field_error('confirm_password', 'confirm_password') ?>
+    </div>
+    <button type="submit" class="btn btn-primary btn-lg w-100">
+      <i class="bi bi-check2-circle" aria-hidden="true"></i> Create Account
+    </button>
+  </form>
+
+  <hr class="my-4">
+  <div class="auth-links"><p class="mb-0">Already registered? <a href="<?= url('login') ?>">Sign in</a></p></div>
 </div>
-</body>
-</html>
+<p class="text-center mt-3"><a class="auth-back" href="<?= url('home') ?>"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i> Back to home</a></p>
+<?php require VIEW_PATH . '/layouts/auth_foot.php'; ?>

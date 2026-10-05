@@ -74,7 +74,15 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
           </select>
           <div class="form-text">Changing a role is recorded in the audit log. You can’t change your own role, and the last active admin can’t lose the role.</div>
         </div>
-        <div class="mb-2" id="userPasswordRow"><label class="form-label">Password</label><input type="password" name="password" class="form-control" minlength="<?= PASSWORD_MIN_LENGTH ?>"></div>
+        <div id="userPasswordRow">
+          <div class="mb-2"><label class="form-label" for="userPassword">Password</label>
+            <input type="password" name="password" class="form-control" <?= password_input_attrs('userPassword') ?>>
+            <?= password_checklist('userPassword') ?></div>
+          <div class="mb-2"><label class="form-label" for="userPasswordConfirm">Confirm password</label>
+            <input type="password" name="password_confirm" id="userPasswordConfirm" class="form-control" data-pw-confirm-for="userPassword"
+                   autocomplete="new-password" aria-describedby="userPasswordConfirm-match">
+            <?= password_match_check('userPasswordConfirm') ?></div>
+        </div>
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
     </form>
@@ -86,7 +94,15 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
     <form method="POST" action="<?= url('admin/user-reset') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="id" id="resetId">
       <div class="modal-header"><h5 class="modal-title">Reset password — <span id="resetEmail"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-      <div class="modal-body"><label class="form-label">New password</label><input type="password" name="new_password" class="form-control" minlength="<?= PASSWORD_MIN_LENGTH ?>" required></div>
+      <div class="modal-body">
+        <div class="mb-2"><label class="form-label" for="resetPassword">New password</label>
+          <input type="password" name="new_password" class="form-control" required <?= password_input_attrs('resetPassword') ?>>
+          <?= password_checklist('resetPassword') ?></div>
+        <div class="mb-2"><label class="form-label" for="resetPasswordConfirm">Confirm new password</label>
+          <input type="password" name="new_password_confirm" id="resetPasswordConfirm" class="form-control" data-pw-confirm-for="resetPassword" required
+                 autocomplete="new-password" aria-describedby="resetPasswordConfirm-match">
+          <?= password_match_check('resetPasswordConfirm') ?></div>
+      </div>
       <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Reset</button></div>
     </form>
   </div>

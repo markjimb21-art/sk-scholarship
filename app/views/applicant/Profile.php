@@ -15,10 +15,15 @@
       <hr class="my-4">
       <h6>Change Password (optional)</h6>
       <div class="row g-3">
-        <div class="col-md-4"><label class="form-label">Current Password</label>
-          <input type="password" name="current_password" class="form-control"></div>
-        <div class="col-md-4"><label class="form-label">New Password</label>
-          <input type="password" name="new_password" class="form-control" minlength="<?= PASSWORD_MIN_LENGTH ?>"></div>
+        <div class="col-md-4"><label class="form-label" for="currentPassword">Current password</label>
+          <input type="password" name="current_password" id="currentPassword" class="form-control" autocomplete="current-password"></div>
+        <div class="col-md-4"><label class="form-label" for="newPassword">New password</label>
+          <input type="password" name="new_password" class="form-control" <?= password_input_attrs('newPassword') ?>>
+          <?= password_checklist('newPassword') ?></div>
+        <div class="col-md-4"><label class="form-label" for="newPasswordConfirm">Confirm new password</label>
+          <input type="password" name="new_password_confirm" id="newPasswordConfirm" class="form-control" data-pw-confirm-for="newPassword"
+                 autocomplete="new-password" aria-describedby="newPasswordConfirm-match">
+          <?= password_match_check('newPasswordConfirm') ?></div>
       </div>
 
       <button class="btn btn-primary mt-4"><i class="bi bi-save me-1"></i> Save Changes</button>

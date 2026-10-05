@@ -1,16 +1,11 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Something went wrong · <?= e(APP_NAME_SHORT) ?></title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-<div class="container py-5 text-center">
-  <h1 class="display-6 fw-bold">Something went wrong</h1>
-  <p class="text-muted">An unexpected error occurred. It has been logged. Please try again, or contact the SK office if the problem continues.</p>
-  <a class="btn btn-primary" href="javascript:history.back()">Go back</a>
+<?php
+$pageTitle = 'Something went wrong';
+require VIEW_PATH . '/layouts/auth_head.php';
+?>
+<div class="auth-card text-center">
+  <?php require VIEW_PATH . '/layouts/auth_brand.php'; ?>
+  <h1 class="h3">Something went wrong</h1>
+  <p>An unexpected error occurred and it has been logged. Please try again, or contact the SK office if the problem continues.</p>
+  <a class="btn btn-primary btn-lg" href="javascript:history.back()">Go back</a>
 </div>
-</body>
-</html>
+<?php require VIEW_PATH . '/layouts/auth_foot.php'; ?>

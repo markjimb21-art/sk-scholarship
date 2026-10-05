@@ -720,7 +720,8 @@ final class ApplicantController
             $contact = digits_only($_POST['contact_number'] ?? '');
             if ($name === '') { flash('danger', 'Full name required.'); redirect('applicant/profile'); }
             if (!empty($_POST['new_password'])) {
-                if (strlen($_POST['new_password']) < PASSWORD_MIN_LENGTH) { flash('danger', 'Password too short.'); redirect('applicant/profile'); }
+                if ($problems = password_problems((string)$_POST['new_password'])) { flash('danger', password_rule_message($problems)); redirect('applicant/profile'); }
+                if ((string)$_POST['new_password'] !== (string)($_POST['new_password_confirm'] ?? '')) { flash('danger', 'The two new passwords do not match.'); redirect('applicant/profile'); }
                 if (!password_verify($_POST['current_password'] ?? '', $user['password_hash'])) { flash('danger', 'Current password incorrect.'); redirect('applicant/profile'); }
                 $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?")
                     ->execute([password_hash($_POST['new_password'], PASSWORD_DEFAULT), $user['id']]);

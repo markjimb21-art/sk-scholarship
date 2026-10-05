@@ -9,6 +9,19 @@ final class AuthController
             $email = trim((string)($_POST['email'] ?? ''));
             $password = (string)($_POST['password'] ?? '');
 
+            // Empty fields: a friendly message (same words as the sign-in pop-up) instead of "Invalid credentials".
+            // Only emptiness is checked here — the new-password rule never applies at login, so old passwords still work.
+            if ($email === '' || $password === '') {
+                $_SESSION['_field_errors'] = array_filter([
+                    'email' => $email === '' ? 'Enter your email address.' : null,
+                    'password' => $password === '' ? 'Enter your password.' : null,
+                ]);
+                flash('danger', 'Please enter your ' . implode(' and ', array_filter([
+                    $email === '' ? 'email address' : null, $password === '' ? 'password' : null])) . '.');
+                $_SESSION['_old'] = ['email' => $email];
+                redirect('login');
+            }
+
             $result = Auth::login($email, $password);
 
             if (!$result['ok'] && ($result['error'] ?? '') === 'unverified') {
@@ -47,10 +60,11 @@ final class AuthController
 
             $v = new Validator($_POST);
             $v->required('full_name')->required('email')->email('email')
-              ->required('password')->min('password', PASSWORD_MIN_LENGTH)
-              ->required('confirm_password')->matches('password', 'confirm_password', 'Password confirmation');
+              ->required('password')->strongPassword('password')
+              ->required('confirm_password', 'Confirm password')->matches('confirm_password', 'password', 'Password confirmation');
 
             if ($v->fails()) {
+                $_SESSION['_field_errors'] = $v->errors();
                 flash('danger', $v->firstError());
                 $_SESSION['_old'] = $keep;
                 redirect('register');
@@ -261,12 +275,14 @@ final class AuthController
             $pw = (string)($_POST['password'] ?? '');
             $cpw = (string)($_POST['confirm_password'] ?? '');
 
-            if (mb_strlen($pw) < PASSWORD_MIN_LENGTH) {
-                flash('danger', 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.');
+            if ($problems = password_problems($pw)) {
+                $_SESSION['_field_errors'] = ['password' => password_rule_message($problems)];
+                flash('danger', password_rule_message($problems));
                 redirect('reset-password');
             }
             if ($pw !== $cpw) {
-                flash('danger', 'Passwords do not match.');
+                $_SESSION['_field_errors'] = ['confirm_password' => 'The two passwords do not match.'];
+                flash('danger', 'The two passwords do not match.');
                 redirect('reset-password');
             }
 

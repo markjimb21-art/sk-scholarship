@@ -4,19 +4,20 @@ $current = $_GET['r'] ?? '';
 $item = function (string $route, string $icon, string $label) use ($current) {
     $active = ($current === $route || str_starts_with($current, $route . '/')) ? ' active' : '';
     echo '<li class="nav-item">'
-       . '<a class="nav-link' . $active . '" href="' . url($route) . '">'
-       . '<i class="bi ' . $icon . '"></i><span>' . $label . '</span></a></li>';
+       . '<a class="nav-link' . $active . '" href="' . url($route) . '"' . ($active ? ' aria-current="page"' : '') . '>'
+       . '<i class="bi ' . $icon . '" aria-hidden="true"></i><span>' . $label . '</span></a></li>';
 };
 ?>
 <aside class="app-sidebar" id="appSidebar">
   <div class="sidebar-brand">
-    <i class="bi bi-mortarboard-fill"></i>
+    <img class="brand-logo" src="<?= e(asset('img/sk-logo.png')) ?>" alt="SK Barangay Estefania logo" width="52" height="52">
     <div>
-      <div class="fw-bold"><?= e(APP_NAME_SHORT) ?></div>
-      <small>Barangay Estefania</small>
+      <div class="brand-name"><?= e(APP_NAME_SHORT) ?></div>
+      <div class="brand-sub">Barangay Estefania</div>
     </div>
   </div>
 
+  <nav aria-label="Main menu">
   <ul class="nav flex-column sidebar-nav">
     <?php if ($roleName === 'applicant'): ?>
       <?php
@@ -36,7 +37,7 @@ $item = function (string $route, string $icon, string $label) use ($current) {
       $item = static function (string $route, string $icon, string $label) use (&$pendingSection, $staffItem): void {
           if (!AdminController::canAccess(substr($route, 6))) return;
           if ($pendingSection !== null) {
-              echo '<li class="nav-item small text-uppercase text-muted px-3 pt-3 pb-1" style="font-size:.7rem">' . e($pendingSection) . '</li>';
+              echo '<li class="nav-item sidebar-section" role="presentation">' . e($pendingSection) . '</li>';
               $pendingSection = null;
           }
           $staffItem($route, $icon, $label);
@@ -68,4 +69,5 @@ $item = function (string $route, string $icon, string $label) use ($current) {
     ?>
   <?php endif; ?>
   </ul>
+  </nav>
 </aside>
