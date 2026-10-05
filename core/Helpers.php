@@ -16,7 +16,12 @@ function redirect(string $path): void {
 
 function url(string $path = ''): string { return BASE_URL . '/' . ltrim($path, '/'); }
 
-function asset(string $path): string { return BASE_URL . '/assets/' . ltrim($path, '/'); }
+/** URL of a file in public/assets/, with ?v=<last modified> so browsers fetch it again after every change. */
+function asset(string $path): string {
+    $path = ltrim($path, '/');
+    $file = PUBLIC_PATH . '/assets/' . $path;
+    return BASE_URL . '/assets/' . $path . (is_file($file) ? '?v=' . filemtime($file) : '');
+}
 
 function old(string $key, $default = '') { return $_SESSION['_old'][$key] ?? $default; }
 
