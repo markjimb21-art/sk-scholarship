@@ -71,7 +71,7 @@ these tokens, so the existing `btn-primary`, `text-muted`, `alert-*` and `badge 
 | `--border-field` | `#6B7486` | form field borders (visible edge) |
 | `--focus-ring` | `3px solid var(--brand-blue-dark)`, 2px offset (yellow on the sidebar) | every interactive element |
 | Badge pairs | success `#14532D`/`#DCF2E4`, warning `#6B4300`/`#FFF1C7`, danger `#9B111B`/`#FDE4E5`, info `#083A87`/`#E1ECFB`, neutral `#2F3645`/`#E7EAF0`, primary `#FFF`/`#0B4DB3` | status badges (the word is always shown: `APP_STATUS_LABELS` already does that) |
-| Type | `"Atkinson Hyperlegible", system-ui, sans-serif`; root 18px (1.125rem), line-height 1.6; `.small` = 0.875rem → 15.75px; h1–h6 bold, 2.0/1.6/1.35/1.2/1.1/1rem | everywhere |
+| Type | Body, forms, tables: `"Atkinson Hyperlegible", system-ui, sans-serif`. Headings, the system name and big numbers: `"Montserrat"` 700 (800 for the name and landing title), the poster's bold geometric style (revised after review); root 18px (1.125rem), line-height 1.6; `.small` = 0.875rem → 15.75px; h1–h6 bold, 2.0/1.6/1.35/1.2/1.1/1rem | everywhere |
 | Text-size scale | `html[data-text-size]` = 100% / 115% / 130% | A / A+ / A++ control |
 | Measure | `--measure: 70ch` on paragraphs and alerts in long-text areas | readability |
 | Target | `--target-min: 44px` (min-height/min-width) | buttons, sidebar links, table action links, checkboxes (via label padding), eye toggle |

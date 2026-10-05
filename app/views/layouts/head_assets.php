@@ -5,6 +5,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="<?= e(asset('img/favicon-32.png')) ?>">
 <link rel="apple-touch-icon" sizes="180x180" href="<?= e(asset('img/apple-touch-icon.png')) ?>">
 <link rel="preload" href="<?= e(asset('fonts/atkinson-hyperlegible-latin-400-normal.woff2')) ?>" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="<?= e(asset('fonts/montserrat-latin-700-normal.woff2')) ?>" as="font" type="font/woff2" crossorigin>
 <link href="<?= e(asset('vendor/bootstrap/bootstrap.min.css')) ?>" rel="stylesheet">
 <link href="<?= e(asset('vendor/bootstrap-icons/bootstrap-icons.min.css')) ?>" rel="stylesheet">
 <link href="<?= e(asset('css/style.css')) ?>" rel="stylesheet">
