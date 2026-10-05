@@ -104,8 +104,8 @@ final class Notification
 
     /** Admin-only "Send Test Email" (see AdminController::settingsTestEmail). */
     public static function sendTestEmail(string $toEmail): array {
-        $subject = 'SK Scholarship MIS — Test Email';
-        $plain = 'This is a test email from the Sangguniang Kabataan Scholarship Management Information System.';
+        $subject = APP_NAME_SHORT . ' — Test Email';
+        $plain = 'This is a test email from ' . APP_NAME . '.';
         $html = self::brand($subject, 'Administrator', '<p>' . $plain . '</p>');
         $ok = self::sendMail($toEmail, 'Administrator', $subject, $html, $plain);
         return $ok
@@ -124,9 +124,10 @@ final class Notification
     }
 
     /**
-     * Shared SK Scholarship / Barangay Estefania e-mail shell: subject as heading, greeting by name,
+     * Shared SK EduKabataan / Barangay Estefania e-mail shell: subject as heading, greeting by name,
      * body HTML, an optional call-to-action button, and a footer. Used for every notification e-mail
-     * so all outgoing mail looks consistent.
+     * so all outgoing mail looks consistent. The header is text and colors only (no remote image), so it
+     * still looks right in mail clients that block images. Colors are the site's tokens (style.css).
      */
     public static function brand(string $subject, string $toName, string $bodyHtml, ?string $actionUrl = null, ?string $actionLabel = null): string {
         $name = htmlspecialchars($toName, ENT_QUOTES, 'UTF-8');
@@ -134,24 +135,28 @@ final class Notification
         $button = '';
         if ($actionUrl !== null && $actionLabel !== null) {
             $button = '<p style="margin:28px 0;"><a href="' . htmlspecialchars($actionUrl, ENT_QUOTES, 'UTF-8') . '" '
-                . 'style="background:#0d3b66;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;display:inline-block;font-weight:bold;">'
+                . 'style="background:#0B4DB3;color:#ffffff;text-decoration:none;padding:14px 26px;border-radius:8px;display:inline-block;font-weight:bold;font-size:17px;">'
                 . htmlspecialchars($actionLabel, ENT_QUOTES, 'UTF-8') . '</a></p>';
         }
+        $appName = htmlspecialchars(APP_NAME_SHORT, ENT_QUOTES, 'UTF-8');
+        $appTagline = 'Educational Assistance for College Students';
+        $subtitle = htmlspecialchars(APP_SUBTITLE, ENT_QUOTES, 'UTF-8');
         return <<<HTML
-<!doctype html><html><body style="margin:0;padding:0;background:#f2f4f7;font-family:Arial,Helvetica,sans-serif;">
-<div style="max-width:560px;margin:0 auto;padding:24px;">
-  <div style="background:#0d3b66;color:#fff;padding:20px 24px;border-radius:8px 8px 0 0;">
-    <div style="font-size:15px;letter-spacing:.5px;opacity:.85;">SANGGUNIANG KABATAAN &middot; BARANGAY ESTEFANIA</div>
-    <div style="font-size:20px;font-weight:bold;margin-top:4px;">Scholarship Management System</div>
+<!doctype html><html><body style="margin:0;padding:0;background:#F5F7FB;font-family:Verdana,Arial,Helvetica,sans-serif;color:#1A1F2B;">
+<div style="max-width:600px;margin:0 auto;padding:24px 12px;">
+  <div style="background:#082B66;color:#ffffff;padding:22px 26px;border-radius:10px 10px 0 0;border-bottom:5px solid #F6C90E;">
+    <div style="font-size:24px;font-weight:bold;line-height:1.2;color:#ffffff;">{$appName}</div>
+    <div style="font-size:17px;font-weight:bold;margin-top:2px;color:#ffffff;">{$appTagline}</div>
+    <div style="font-size:15px;margin-top:6px;color:#D6E2F5;">{$subtitle}</div>
   </div>
-  <div style="background:#fff;padding:24px;border:1px solid #e5e7eb;border-top:none;">
-    <h2 style="margin-top:0;color:#0d3b66;font-size:18px;">{$title}</h2>
-    <p>Hello {$name},</p>
-    <div style="color:#333;font-size:14px;line-height:1.6;">{$bodyHtml}</div>
+  <div style="background:#ffffff;padding:26px;border:1px solid #D3D9E3;border-top:none;">
+    <h2 style="margin-top:0;color:#083A87;font-size:21px;line-height:1.3;">{$title}</h2>
+    <p style="font-size:17px;line-height:1.6;">Hello {$name},</p>
+    <div style="color:#1A1F2B;font-size:17px;line-height:1.6;">{$bodyHtml}</div>
     {$button}
   </div>
-  <div style="background:#f2f4f7;color:#888;font-size:11px;padding:16px 24px;text-align:center;">
-    This is an automated message from the SK Scholarship Management Information System.<br>
+  <div style="background:#F5F7FB;color:#454E5F;font-size:15px;line-height:1.5;padding:16px 24px;text-align:center;">
+    This is an automated message from {$appName}.<br>
     Please do not reply directly to this e-mail. For assistance, contact your Barangay Estefania SK office.
   </div>
 </div>
@@ -205,7 +210,7 @@ HTML;
                 };
             }
 
-            $mail->setFrom($from, getenv('MAIL_FROM_NAME') ?: 'SK Scholarship');
+            $mail->setFrom($from, getenv('MAIL_FROM_NAME') ?: APP_NAME_SHORT);
             $mail->addAddress($toEmail, $toName);
             $mail->Subject = $subject;
             $mail->isHTML(true);

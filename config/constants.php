@@ -1,6 +1,15 @@
 <?php
 declare(strict_types=1);
 
+// System name (docs/CHANGE_PLAN_UI.md U1): every page title, the sidebar, e-mails and PDF reports use these.
+const APP_NAME = 'SK EduKabataan: Educational Assistance for College Students';
+const APP_NAME_SHORT = 'SK EduKabataan';
+const APP_SUBTITLE = 'Sangguniang Kabataan · Barangay Estefania · Bacolod City';
+
+// Password rule for every password that is CREATED or CHANGED (never at login): PASSWORD_MIN_LENGTH characters
+// and at least one of these special characters. Checked by password_problems() and, live, by ui.js.
+const PASSWORD_SPECIAL_CHARS = '!@#$%^&*()_+-=[]{};:\'",.<>/?\\|`~';
+
 // Every status, list and rule value used by the process in docs/PROCESS.md lives here.
 
 // Application statuses (applications.status) => plain-language label shown to users.

@@ -1,4 +1,4 @@
-# SK Scholarship Management System
+# SK EduKabataan: Educational Assistance for College Students
 
 A web application for the Sangguniang Kabataan (SK) college scholarship. It covers application, screening, interview, final decision, the cash claim and release for each semester, renewals, budgets, analytics and reports.
 
@@ -103,7 +103,7 @@ mpp\sk-scholarship-backups\backup_YYYY-MM-DD.sql   # outside the project
    MAIL_USER=your-email@gmail.com
    MAIL_PASS=your-app-password
    MAIL_FROM=your-email@gmail.com
-   MAIL_FROM_NAME="SK Scholarship"
+   MAIL_FROM_NAME="SK EduKabataan"
    MAIL_ENCRYPTION=ssl
    ```
    `APP_ENV` must be exactly `development` to enable debug output and error display; anything else (including unset) is treated as production. **On a deployed server, set `APP_ENV=production`.** Development mode shows stack traces, SQL errors and file paths to visitors.
@@ -130,7 +130,7 @@ The script only runs from the command line. Run it **every hour**:
 
 **Windows (XAMPP), Task Scheduler:**
 1. Open *Task Scheduler*, then choose *Create Task…*
-2. *General* tab: name it `SK Scholarship reminders` and choose *Run whether user is logged on or not*.
+2. *General* tab: name it `SK EduKabataan reminders` and choose *Run whether user is logged on or not*.
 3. *Triggers* tab: *New…*, *Daily*, then tick *Repeat task every: 1 hour* for a duration of *Indefinitely*.
 4. *Actions* tab: *New…*, *Start a program*:
    - Program/script: `C:\xampp\php\php.exe`

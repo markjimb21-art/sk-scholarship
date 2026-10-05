@@ -1,4 +1,4 @@
--- SK Scholarship — full database dump (schema + sample data)
+-- SK EduKabataan: Educational Assistance for College Students — full database dump (schema + sample data)
 -- Matches docs/PROCESS.md: includes every migration up to the 2026_10_*.sql files.
 -- Fresh install:  mysql -u root sk_scholarship < database/sk_scholarship.sql
 -- Existing database: do NOT import this; run the files in database/migrations/ instead.

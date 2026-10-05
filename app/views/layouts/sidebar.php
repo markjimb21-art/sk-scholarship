@@ -12,7 +12,7 @@ $item = function (string $route, string $icon, string $label) use ($current) {
   <div class="sidebar-brand">
     <i class="bi bi-mortarboard-fill"></i>
     <div>
-      <div class="fw-bold">SK Scholarship</div>
+      <div class="fw-bold"><?= e(APP_NAME_SHORT) ?></div>
       <small>Barangay Estefania</small>
     </div>
   </div>

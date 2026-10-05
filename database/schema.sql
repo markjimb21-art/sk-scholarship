@@ -1,5 +1,5 @@
 -- ============================================================
--- SK SCHOLARSHIP MANAGEMENT INFORMATION SYSTEM — Barangay Estefania
+-- SK EDUKABATAAN: EDUCATIONAL ASSISTANCE FOR COLLEGE STUDENTS — Barangay Estefania
 -- Empty schema + reference data. Structure matches docs/PROCESS.md and
 -- database/sk_scholarship.sql (all migrations up to 2026_09_28_restructure.sql).
 -- ============================================================

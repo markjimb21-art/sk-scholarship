@@ -1,4 +1,4 @@
-# SK Scholarship — The Process
+# SK EduKabataan — The Process
 
 This is the source of truth for the system. Every page is one step below, every status has exactly one
 meaning, and every rule marked **(server)** is enforced in PHP; the page only mirrors it.

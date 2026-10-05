@@ -74,7 +74,7 @@ final class AuthController
             }
 
             $userId = (int)$result['user_id'];
-            Notification::send($userId, 'Account Created', 'Your SK Scholarship account has been created. Verify your e-mail to activate it.', 'info');
+            Notification::send($userId, 'Account Created', 'Your ' . APP_NAME_SHORT . ' account has been created. Verify your e-mail to activate it.', 'info');
             $otp = $this->startOtp($userId, 'registration');
             if (!empty($otp['email_sent'])) {
                 flash('success', 'Account created. We sent a 6-digit code to your e-mail — enter it below to verify your account.');
@@ -112,10 +112,10 @@ final class AuthController
         $stmt->execute([$userId]);
         $user = $stmt->fetch();
         if ($user) {
-            $subject = $purpose === 'registration' ? 'Verify your SK Scholarship account' : 'Your password reset code';
+            $subject = $purpose === 'registration' ? 'Verify your ' . APP_NAME_SHORT . ' account' : 'Your password reset code';
             $intro = $purpose === 'registration'
-                ? 'Use this code to verify your e-mail and activate your SK Scholarship account.'
-                : 'Use this code to reset your SK Scholarship password.';
+                ? 'Use this code to verify your e-mail and activate your ' . APP_NAME_SHORT . ' account.'
+                : 'Use this code to reset your ' . APP_NAME_SHORT . ' password.';
             $body = '<p>' . $intro . '</p>'
                   . '<p style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#0d3b66;text-align:center;margin:24px 0;">' . e($result['code']) . '</p>'
                   . '<p>This code expires in ' . (int)$result['ttl_minutes'] . ' minutes and can only be used once. '
@@ -151,7 +151,7 @@ final class AuthController
             if ($result['ok']) {
                 Database::conn()->prepare("UPDATE users SET email_verified = 1 WHERE id = ?")->execute([$userId]);
                 AuditLog::write('registration_otp_verified', 'users', $userId, 'E-mail verified');
-                Notification::send($userId, 'Email Verified', 'Your e-mail has been verified. Your SK Scholarship account is now active.', 'success', url('login'));
+                Notification::send($userId, 'Email Verified', 'Your e-mail has been verified. Your ' . APP_NAME_SHORT . ' account is now active.', 'success', url('login'));
                 unset($_SESSION['otp_user_id'], $_SESSION['otp_purpose']);
                 flash('success', 'E-mail verified successfully. You can now log in.');
                 redirect('login');
@@ -283,8 +283,8 @@ final class AuthController
             $stmt->execute([$userId]);
             if ($user = $stmt->fetch()) {
                 $html = Notification::brand('Your password was changed', $user['full_name'],
-                    '<p>Your SK Scholarship account password was just changed. If this was not you, contact the SK office immediately.</p>');
-                $confirmSent = Notification::sendMail($user['email'], $user['full_name'], 'Your SK Scholarship password was changed', $html,
+                    '<p>Your ' . APP_NAME_SHORT . ' account password was just changed. If this was not you, contact the SK office immediately.</p>');
+                $confirmSent = Notification::sendMail($user['email'], $user['full_name'], 'Your ' . APP_NAME_SHORT . ' password was changed', $html,
                     'Your password was just changed. If this was not you, contact the SK office immediately.');
                 // Password is already changed at this point regardless — a failed confirmation e-mail
                 // must never block or roll back the password change itself, only be logged.
