@@ -12,7 +12,7 @@ window.SKCharts = (function () {
     if (v === null || v === undefined) return '—';
     return money ? '₱' + Number(v).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(v);
   }
-  function axisTitle(text) { return { display: !!text, text: text || '', color: INK, font: { size: 11 } }; }
+  function axisTitle(text) { return { display: !!text, text: text || '', color: INK, font: { size: 15 } }; }
 
   /**
    * bar(id, labels, series, opts)  series: [{label, data}] (one series = one hue, no legend)

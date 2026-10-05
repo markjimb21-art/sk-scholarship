@@ -140,7 +140,8 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
                 <form method="POST" action="<?= url('admin/documents/invalidate') ?>" class="mt-1" onsubmit="return confirm('Remove this file? The record is kept, marked Invalid with your reason.');">
                   <?= csrf_field() ?><input type="hidden" name="table" value="<?= e($invTable) ?>"><input type="hidden" name="id" value="<?= $invId ?>">
                   <input type="hidden" name="back" value="<?= e('admin/application&id=' . (int)$app['id']) ?>">
-                  <input name="reason" class="form-control form-control-sm mb-1" required maxlength="500" placeholder="Why (e.g. another person's ID)">
+                  <label class="form-label" for="invReason<?= $invId ?>">Why is this file invalid?</label>
+                  <input name="reason" id="invReason<?= $invId ?>" class="form-control form-control-sm mb-1" required maxlength="500" placeholder="e.g. another person's ID">
                   <button class="btn btn-sm btn-outline-danger">Mark invalid and remove the file</button>
                 </form>
               </details>
@@ -232,7 +233,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/screening/decide') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$app['id'] ?>"><input type="hidden" name="decision" value="return">
-      <div class="modal-header"><h5 class="modal-title">Return for correction</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title">Return for correction</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <label class="form-label">Items the applicant must fix <span class="text-danger">*</span></label>
         <textarea name="remarks" class="form-control" rows="4" required placeholder="1. The Certificate of Residency is unreadable — upload a clearer copy.&#10;2. Your father's contact number is incomplete."></textarea>
@@ -240,7 +241,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
         <p class="small fw-semibold mb-1">Tick what is wrong <span class="fw-normal text-muted">— only these can be changed; everything else stays as submitted. Tick nothing to reopen the whole form.</span></p>
         <div style="max-height:260px;overflow:auto" class="border rounded p-2 small">
           <?php foreach (RETURN_FLAG_FIELDS as $step => $fields): ?>
-            <div class="fw-semibold text-uppercase text-muted mt-1" style="font-size:.7rem"><?= e(ucfirst($step)) ?></div>
+            <div class="fw-semibold text-uppercase text-muted mt-1 small"><?= e(ucfirst($step)) ?></div>
             <div class="row g-0">
               <?php foreach ($fields as $f => $label): $fid = 'fl_' . md5("$step.$f"); ?>
                 <div class="col-6 form-check"><input class="form-check-input" type="checkbox" name="flags[]" value="<?= e("$step.$f") ?>" id="<?= $fid ?>">
@@ -248,7 +249,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
               <?php endforeach; ?>
             </div>
           <?php endforeach; ?>
-          <div class="fw-semibold text-uppercase text-muted mt-2" style="font-size:.7rem">Documents</div>
+          <div class="fw-semibold text-uppercase text-muted mt-2 small">Documents</div>
           <?php foreach (DOCUMENT_TYPES as $t): $fid = 'fd_' . md5($t); ?>
             <div class="d-flex gap-3">
               <div class="form-check"><input class="form-check-input" type="checkbox" name="flags[]" value="<?= e("documents.$t") ?>" id="<?= $fid ?>">
@@ -267,7 +268,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/screening/decide') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$app['id'] ?>"><input type="hidden" name="decision" value="reject">
-      <div class="modal-header"><h5 class="modal-title text-danger">Reject application</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title text-danger">Reject application</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <label class="form-label">Reason <span class="text-danger">*</span></label>
         <textarea name="reason" class="form-control" rows="3" required></textarea>

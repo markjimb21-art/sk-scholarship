@@ -31,7 +31,7 @@ $dateLabels = ['applicant_list' => 'submission date', 'interviews' => 'interview
     <form method="POST" action="<?= url('admin/reports/generate') ?>" class="modal-content" target="_blank">
       <?= csrf_field() ?>
       <input type="hidden" name="report_type" id="genReportType">
-      <div class="modal-header"><h5 class="modal-title" id="genTitle">Generate report</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title" id="genTitle">Generate report</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <div class="mb-3">
           <label class="form-label">Format</label>

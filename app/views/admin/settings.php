@@ -63,9 +63,10 @@
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-send me-1"></i> Send test e-mail</h6></div>
       <div class="card-body">
-        <form method="POST" action="<?= url('admin/settings/test-email') ?>" class="d-flex gap-2">
+        <form method="POST" action="<?= url('admin/settings/test-email') ?>" class="d-flex gap-2 align-items-end flex-wrap">
           <?= csrf_field() ?>
-          <input type="email" name="test_email" class="form-control" placeholder="you@example.com" required>
+          <div class="flex-grow-1"><label class="form-label" for="testEmail">Send a test e-mail to</label>
+          <input type="email" name="test_email" id="testEmail" class="form-control" placeholder="you@example.com" required></div>
           <button class="btn btn-outline-primary text-nowrap"><i class="bi bi-send"></i> Send</button>
         </form>
       </div>

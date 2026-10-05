@@ -82,9 +82,10 @@ h1, .h1 { font-size: 2rem; } h2, .h2 { font-size: 1.6rem; } h3, .h3 { font-size:
 h4, .h4 { font-size: 1.2rem; } h5, .h5 { font-size: 1.1rem; } h6, .h6 { font-size: 1rem; }
 .fw-semibold { font-weight: 700 !important; }
 /* Small text never below 15px (0.875rem of 18px = 15.75px); rem, so nesting can't shrink it further. */
-small, .small, .form-text, .badge, .dropdown-item-text, .table-sm, .btn-sm, .form-control-sm, .form-select-sm,
+small, .small, .form-text, .badge, .dropdown-item-text, .table-sm, .btn-sm, .form-control-sm, .form-select-sm, code, kbd,
 .invalid-feedback, .valid-feedback { font-size: .875rem !important; }
 .text-muted, .text-secondary, .text-body-secondary, .form-text { color: var(--text-muted) !important; }
+code { color: var(--brand-blue-dark); }
 p { max-width: var(--measure); }
 .text-center p, p.text-center, .card-body.text-center p { margin-left: auto; margin-right: auto; }
 a { color: var(--brand-blue); text-underline-offset: .15em; }

@@ -40,9 +40,10 @@ $moving = $app['status'] === 'Interview Scheduled';
         <?php endif; ?>
         <button class="btn btn-success btn-sm"><i class="bi bi-check-lg"></i> Confirm</button>
       </form>
-      <form method="POST" action="<?= url('admin/slot-request-decide') ?>" class="d-flex gap-2">
+      <form method="POST" action="<?= url('admin/slot-request-decide') ?>" class="d-flex gap-2 align-items-end flex-wrap">
         <?= csrf_field() ?><input type="hidden" name="request_id" value="<?= (int)$pending['id'] ?>"><input type="hidden" name="decision" value="decline">
-        <input name="note" class="form-control form-control-sm" placeholder="Reason (shown to the applicant)" maxlength="255">
+        <div class="flex-grow-1"><label class="form-label" for="declineNote">Reason for declining (shown to the applicant)</label>
+        <input name="note" id="declineNote" class="form-control form-control-sm" maxlength="255"></div>
         <button class="btn btn-outline-danger btn-sm">Decline</button>
       </form>
     </div>

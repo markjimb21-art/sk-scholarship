@@ -8,16 +8,16 @@ $pct = static fn($r) => $r === null ? 'no data' : number_format($r * 100, 1) . '
     <p class="text-muted small mb-0">Every number shows the formula that produced it.</p>
   </div>
   <?php if ($programs): ?>
-  <form method="GET" action="<?= url('admin/analytics') ?>" class="d-flex gap-2">
-    <select name="program_id" class="form-select form-select-sm" onchange="this.form.submit()">
+  <form method="GET" action="<?= url('admin/analytics') ?>" class="d-flex gap-2 align-items-end flex-wrap">
+    <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" onchange="this.form.submit()">
       <?php foreach ($programs as $p): ?>
         <option value="<?= (int)$p['id'] ?>" <?= $program && (int)$program['id'] === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option>
       <?php endforeach; ?>
-    </select>
+    </select></div>
     <?php if ($data): ?>
-    <select name="academic_year" class="form-select form-select-sm" onchange="this.form.submit()" title="Academic year for the budget analysis">
+    <div><label class="form-label" for="f_academic_year">Academic year</label><select id="f_academic_year" name="academic_year" class="form-select form-select-sm" onchange="this.form.submit()" title="Academic year for the budget analysis">
       <?php foreach ($years as $y): ?><option value="<?= e($y) ?>" <?= $data['ay'] === $y ? 'selected' : '' ?>>A.Y. <?= e($y) ?></option><?php endforeach; ?>
-    </select>
+    </select></div>
     <?php endif; ?>
   </form>
   <?php endif; ?>

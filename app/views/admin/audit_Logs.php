@@ -7,37 +7,37 @@
 
 <form method="GET" action="<?= url('admin/audit-logs') ?>" class="card border-0 shadow-sm mb-3">
   <div class="card-body">
-    <div class="row g-2">
-      <div class="col-md-3"><input name="q" class="form-control form-control-sm" placeholder="Search description…" value="<?= e($filters['q']) ?>"></div>
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3"><div><label class="form-label" for="f_q">Search</label><input id="f_q" name="q" class="form-control form-control-sm" placeholder="Search description…" value="<?= e($filters['q']) ?>"></div></div>
       <div class="col-md-2">
-        <select name="action" class="form-select form-select-sm">
+        <div><label class="form-label" for="f_action">Action</label><select id="f_action" name="action" class="form-select form-select-sm">
           <option value="">All Actions</option>
           <?php foreach ($actions as $a): ?>
             <option <?= $filters['action'] === $a['action'] ? 'selected' : '' ?>><?= e($a['action']) ?></option>
           <?php endforeach; ?>
-        </select>
+        </select></div>
       </div>
       <div class="col-md-2">
-        <select name="entity_type" class="form-select form-select-sm">
+        <div><label class="form-label" for="f_entity_type">Record type</label><select id="f_entity_type" name="entity_type" class="form-select form-select-sm">
           <option value="">All Entities</option>
           <?php foreach ($entityTypes as $e2): ?>
             <option <?= $filters['entity_type'] === $e2['entity_type'] ? 'selected' : '' ?>><?= e($e2['entity_type']) ?></option>
           <?php endforeach; ?>
-        </select>
+        </select></div>
       </div>
       <div class="col-md-2">
-        <select name="user_id" class="form-select form-select-sm">
+        <div><label class="form-label" for="f_user_id">User</label><select id="f_user_id" name="user_id" class="form-select form-select-sm">
           <option value="">All Users</option>
           <?php foreach ($users as $u): ?>
             <option value="<?= (int)$u['id'] ?>" <?= (int)$filters['user_id'] === (int)$u['id'] ? 'selected' : '' ?>><?= e($u['full_name']) ?></option>
           <?php endforeach; ?>
-        </select>
+        </select></div>
       </div>
-      <div class="col-md-1"><input type="date" name="date_from" class="form-control form-control-sm" value="<?= e($filters['date_from']) ?>"></div>
-      <div class="col-md-1"><input type="date" name="date_to" class="form-control form-control-sm" value="<?= e($filters['date_to']) ?>"></div>
+      <div class="col-md-1"><div><label class="form-label" for="f_date_from">From</label><input id="f_date_from" type="date" name="date_from" class="form-control form-control-sm" value="<?= e($filters['date_from']) ?>"></div></div>
+      <div class="col-md-1"><div><label class="form-label" for="f_date_to">To</label><input id="f_date_to" type="date" name="date_to" class="form-control form-control-sm" value="<?= e($filters['date_to']) ?>"></div></div>
       <div class="col-md-1 d-flex gap-1">
-        <button class="btn btn-sm btn-primary flex-grow-1"><i class="bi bi-search"></i></button>
-        <a href="<?= url('admin/audit-logs') ?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-x"></i></a>
+        <button class="btn btn-sm btn-primary flex-grow-1" aria-label="Search"><i class="bi bi-search" aria-hidden="true"></i></button>
+        <a href="<?= url('admin/audit-logs') ?>" class="btn btn-sm btn-outline-secondary" aria-label="Clear filters"><i class="bi bi-x" aria-hidden="true"></i></a>
       </div>
     </div>
   </div>
@@ -77,8 +77,8 @@
                 <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#diffModal"
                         data-old='<?= e($log['old_values'] ?? '{}') ?>'
                         data-new='<?= e($log['new_values'] ?? '{}') ?>'
-                        data-action='<?= e($log['action']) ?>'>
-                  <i class="bi bi-arrow-left-right"></i>
+                        data-action='<?= e($log['action']) ?>' aria-label="Show what changed">
+                  <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
                 </button>
               <?php endif; ?>
             </td>
@@ -105,7 +105,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">Change Details · <code id="diffAction"></code></h5>
-        <button class="btn-close" data-bs-dismiss="modal"></button>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div class="row g-3">

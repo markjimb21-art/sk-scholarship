@@ -45,7 +45,7 @@
             </td>
             <td class="text-end text-nowrap">
               <button class="btn btn-sm btn-outline-primary" title="Edit" data-bs-toggle="modal" data-bs-target="#programModal"
-                      onclick='openProgramModal(<?= js_json($p) ?>)'><i class="bi bi-pencil"></i></button>
+                      onclick='openProgramModal(<?= js_json($p) ?>)' aria-label="Edit program"><i class="bi bi-pencil" aria-hidden="true"></i></button>
               <form method="POST" action="<?= url('admin/program-toggle') ?>" class="d-inline"
                     onsubmit="return confirm(<?= e(js_json(($p['is_active'] ? 'Close' : 'Open') . ' "' . $p['program_name'] . '"?')) ?>);">
                 <?= csrf_field() ?>
@@ -67,7 +67,7 @@
       <input type="hidden" name="id" id="programId" value="">
       <div class="modal-header">
         <h5 class="modal-title" id="programModalTitle">Add Program</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div class="row g-3">

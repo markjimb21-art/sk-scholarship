@@ -97,8 +97,9 @@
       <?php if ($scholar['status'] === 'Active'): ?>
         <form method="POST" action="<?= url('admin/scholar-end') ?>" onsubmit="return confirm('End this scholarship? The scholar can no longer claim or renew.');">
           <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$scholar['id'] ?>">
-          <select name="reason" class="form-select mb-2" required>
-            <option value="">Reason…</option>
+          <label class="form-label" for="endReason">Why is it ending?</label>
+          <select name="reason" id="endReason" class="form-select mb-2" required>
+            <option value="">Choose a reason…</option>
             <?php foreach (SCHOLAR_END_REASONS as $r): ?><option><?= e($r) ?></option><?php endforeach; ?>
           </select>
           <button class="btn btn-outline-danger w-100">End scholarship and notify</button>

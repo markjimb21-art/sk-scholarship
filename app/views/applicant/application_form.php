@@ -120,12 +120,12 @@ $program = $app ?: $openProgram;
             <label class="form-label">Complete Address *</label>
             <div class="row g-2 align-items-center">
               <div class="col-sm-3">
-                <input name="address_unit" class="form-control" placeholder="Unit/House No." data-uppercase
+                <input name="address_unit" class="form-control" placeholder="Unit/House No." aria-label="Unit or house number" data-uppercase
                        value="<?= e($personal['address_unit'] ?? '') ?>">
               </div>
               <div class="col-auto text-muted">/</div>
               <div class="col-sm-4">
-                <select name="purok_id" class="form-select" required>
+                <select name="purok_id" class="form-select" required aria-label="Purok or subdivision">
                   <option value="">— Select Purok/Subdivision —</option>
                   <?php foreach ($puroks as $p): ?>
                     <option value="<?= (int)$p['id'] ?>" <?= (int)($personal['purok_id'] ?? 0) === (int)$p['id'] ? 'selected' : '' ?>>
@@ -136,7 +136,7 @@ $program = $app ?: $openProgram;
               </div>
               <div class="col-auto text-muted">/</div>
               <div class="col-sm-4">
-                <input class="form-control bg-light" readonly value="<?= e(ADDRESS_BARANGAY . ' / ' . ADDRESS_CITY) ?>">
+                <input class="form-control bg-light" readonly aria-label="Barangay and city (fixed)" value="<?= e(ADDRESS_BARANGAY . ' / ' . ADDRESS_CITY) ?>">
               </div>
             </div>
             <div class="form-text">Example: 12 / EAST HOMES 3 / BARANGAY ESTEFANIA / BACOLOD CITY. The barangay and city are fixed — this scholarship is exclusive to Barangay Estefania residents.</div>

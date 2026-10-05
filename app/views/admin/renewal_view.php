@@ -46,7 +46,7 @@
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/renewals/decide') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="decision" value="resubmit">
-      <div class="modal-header"><h5 class="modal-title">Ask for a re-upload</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title">Ask for a re-upload</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <p class="small mb-1">Documents to re-upload:</p>
         <?php foreach (TERM_DOCUMENT_TYPES['renewal'] as $t): ?>

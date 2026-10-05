@@ -5,11 +5,11 @@
     <p class="text-muted small mb-0">Ranked by interview total (highest first); ties go to the lower family income, then the better GWA.</p>
   </div>
   <form method="GET" action="<?= url('admin/decisions') ?>">
-    <select name="program_id" class="form-select form-select-sm" onchange="this.form.submit()">
+    <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" onchange="this.form.submit()">
       <?php foreach ($programs as $p): ?>
         <option value="<?= (int)$p['id'] ?>" <?= $program && (int)$program['id'] === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option>
       <?php endforeach; ?>
-    </select>
+    </select></div>
   </form>
 </div>
 
@@ -84,7 +84,7 @@
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/decisions/decide') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="id" id="rejectId"><input type="hidden" name="decision" value="reject">
-      <div class="modal-header"><h5 class="modal-title text-danger">Reject <span id="rejectName"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title text-danger">Reject <span id="rejectName"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <label class="form-label">Reason <span class="text-danger">*</span></label>
         <textarea name="reason" class="form-control" rows="3" required></textarea>

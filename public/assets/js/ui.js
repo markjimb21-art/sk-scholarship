@@ -128,6 +128,31 @@
     });
   });
 
+  /* ---------- Charts use the site font, never below 15px (pages draw their charts after this runs) ---------- */
+  if (window.Chart && window.Chart.defaults) {
+    window.Chart.defaults.font.family = '"Atkinson Hyperlegible", system-ui, sans-serif';
+    window.Chart.defaults.font.size = 15;
+    window.Chart.defaults.color = '#454E5F';
+  }
+
+  /* ---------- Every visible label is tied to its field ----------
+     Many forms write <label class="form-label">Name</label><input …> without for/id. Link each label to the first
+     field after it in the same container, so screen readers announce it and clicking the label focuses the field. */
+  var autoId = 0;
+  document.querySelectorAll('label.form-label:not([for])').forEach(function (label) {
+    var field = null, el = label.nextElementSibling;
+    while (el && !field) {
+      field = el.matches('input:not([type=hidden]), select, textarea') ? el : el.querySelector('input:not([type=hidden]), select, textarea');
+      el = el.nextElementSibling;
+    }
+    if (!field || (field.id && document.querySelector('label[for="' + CSS.escape(field.id) + '"]'))) return;
+    if (!field.id) field.id = 'sk-field-' + (++autoId);
+    label.setAttribute('for', field.id);
+  });
+
+  /* ---------- Icons are decorative: the words next to them (or the control's aria-label) carry the meaning ---------- */
+  document.querySelectorAll('i.bi:not([aria-hidden])').forEach(function (i) { i.setAttribute('aria-hidden', 'true'); });
+
   /* ---------- Wide tables scroll inside their card ---------- */
   document.querySelectorAll('table.table').forEach(function (table) {
     if (table.closest('.table-responsive')) return;

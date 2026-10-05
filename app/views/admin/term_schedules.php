@@ -70,7 +70,7 @@ $editId = (int)($_GET['edit'] ?? 0);
       <?= csrf_field() ?>
       <input type="hidden" name="purpose" value="<?= e($purpose) ?>">
       <input type="hidden" name="id" id="schId">
-      <div class="modal-header"><h5 class="modal-title" id="schTitle">New window</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title" id="schTitle">New window</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <div id="schFixed">
           <div class="mb-2">

@@ -14,15 +14,15 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
 </div>
 
 <form method="GET" action="<?= url('admin/users') ?>" class="card border-0 shadow-sm mb-3">
-  <div class="card-body row g-2">
-    <div class="col-md-6"><input name="q" class="form-control" placeholder="Search name or e-mail" value="<?= e($q) ?>"></div>
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-md-6"><div><label class="form-label" for="f_q">Search</label><input id="f_q" name="q" class="form-control" placeholder="Search name or e-mail" value="<?= e($q) ?>"></div></div>
     <div class="col-md-4">
-      <select name="role" class="form-select">
+      <div><label class="form-label" for="f_role">Role</label><select id="f_role" name="role" class="form-select">
         <option value="">All roles</option>
         <?php foreach ($roleLabels as $rk => $rl): ?><option value="<?= e($rk) ?>" <?= $role === $rk ? 'selected' : '' ?>><?= e($rk === 'applicant' ? 'Applicant / scholar' : $rl) ?></option><?php endforeach; ?>
-      </select>
+      </select></div>
     </div>
-    <div class="col-md-2"><button class="btn btn-primary w-100"><i class="bi bi-search"></i></button></div>
+    <div class="col-md-2"><button class="btn btn-primary w-100" aria-label="Search"><i class="bi bi-search" aria-hidden="true"></i></button></div>
   </div>
 </form>
 
@@ -40,10 +40,10 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
             <td><small class="text-muted"><?= $u['last_login'] ? e(date('M d, Y g:i A', strtotime($u['last_login']))) : 'Never' ?></small></td>
             <td class="text-end text-nowrap">
               <?php if ($u['role_name'] !== 'applicant'): ?>
-                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick='openUserModal(<?= js_json($u) ?>)'><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick='openUserModal(<?= js_json($u) ?>)' aria-label="Edit account"><i class="bi bi-pencil" aria-hidden="true"></i></button>
               <?php endif; ?>
               <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#resetModal"
-                      onclick='document.getElementById("resetId").value = <?= (int)$u["id"] ?>; document.getElementById("resetEmail").textContent = <?= js_json($u["email"]) ?>;'>
+                      onclick='document.getElementById("resetId").value = <?= (int)$u["id"] ?>; document.getElementById("resetEmail").textContent = <?= js_json($u["email"]) ?>;' aria-label="Reset password for <?= e($u['email']) ?>">
                 <i class="bi bi-key"></i></button>
               <?php if (!$self): ?>
                 <form method="POST" action="<?= url('admin/user-toggle') ?>" class="d-inline">
@@ -63,7 +63,7 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/user-save') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="id" id="userId">
-      <div class="modal-header"><h5 class="modal-title" id="userModalTitle">Add staff</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title" id="userModalTitle">Add staff</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <div class="mb-2"><label class="form-label">Full name</label><input name="full_name" id="userName" class="form-control" required></div>
         <div class="mb-2"><label class="form-label">E-mail</label><input type="email" name="email" id="userEmail" class="form-control" required></div>
@@ -93,7 +93,7 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/user-reset') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="id" id="resetId">
-      <div class="modal-header"><h5 class="modal-title">Reset password — <span id="resetEmail"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title">Reset password — <span id="resetEmail"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <div class="mb-2"><label class="form-label" for="resetPassword">New password</label>
           <input type="password" name="new_password" class="form-control" required <?= password_input_attrs('resetPassword') ?>>

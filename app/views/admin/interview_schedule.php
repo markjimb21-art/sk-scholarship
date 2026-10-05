@@ -122,7 +122,7 @@ $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] 
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/interview-schedule-update') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$schedule['id'] ?>">
-      <div class="modal-header"><h5 class="modal-title">Edit schedule</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title">Edit schedule</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <div class="mb-2"><label class="form-label small">Date</label><input type="date" name="interview_date" class="form-control" value="<?= e($schedule['interview_date']) ?>" required></div>
         <div class="row g-2 mb-2">

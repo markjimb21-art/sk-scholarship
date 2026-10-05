@@ -25,11 +25,11 @@
             <td><?= e($peso($b['committed'])) ?></td>
             <td class="<?= $after < 0 ? 'text-danger fw-bold' : 'text-success' ?>"><?= e(($after < 0 ? 'Shortfall ' : 'Surplus ') . $peso(abs($after))) ?></td>
             <td class="text-end text-nowrap">
-              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#budgetModal" onclick='openBudgetModal(<?= js_json($b) ?>)'><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#budgetModal" onclick='openBudgetModal(<?= js_json($b) ?>)' aria-label="Edit budget"><i class="bi bi-pencil" aria-hidden="true"></i></button>
               <?php if ((float)$b['released'] == 0.0): ?>
                 <form method="POST" action="<?= url('admin/budget-delete') ?>" class="d-inline" onsubmit="return confirm('Delete this budget?');">
                   <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
-                  <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                  <button class="btn btn-sm btn-outline-danger" aria-label="Delete budget"><i class="bi bi-trash" aria-hidden="true"></i></button>
                 </form>
               <?php endif; ?>
             </td>
@@ -54,7 +54,7 @@
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/budget-save') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="id" id="budgetId">
-      <div class="modal-header"><h5 class="modal-title" id="budgetTitle">Add budget</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title" id="budgetTitle">Add budget</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <div class="mb-3">
           <label class="form-label">Program</label>

@@ -3,32 +3,33 @@
 // Events come from admin/calendar-feed; the list under the calendar is built from the same events.
 ?>
 <style>
-  /* Today's cell: keep FullCalendar's highlight visible whatever the site styles do. */
-  .fc .fc-daygrid-day.fc-day-today { background-color: rgba(255, 193, 7, .18) !important; }
+  /* Today's cell: pale blue with a yellow bar on top (yellow never sits behind text). */
+  .fc .fc-daygrid-day.fc-day-today { background-color: var(--brand-blue-tint) !important; box-shadow: inset 0 4px 0 var(--brand-yellow); }
   .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number { font-weight: 700; }
-  .fc .fc-daygrid-day.cal-day-flash { box-shadow: inset 0 0 0 3px #0d6efd; }
+  .fc .fc-daygrid-day.cal-day-flash { box-shadow: inset 0 0 0 3px var(--brand-blue); }
   /* Bootstrap styles every <a>; FullCalendar's day numbers and weekday headers are links. */
   .fc a.fc-daygrid-day-number, .fc a.fc-col-header-cell-cushion { color: inherit; text-decoration: none; }
   /* Every event is ONE line (full text in the hover tooltip), so a busy week never makes its row taller than the others. */
   .fc .fc-daygrid-block-event .fc-event-main-frame { flex-wrap: nowrap; min-width: 0; }
   .fc .fc-daygrid-event .fc-event-time { white-space: nowrap; flex: none; }
   .fc .fc-daygrid-event .fc-event-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; }
-  .fc .fc-daygrid-event { font-size: .75rem; line-height: 1.25; }
-  .fc .fc-daygrid-more-link { font-size: .72rem; font-weight: 600; }
+  .fc .fc-daygrid-event { font-size: .875rem; line-height: 1.3; }
+  .fc .fc-daygrid-more-link { font-size: .875rem; font-weight: 700; }
+  .fc .fc-button { min-height: var(--target-min); font-weight: 700; }
   .fc-ev-cancelled .fc-event-title { text-decoration: line-through; }
   .fc-ev-planned { border-style: dashed !important; border-width: 2px !important; }
   .fc-ev-overdue { font-weight: 700; }
-  .fc-event.highlighted { box-shadow: 0 0 0 3px #0d6efd; z-index: 5; }
+  .fc-event.highlighted { box-shadow: 0 0 0 3px var(--brand-blue-dark); z-index: 5; }
   .cal-pulse { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: #fff; margin-right: .3rem;
                animation: cal-pulse 1.2s ease-in-out infinite; vertical-align: middle; }
   .cal-list .cal-dot { display: inline-block; width: .75rem; height: .75rem; border-radius: 50%; flex: none; margin-top: .3rem; }
   .cal-list .cal-dot.cal-pulse { background: #fd7e14; margin-right: 0; }
   .cal-list .cal-dot.outlined { background: #fff !important; border: 2px dashed currentColor; }
   .cal-list li { cursor: pointer; transition: background-color .3s; }
-  .cal-list li.highlighted { background: #e7f1ff; }
+  .cal-list li.highlighted { background: var(--info-bg); }
   .cal-flash { animation: cal-flash 2s ease-out; }
   @keyframes cal-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
-  @keyframes cal-flash { 0% { background: #fff3cd; } 100% { background: inherit; } }
+  @keyframes cal-flash { 0% { background: var(--info-bg); } 100% { background: inherit; } }
   @media (prefers-reduced-motion: reduce) { .cal-pulse, .cal-flash { animation: none; } }
 </style>
 
@@ -38,12 +39,12 @@
     <p class="text-muted small mb-0">Interview schedules and claim/renewal deadlines. Click an event or a row below to find it in the other.</p>
   </div>
   <form method="GET" action="<?= url('admin/calendar') ?>">
-    <select name="program_id" id="calProgram" class="form-select form-select-sm">
+    <div><label class="form-label" for="calProgram">Program</label><select name="program_id" id="calProgram" class="form-select form-select-sm">
       <option value="">All programs</option>
       <?php foreach ($programs as $p): ?>
         <option value="<?= (int)$p['id'] ?>" <?= $programId === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option>
       <?php endforeach; ?>
-    </select>
+    </select></div>
   </form>
 </div>
 

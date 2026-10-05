@@ -4,22 +4,22 @@
 </div>
 
 <form method="GET" action="<?= url('admin/scholars') ?>" class="card border-0 shadow-sm mb-3">
-  <div class="card-body row g-2">
-    <div class="col-md-5"><input name="q" class="form-control" placeholder="Name, e-mail or scholar ID" value="<?= e($filters['q']) ?>"></div>
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-md-5"><div><label class="form-label" for="f_q">Search</label><input id="f_q" name="q" class="form-control" placeholder="Name, e-mail or scholar ID" value="<?= e($filters['q']) ?>"></div></div>
     <div class="col-md-2">
-      <select name="status" class="form-select">
+      <div><label class="form-label" for="f_status">Status</label><select id="f_status" name="status" class="form-select">
         <?php foreach (['Active' => 'Active', 'Ended' => 'Ended', 'all' => 'All'] as $v => $l): ?>
           <option value="<?= $v ?>" <?= $filters['status'] === $v ? 'selected' : '' ?>><?= $l ?></option>
         <?php endforeach; ?>
-      </select>
+      </select></div>
     </div>
     <div class="col-md-3">
-      <select name="program_id" class="form-select">
+      <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select">
         <option value="">All programs</option>
         <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>" <?= $filters['program_id'] === (string)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?></option><?php endforeach; ?>
-      </select>
+      </select></div>
     </div>
-    <div class="col-md-2"><button class="btn btn-primary w-100"><i class="bi bi-search"></i></button></div>
+    <div class="col-md-2"><button class="btn btn-primary w-100" aria-label="Search"><i class="bi bi-search" aria-hidden="true"></i></button></div>
   </div>
 </form>
 

@@ -52,7 +52,7 @@ $minGwa = $term['min_gpa'] !== null ? (float)$term['min_gpa'] : 0.0;
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/claims/decide') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="term_id" value="<?= (int)$term['id'] ?>"><input type="hidden" name="decision" value="resubmit">
-      <div class="modal-header"><h5 class="modal-title">Ask for a re-upload</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header"><h5 class="modal-title">Ask for a re-upload</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <p class="small mb-1">Documents to re-upload:</p>
         <?php foreach (TERM_DOCUMENT_TYPES['claim'] as $t): ?>

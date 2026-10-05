@@ -21,8 +21,8 @@
       <tbody>
         <?php foreach (INTERVIEW_RUBRIC as $field => $c): ?>
           <tr>
-            <td><?= e($c['label']) ?></td>
-            <td><input type="number" name="<?= e($field) ?>" class="form-control score-input" min="0" max="<?= (int)$c['max'] ?>" step="0.5"
+            <td><label for="score_<?= e($field) ?>" class="mb-0"><?= e($c['label']) ?></label></td>
+            <td><input type="number" id="score_<?= e($field) ?>" name="<?= e($field) ?>" class="form-control score-input" min="0" max="<?= (int)$c['max'] ?>" step="0.5"
                        value="<?= e((string)($evaluation[$field] ?? '')) ?>" required></td>
             <td>0 – <?= (int)$c['max'] ?></td>
           </tr>
