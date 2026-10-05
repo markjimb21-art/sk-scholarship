@@ -167,7 +167,7 @@ constant, so the two can't drift.
   - the tokens, Bootstrap variable overrides and base type;
   - focus, 44px targets and `prefers-reduced-motion`;
   - badges, tables that scroll inside their card, auth-page layout, 360px rules.
-- `public/assets/js/app.js`: hard-coded `/sk-scholarship/public/` notification URL → `BASE_URL`-based (needed so the new asset loading works on any install path; behavior unchanged).
+- `public/assets/js/app.js`: the menu button reports open/closed (`aria-expanded`). *(As built: the hard-coded `/sk-scholarship/public/` notification URL was left alone. No view has `data-notifications`, so that code never runs, and changing it would alter dead code only.)*
 - Applicant + admin views: **restyle only**. Mostly no edits at all, because the shared CSS does the work. Edits only where a view has its own inline color/size (`calendar.php` "today" cell, `analytics.php` one inline color), an icon-only button without `aria-label`, or a placeholder used as the only label.
 - `database/schema.sql`, `database/sk_scholarship.sql`: header comment only. `README.md`, `docs/PROCESS.md`: name.
 
