@@ -24,6 +24,7 @@ php bin/smoke_test.php                             # every route, signed in as e
 | integration | `AnalyticsTest` | projected scholars, committed, projected need, surplus, extra fundable, attendance, no-show, scores, on-time rate, against numbers worked out by hand from the seed |
 | integration | `BudgetTest` | suggested budget = slots × amount per semester × 2 |
 | integration | `InterviewSuggestionsTest` | slot suggestions: existing schedules first, business hours, Mon–Sat, after the application period, no holidays, no other program's day, no overlaps |
+| integration | `ReminderScriptTest` | `bin/send_reminders.php` run for real: interview, deadline and daily-digest reminders each go out once; a second run sends nothing |
 | integration | `DocumentVersionsTest` | the "current document" across application and claim/renewal uploads; full history newest first |
 | http | `LoginAndPasswordRuleTest` | an old password without a special character still signs in; registration applies the rule |
 | http | `DocumentUploadTest` | upload type/size/content checks through the real upload endpoint |
