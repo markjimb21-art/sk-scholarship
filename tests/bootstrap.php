@@ -29,6 +29,7 @@ foreach (glob(__DIR__ . '/../app/models/*.php') as $model) require_once $model;
 require __DIR__ . '/support/TestServer.php';
 require __DIR__ . '/support/HttpClient.php';
 require __DIR__ . '/support/DatabaseTestCase.php';
+require __DIR__ . '/support/HttpTestCase.php';
 
 // The seed is loaded once here; test classes that change data call TestDatabase::rebuild() themselves.
 TestDatabase::rebuild();
