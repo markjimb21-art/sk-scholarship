@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Upload validation (type, size, real content) through the real upload endpoint — Document::storeUpload() only accepts
+ * Upload validation (type, size, real content) through the real upload endpoint — DocumentStorage::store() only accepts
  * genuine HTTP uploads, so these go through the built-in server. Files land in the temporary STORAGE_PATH, never in
  * storage/.
  */

@@ -175,7 +175,7 @@ final class Term
         $allowed = $purpose === 'claim' ? self::claimEditable($term) : Renewal::editable($term);
         if (!$allowed) return ['ok' => false, 'error' => self::closedReason($term, $purpose) ?? 'These documents can’t be changed right now.'];
 
-        $stored = Document::storeUpload($file, TERM_DOCUMENT_PATH, 'storage/term-documents/', (string)(int)$term['id']);
+        $stored = DocumentStorage::store($file, TERM_DOCUMENT_PATH, 'storage/term-documents/', (string)(int)$term['id']);
         if (!$stored['ok']) return $stored;
 
         $pdo = Database::conn();
@@ -192,7 +192,7 @@ final class Term
             $pdo->commit();
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            Document::deleteFile($stored['rel']);
+            DocumentStorage::deleteFile($stored['rel']);
             throw $e;
         }
         return ['ok' => true];

@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once BASE_PATH . '/app/models/Applicant.php';
 require_once BASE_PATH . '/app/models/Application.php';
 require_once BASE_PATH . '/app/models/Document.php';
+require_once BASE_PATH . '/app/models/DocumentStorage.php';
 require_once BASE_PATH . '/app/models/Interview.php';
 require_once BASE_PATH . '/app/models/Program.php';
 require_once BASE_PATH . '/app/models/Scholar.php';
@@ -480,7 +481,7 @@ final class ApplicantController
     {
         $doc = Term::document((int)($_GET['id'] ?? 0));
         if (!$doc || (int)$doc['applicant_id'] !== (int)$this->applicant()['id']) { http_response_code(404); die('Document not found.'); }
-        Document::send($doc['file_path'], $doc['original_filename'], $doc['type'], 'term_documents', (int)$doc['id'], isset($_GET['download']));
+        DocumentStorage::send($doc['file_path'], $doc['original_filename'], $doc['type'], 'term_documents', (int)$doc['id'], isset($_GET['download']));
     }
 
     /* ================= A4: INTERVIEW SLOT REQUEST ================= */

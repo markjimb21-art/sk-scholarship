@@ -75,7 +75,7 @@ final class FundsController
     {
         $doc = Term::document((int)($_GET['id'] ?? 0));
         if (!$doc) { http_response_code(404); die('Document not found.'); }
-        Document::send($doc['file_path'], $doc['original_filename'], $doc['type'], 'term_documents', (int)$doc['id'], isset($_GET['download']));
+        DocumentStorage::send($doc['file_path'], $doc['original_filename'], $doc['type'], 'term_documents', (int)$doc['id'], isset($_GET['download']));
     }
 
     /* ---------------- B8 releases ---------------- */
