@@ -135,7 +135,7 @@ final class Renewal
             AuditLog::write('term_opened', 'scholar_terms', (int)$pdo->lastInsertId(),
                 "Opened {$req['academic_year']} {$req['semester']} for {$req['scholar_code']} (renewal approved)");
             if ($req['from_term_id']) {
-                Term::markDocuments((int)$req['from_term_id'], 'renewal', 'Verified', null);
+                TermDocument::mark((int)$req['from_term_id'], 'renewal', 'Verified', null);
             }
             $pdo->commit();
         } catch (DomainException $e) {
@@ -166,8 +166,8 @@ final class Renewal
         try {
             $pdo->beginTransaction();
             self::changeStatus($req, 'resubmit', $adminId, ['remarks' => $remarks, 'reviewed_by' => $adminId, 'reviewed_at' => date('Y-m-d H:i:s')], $remarks);
-            Term::markDocuments((int)$req['from_term_id'], 'renewal', 'Resubmit', $remarks, $types);
-            if ($invalid) Term::invalidateNewest((int)$req['from_term_id'], 'renewal', $types, $remarks, $adminId);
+            TermDocument::mark((int)$req['from_term_id'], 'renewal', 'Resubmit', $remarks, $types);
+            if ($invalid) TermDocument::invalidateNewest((int)$req['from_term_id'], 'renewal', $types, $remarks, $adminId);
             $pdo->commit();
         } catch (DomainException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
@@ -183,7 +183,7 @@ final class Renewal
     public static function submit(array $term, int $userId): array
     {
         if (!self::editable($term)) return ['ok' => false, 'error' => Term::closedReason($term, 'renewal') ?? 'A renewal can’t be submitted right now.'];
-        if (!Term::documentsReady((int)$term['id'], 'renewal')) {
+        if (!TermDocument::ready((int)$term['id'], 'renewal')) {
             return ['ok' => false, 'error' => 'Upload both your Enrollment Form and School ID first.'];
         }
 

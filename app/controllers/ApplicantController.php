@@ -9,6 +9,7 @@ require_once BASE_PATH . '/app/models/Interview.php';
 require_once BASE_PATH . '/app/models/Program.php';
 require_once BASE_PATH . '/app/models/Scholar.php';
 require_once BASE_PATH . '/app/models/Term.php';
+require_once BASE_PATH . '/app/models/TermDocument.php';
 require_once BASE_PATH . '/app/models/Renewal.php';
 require_once BASE_PATH . '/app/models/Budget.php';
 require_once BASE_PATH . '/app/models/TermSchedule.php';
@@ -418,8 +419,8 @@ final class ApplicantController
         $scholar = Scholar::forApplicant((int)$applicant['id']);
         $terms = $scholar ? Term::forScholar((int)$scholar['id']) : [];
         $term = $scholar ? Term::current((int)$scholar['id']) : null;
-        $claimDocs = $term ? Term::documents((int)$term['id'], 'claim') : [];
-        $renewalDocs = $term ? Term::documents((int)$term['id'], 'renewal') : [];
+        $claimDocs = $term ? TermDocument::forTerm((int)$term['id'], 'claim') : [];
+        $renewalDocs = $term ? TermDocument::forTerm((int)$term['id'], 'renewal') : [];
         $renewal = $term ? Renewal::forTerm((int)$term['id']) : null;
         $nextSemester = $term ? Term::nextSemester($term['academic_year'], $term['semester']) : null;
         $claimWindow = $term ? Term::claimWindow($term) : null;
@@ -443,7 +444,7 @@ final class ApplicantController
         $term = $this->ownTerm();
         if (!$term) { flash('danger', 'Semester not found.'); redirect('applicant/scholarship'); }
         $type = (string)($_POST['type'] ?? '');
-        $result = Term::uploadDocument($term, $purpose, $type, $_FILES['file'] ?? []);
+        $result = TermDocument::upload($term, $purpose, $type, $_FILES['file'] ?? []);
         if ($result['ok']) flash('success', "$type uploaded.");
         else               flash('danger', $result['error']);
         redirect('applicant/scholarship');
@@ -479,7 +480,7 @@ final class ApplicantController
 
     private function viewTermDocument(): void
     {
-        $doc = Term::document((int)($_GET['id'] ?? 0));
+        $doc = TermDocument::find((int)($_GET['id'] ?? 0));
         if (!$doc || (int)$doc['applicant_id'] !== (int)$this->applicant()['id']) { http_response_code(404); die('Document not found.'); }
         DocumentStorage::send($doc['file_path'], $doc['original_filename'], $doc['type'], 'term_documents', (int)$doc['id'], isset($_GET['download']));
     }

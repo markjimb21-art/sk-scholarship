@@ -31,6 +31,7 @@ php bin/smoke_test.php                             # every route, signed in as e
 | http | `DocumentUploadTest` | upload type/size/content checks through the real upload endpoint |
 | http | `AdminWritePathsTest` | staff accounts (create, edit, role change, deactivate, reset), last-admin protection, user search, settings (with their limits), holidays, audit-log filters, notifications, dashboard counters |
 | http | `ApplicantWritePathsTest` | autosave of the 3 steps (cleaning and history), first save creates the Draft, Returned-with-flags lock, profile and password change, own documents only, notifications |
+| http | `ScholarClaimTest` | a scholar uploads School ID + Grades in an open claim window and submits; another applicant cannot touch that semester |
 | http | `AuthFlowsTest` | register → e-mail code → verified → sign in; forgot password → code → new password (and unlock); unknown e-mail looks the same |
 | smoke | `bin/smoke_test.php` | every route as admin, reviewer, treasurer and three applicants: no HTTP 500, no PHP warning, and each staff role sees exactly the pages the access map allows (404 for the rest) |
 

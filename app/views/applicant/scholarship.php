@@ -86,7 +86,7 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
         <form method="POST" action="<?= url('applicant/claim/submit') ?>" class="mt-3">
           <?= csrf_field() ?>
           <input type="hidden" name="term_id" value="<?= (int)$term['id'] ?>">
-          <button class="btn btn-success" <?= Term::documentsReady((int)$term['id'], 'claim') ? '' : 'disabled title="Upload both documents first."' ?>>
+          <button class="btn btn-success" <?= TermDocument::ready((int)$term['id'], 'claim') ? '' : 'disabled title="Upload both documents first."' ?>>
             <i class="bi bi-send-check"></i> Submit claim
           </button>
         </form>
@@ -125,7 +125,7 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
       <form method="POST" action="<?= url('applicant/renewal/submit') ?>" class="mt-3">
         <?= csrf_field() ?>
         <input type="hidden" name="term_id" value="<?= (int)$term['id'] ?>">
-        <button class="btn btn-success" <?= Term::documentsReady((int)$term['id'], 'renewal') ? '' : 'disabled title="Upload both documents first."' ?>>
+        <button class="btn btn-success" <?= TermDocument::ready((int)$term['id'], 'renewal') ? '' : 'disabled title="Upload both documents first."' ?>>
           <i class="bi bi-send-check"></i> Submit renewal
         </button>
       </form>

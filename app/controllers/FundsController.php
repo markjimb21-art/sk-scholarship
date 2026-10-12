@@ -46,7 +46,7 @@ final class FundsController
     {
         $term = Term::find((int)($_GET['id'] ?? 0));
         if (!$term) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
-        $docs = Term::documents((int)$term['id'], 'claim');
+        $docs = TermDocument::forTerm((int)$term['id'], 'claim');
         $history = Term::forScholar((int)$term['scholar_id']);
         render('admin/claim_view', compact('term', 'docs', 'history'), 'Claim · ' . $term['full_name']);
     }
@@ -73,7 +73,7 @@ final class FundsController
     /** Admin can open any semester document. */
     public function termDocument(): void
     {
-        $doc = Term::document((int)($_GET['id'] ?? 0));
+        $doc = TermDocument::find((int)($_GET['id'] ?? 0));
         if (!$doc) { http_response_code(404); die('Document not found.'); }
         DocumentStorage::send($doc['file_path'], $doc['original_filename'], $doc['type'], 'term_documents', (int)$doc['id'], isset($_GET['download']));
     }
@@ -112,7 +112,7 @@ final class FundsController
     {
         $req = Renewal::find((int)($_GET['id'] ?? 0));
         if (!$req) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
-        $docs = $req['from_term_id'] ? Term::documents((int)$req['from_term_id'], 'renewal') : [];
+        $docs = $req['from_term_id'] ? TermDocument::forTerm((int)$req['from_term_id'], 'renewal') : [];
         $history = Term::forScholar((int)$req['scholar_id']);
         render('admin/renewal_view', compact('req', 'docs', 'history'), 'Renewal · ' . $req['full_name']);
     }
