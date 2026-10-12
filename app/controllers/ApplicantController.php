@@ -72,10 +72,8 @@ final class ApplicantController
             $slotChoices = Interview::suggestSlots((int)$app['program_id'], SlotRequest::APPLICANT_CHOICES);
         }
 
-        $pageTitle = 'My Dashboard';
-        require VIEW_PATH . '/layouts/header.php';
-        require VIEW_PATH . '/applicant/dashboard.php';
-        require VIEW_PATH . '/layouts/footer.php';
+        render('applicant/dashboard', compact('applicant', 'app', 'openProgram', 'scholar', 'interview', 'term', 'renewal', 'journey',
+            'pastApplications', 'slotRequest', 'slotChoices'), 'My Dashboard');
     }
 
     /**
@@ -237,11 +235,9 @@ final class ApplicantController
         $schools = Lookup::schools();
         $courses = Lookup::courses();
 
-        $pageTitle = 'My Application';
         $pageScripts = [asset('js/application-autosave.js'), asset('js/application-review.js')];
-        require VIEW_PATH . '/layouts/header.php';
-        require VIEW_PATH . '/applicant/application_form.php';
-        require VIEW_PATH . '/layouts/footer.php';
+        render('applicant/application_form', compact('applicant', 'app', 'openProgram', 'personal', 'education', 'family', 'documents',
+            'editable', 'completeness', 'flags', 'puroks', 'schools', 'courses', 'pageScripts'), 'My Application');
     }
 
     /**
@@ -428,10 +424,8 @@ final class ApplicantController
         $claimWindow = $term ? Term::claimWindow($term) : null;
         $renewalWindow = $term && $term['claim_status'] === 'Released' ? Renewal::window($term, $renewal) : null;
 
-        $pageTitle = 'My Scholarship';
-        require VIEW_PATH . '/layouts/header.php';
-        require VIEW_PATH . '/applicant/scholarship.php';
-        require VIEW_PATH . '/layouts/footer.php';
+        render('applicant/scholarship', compact('applicant', 'scholar', 'terms', 'term', 'claimDocs', 'renewalDocs', 'renewal',
+            'nextSemester', 'claimWindow', 'renewalWindow'), 'My Scholarship');
     }
 
     /** The current semester of the logged-in scholar, only if $_POST['term_id'] is theirs. */
@@ -524,10 +518,7 @@ final class ApplicantController
             json_response(['ok' => true]);
         }
         $notifications = Notification::forUser($userId);
-        $pageTitle = 'Notifications';
-        require VIEW_PATH . '/layouts/header.php';
-        require VIEW_PATH . '/applicant/notifications.php';
-        require VIEW_PATH . '/layouts/footer.php';
+        render('applicant/notifications', compact('userId', 'notifications'), 'Notifications');
     }
 
     private function profile(): void
@@ -549,9 +540,6 @@ final class ApplicantController
             flash('success', 'Profile updated.');
             redirect('applicant/profile');
         }
-        $pageTitle = 'My Profile';
-        require VIEW_PATH . '/layouts/header.php';
-        require VIEW_PATH . '/applicant/Profile.php';   // file on disk is Profile.php (case-sensitive on Linux)
-        require VIEW_PATH . '/layouts/footer.php';
+        render('applicant/Profile', compact('user'), 'My Profile');   // file on disk is Profile.php (case-sensitive on Linux)
     }
 }
