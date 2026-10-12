@@ -108,16 +108,16 @@ final class AdminController
         'reports/generate'          => ['ReportController', 'generate', self::ADMIN],
         'analytics'                 => ['ReportController', 'analytics', self::ADMIN],
         // Accounts, settings, audit
-        'users'                     => ['AdminController', 'users', self::ADMIN],
-        'user-save'                 => ['AdminController', 'userSave', self::ADMIN],
-        'user-toggle'               => ['AdminController', 'userToggle', self::ADMIN],
-        'user-reset'                => ['AdminController', 'userReset', self::ADMIN],
-        'settings'                  => ['AdminController', 'settings', self::ADMIN],
-        'settings/save'             => ['AdminController', 'settingsSave', self::ADMIN],
-        'settings/test-email'       => ['AdminController', 'settingsTestEmail', self::ADMIN],
-        'settings/holiday-save'     => ['AdminController', 'holidaySave', self::ADMIN],
-        'settings/holiday-delete'   => ['AdminController', 'holidayDelete', self::ADMIN],
-        'audit-logs'                => ['AdminController', 'auditLogs', self::ADMIN],
+        'users'                     => ['UserController', 'users', self::ADMIN],
+        'user-save'                 => ['UserController', 'userSave', self::ADMIN],
+        'user-toggle'               => ['UserController', 'userToggle', self::ADMIN],
+        'user-reset'                => ['UserController', 'userReset', self::ADMIN],
+        'settings'                  => ['SettingsController', 'settings', self::ADMIN],
+        'settings/save'             => ['SettingsController', 'settingsSave', self::ADMIN],
+        'settings/test-email'       => ['SettingsController', 'settingsTestEmail', self::ADMIN],
+        'settings/holiday-save'     => ['SettingsController', 'holidaySave', self::ADMIN],
+        'settings/holiday-delete'   => ['SettingsController', 'holidayDelete', self::ADMIN],
+        'audit-logs'                => ['AuditController', 'auditLogs', self::ADMIN],
     ];
 
     /** Staff roles that reach the admin area at all (each route then checks its own list). */
@@ -237,186 +237,5 @@ final class AdminController
         if ($state === null) flash('danger', 'Program not found.');
         else flash('success', $state ? 'Program opened. Applicants can apply while today is inside its dates.' : 'Program closed.');
         redirect('admin/programs');
-    }
-
-    /* ================= ACCOUNTS ================= */
-
-    public function users(): void
-    {
-        $q = trim((string)($_GET['q'] ?? ''));
-        $role = in_array($_GET['role'] ?? '', [...self::STAFF, 'applicant'], true) ? $_GET['role'] : '';
-        $users = User::search($q, $role);
-        render('admin/users', compact('users', 'q', 'role'), 'Users');
-    }
-
-    /** Create or edit a STAFF account (admin, reviewer, treasurer); applicants register themselves. Role changes are audit-logged. */
-    public function userSave(): void
-    {
-        require_post('admin/users');
-        $id = (int)($_POST['id'] ?? 0);
-        $roleName = (string)($_POST['role'] ?? '');
-        if (!in_array($roleName, self::STAFF, true)) { flash('danger', 'Choose a role: admin, reviewer or treasurer.'); redirect('admin/users'); }
-        $name = trim((string)($_POST['full_name'] ?? ''));
-        $email = strtolower(trim((string)($_POST['email'] ?? '')));
-        $contact = digits_only($_POST['contact_number'] ?? '');
-        $password = (string)($_POST['password'] ?? '');
-
-        if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) { flash('danger', 'Name and a valid e-mail are required.'); redirect('admin/users'); }
-        if (User::emailTaken($email, $id)) { flash('danger', 'That e-mail is already used.'); redirect('admin/users'); }
-
-        if ($id > 0) {
-            $oldRole = User::roleName($id);
-            if (!in_array($oldRole, self::STAFF, true)) { flash('danger', 'Only staff accounts are managed here.'); redirect('admin/users'); }
-            if ($oldRole !== $roleName) {
-                if ($id === admin_id()) { flash('danger', 'You cannot change your own role.'); redirect('admin/users'); }
-                if ($oldRole === 'admin' && User::otherActiveAdmins($id) === 0) { flash('danger', 'This is the last active admin — make someone else admin first.'); redirect('admin/users'); }
-            }
-            User::updateStaff($id, $name, $email, $contact, $roleName);
-            AuditLog::write('user_updated', 'users', $id, "Updated account $email");
-            if ($oldRole !== $roleName) {
-                AuditLog::write('user_role_changed', 'users', $id, "Role of $email changed from $oldRole to $roleName", ['role' => $oldRole], ['role' => $roleName, 'by' => admin_id()]);
-            }
-            flash('success', $oldRole !== $roleName ? "Account updated; role changed to $roleName." : 'Account updated.');
-        } else {
-            if ($problems = password_problems($password)) { flash('danger', password_rule_message($problems)); redirect('admin/users'); }
-            if ($password !== (string)($_POST['password_confirm'] ?? '')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
-            $newId = User::createStaff($roleName, $name, $email, $password, $contact);
-            AuditLog::write('user_created', 'users', $newId, "Created $roleName account $email", null, ['role' => $roleName, 'by' => admin_id()]);
-            flash('success', ucfirst($roleName) . ' account created.');
-        }
-        redirect('admin/users');
-    }
-
-    public function userToggle(): void
-    {
-        require_post('admin/users');
-        $id = (int)($_POST['id'] ?? 0);
-        if ($id === admin_id()) { flash('danger', 'You cannot deactivate your own account.'); redirect('admin/users'); }
-        $row = User::status($id);
-        if (!$row) { flash('danger', 'User not found.'); redirect('admin/users'); }
-        if ($row['is_active'] && $row['role_name'] === 'admin' && User::otherActiveAdmins($id) === 0) {
-            flash('danger', 'This is the last active admin, so it can’t be deactivated.'); redirect('admin/users');
-        }
-        $new = $row['is_active'] ? 0 : 1;
-        User::setActive($id, $new);
-        AuditLog::write('user_status_changed', 'users', $id, ($new ? 'Activated' : 'Deactivated') . " {$row['email']}");
-        flash('success', $new ? 'Account activated.' : 'Account deactivated.');
-        redirect('admin/users');
-    }
-
-    public function userReset(): void
-    {
-        require_post('admin/users');
-        $id = (int)($_POST['id'] ?? 0);
-        $password = (string)($_POST['new_password'] ?? '');
-        if ($problems = password_problems($password)) { flash('danger', password_rule_message($problems)); redirect('admin/users'); }
-        if ($password !== (string)($_POST['new_password_confirm'] ?? '')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
-        User::resetPassword($id, $password);
-        AuditLog::write('user_password_reset', 'users', $id, 'Admin reset the password');
-        flash('success', 'Password reset.');
-        redirect('admin/users');
-    }
-
-    /* ================= SETTINGS ================= */
-
-    /** Only settings that do something: e-mail on/off, reminder hours, Send Test Email. */
-    public function settings(): void
-    {
-        $rows = Setting::all();
-        $settings = [
-            'email_notifications'      => (string)($rows['email_notifications'] ?? '1'),
-            'interview_reminder_hours' => (string)($rows['interview_reminder_hours'] ?? '24'),
-            'daily_digest_enabled'     => (string)($rows['daily_digest_enabled'] ?? '1'),
-            'daily_digest_sent_on'     => (string)($rows['daily_digest_sent_on'] ?? ''),
-            'admin_event_emails'       => (string)($rows['admin_event_emails'] ?? '0'),
-            'interview_suggestion_window_days' => (string)InterviewSlots::suggestionWindowDays(),
-        ];
-        $mailStatus = Notification::mailConfigStatus();
-        $holidays = Holiday::recent();
-        render('admin/settings', compact('settings', 'mailStatus', 'holidays'), 'Settings');
-    }
-
-    public function settingsSave(): void
-    {
-        require_post('admin/settings');
-        $values = [
-            'email_notifications'      => !empty($_POST['email_notifications']) ? '1' : '0',
-            'interview_reminder_hours' => (string)max(0, min(168, (int)($_POST['interview_reminder_hours'] ?? 24))),
-            'daily_digest_enabled'     => !empty($_POST['daily_digest_enabled']) ? '1' : '0',
-            'admin_event_emails'       => !empty($_POST['admin_event_emails']) ? '1' : '0',
-            'interview_suggestion_window_days' => (string)max(7, min(180, (int)($_POST['interview_suggestion_window_days'] ?? 60))),
-        ];
-        Setting::saveMany($values);
-        AuditLog::write('settings_updated', 'system_settings', null, 'Settings saved', null, $values);
-        flash('success', 'Settings saved.');
-        redirect('admin/settings');
-    }
-
-    /** Add a holiday (never suggested for interviews). */
-    public function holidaySave(): void
-    {
-        require_post('admin/settings');
-        $date = trim((string)($_POST['holiday_date'] ?? ''));
-        $name = trim((string)($_POST['name'] ?? ''));
-        $d = DateTime::createFromFormat('!Y-m-d', $date);
-        if (!$d || $d->format('Y-m-d') !== $date) { flash('danger', 'Choose a valid date.'); redirect('admin/settings'); }
-        if ($name === '') { flash('danger', 'Give the holiday a name.'); redirect('admin/settings'); }
-        $holidayId = Holiday::add($date, $name, admin_id());
-        if ($holidayId === null) { flash('danger', 'That date is already a holiday.'); redirect('admin/settings'); }
-        AuditLog::write('holiday_added', 'holidays', $holidayId, "Holiday $date: $name");
-        flash('success', 'Holiday added. Interview suggestions skip it.');
-        redirect('admin/settings');
-    }
-
-    /** Remove a holiday (a setting, not a record — see "Data retention" in docs/PROCESS.md). */
-    public function holidayDelete(): void
-    {
-        require_post('admin/settings');
-        $id = (int)($_POST['id'] ?? 0);
-        $h = Holiday::find($id);
-        if ($h) {
-            Holiday::delete($id);
-            AuditLog::write('holiday_removed', 'holidays', $id, "Removed holiday {$h['holiday_date']}: {$h['name']}", $h);
-        }
-        flash('success', 'Holiday removed.');
-        redirect('admin/settings');
-    }
-
-    /** Sends a fixed test message. Never echoes SMTP credentials. */
-    public function settingsTestEmail(): void
-    {
-        require_post('admin/settings');
-        $to = strtolower(trim((string)($_POST['test_email'] ?? '')));
-        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) { flash('danger', 'Enter a valid e-mail address to send the test to.'); redirect('admin/settings'); }
-        $result = Notification::sendTestEmail($to);
-        AuditLog::write($result['ok'] ? 'test_email_sent' : 'test_email_failed', 'system_settings', null,
-            $result['ok'] ? 'Test e-mail sent' : 'Test e-mail failed');
-        flash($result['ok'] ? 'success' : 'danger', $result['ok']
-            ? 'Test e-mail sent.'
-            : 'The test e-mail could not be sent.' . (APP_DEBUG ? ' Check storage/logs/app.log for the SMTP error.' : ''));
-        redirect('admin/settings');
-    }
-
-    /* ================= AUDIT LOGS ================= */
-
-    public function auditLogs(): void
-    {
-        $filters = [
-            'q'           => trim((string)($_GET['q'] ?? '')),
-            'action'      => (string)($_GET['action'] ?? ''),
-            'entity_type' => (string)($_GET['entity_type'] ?? ''),
-            'user_id'     => (string)($_GET['user_id'] ?? ''),
-            'date_from'   => (string)($_GET['date_from'] ?? ''),
-            'date_to'     => (string)($_GET['date_to'] ?? ''),
-        ];
-        $page = max(1, (int)($_GET['page'] ?? 1));
-        $limit = 50;
-        $logs = AuditLog::search($filters, $limit, ($page - 1) * $limit);
-        $total = AuditLog::count($filters);
-        $pages = max(1, (int)ceil($total / $limit));
-
-        [$actions, $entityTypes] = AuditLog::filterOptions();
-        $users = User::options();
-        render('admin/audit_Logs', compact('filters', 'logs', 'total', 'page', 'pages', 'actions', 'entityTypes', 'users'), 'Audit Logs');
     }
 }
