@@ -19,7 +19,7 @@ final class InterviewController
         $waiting = $program ? Interview::qualifiedWithoutSchedule((int)$program['id']) : [];
         $noSuggestionReason = null;
         // The New-schedule form suggests free blocks only; existing schedules with room are listed beside it.
-        $suggestions = $program ? Interview::suggestSlots((int)$program['id'], 5, $noSuggestionReason, false) : [];
+        $suggestions = $program ? InterviewSlots::suggestSlots((int)$program['id'], 5, $noSuggestionReason, false) : [];
         $slotRequests = $program ? SlotRequest::pending((int)$program['id']) : [];
         render('admin/interviews', compact('program', 'programs', 'schedules', 'waiting', 'suggestions', 'noSuggestionReason', 'slotRequests'), 'Interviews');
     }
@@ -81,7 +81,7 @@ final class InterviewController
         require_post('admin/interview-schedule&id=' . $scheduleId);
         $ids = array_filter(array_map('intval', (array)($_POST['application_ids'] ?? [])));
         if (!$ids) { flash('warning', 'Select at least one applicant.'); redirect('admin/interview-schedule&id=' . $scheduleId); }
-        $r = Interview::assign($scheduleId, $ids, admin_id());
+        $r = InterviewAssignment::assign($scheduleId, $ids, admin_id());
         if ($r['assigned']) flash('success', "{$r['assigned']} applicant(s) assigned and notified.");
         if ($r['errors']) {
             flash('danger', 'Not assigned: ' . implode('; ', array_map(static fn($k, $v) => trim("$k $v"), array_keys($r['errors']), $r['errors'])) . '.');
@@ -93,7 +93,7 @@ final class InterviewController
     {
         $scheduleId = (int)($_POST['schedule_id'] ?? 0);
         require_post('admin/interview-schedule&id=' . $scheduleId);
-        $r = Interview::unassign((int)($_POST['assignment_id'] ?? 0), admin_id());
+        $r = InterviewAssignment::unassign((int)($_POST['assignment_id'] ?? 0), admin_id());
         flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? 'Applicant removed from this schedule and notified.' : $r['error']);
         redirect('admin/interview-schedule&id=' . $scheduleId);
     }
@@ -104,13 +104,13 @@ final class InterviewController
     public function reschedule(): void
     {
         $appId = (int)($_GET['application_id'] ?? 0);
-        if (!$appId && !empty($_GET['id'])) $appId = (int)(Interview::assignment((int)$_GET['id'])['application_id'] ?? 0);
+        if (!$appId && !empty($_GET['id'])) $appId = (int)(InterviewAssignment::assignment((int)$_GET['id'])['application_id'] ?? 0);
         $app = $appId ? Application::withDetails($appId) : null;
         if (!$app) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
-        $currentAssignment = Interview::assignmentByApplication($appId);
-        $missed = Interview::missedCount($appId);
+        $currentAssignment = InterviewAssignment::assignmentByApplication($appId);
+        $missed = InterviewAssignment::missedCount($appId);
         $why = null;
-        $suggestions = Interview::suggestSlots((int)$app['program_id'], 8, $why);
+        $suggestions = InterviewSlots::suggestSlots((int)$app['program_id'], 8, $why);
         if (($currentAssignment['attendance'] ?? '') === 'Scheduled') {   // don't suggest the schedule they are already on
             $suggestions = array_values(array_filter($suggestions, static fn($s) => (int)$s['schedule_id'] !== (int)$currentAssignment['schedule_id']));
         }
@@ -129,11 +129,11 @@ final class InterviewController
         $back = 'admin/interview-reschedule&application_id=' . $appId;
         require_post($back);
         $r = ($_POST['mode'] ?? '') === 'schedule'
-            ? Interview::scheduleApplication($appId, (int)($_POST['schedule_id'] ?? 0), admin_id())
-            : Interview::scheduleApplicationAt($appId, $_POST, admin_id());
+            ? InterviewAssignment::scheduleApplication($appId, (int)($_POST['schedule_id'] ?? 0), admin_id())
+            : InterviewAssignment::scheduleApplicationAt($appId, $_POST, admin_id());
         if (!$r['ok']) { flash('danger', $r['error']); redirect($back); }
         flash('success', 'Interview scheduled. The applicant was notified.');
-        $a = Interview::assignmentByApplication($appId);
+        $a = InterviewAssignment::assignmentByApplication($appId);
         redirect('admin/interview-schedule&id=' . (int)($a['schedule_id'] ?? 0));
     }
 
@@ -158,7 +158,7 @@ final class InterviewController
     {
         $scheduleId = (int)($_POST['schedule_id'] ?? 0);
         require_post('admin/interview-schedule&id=' . $scheduleId);
-        $r = Interview::markNoShow((int)($_POST['assignment_id'] ?? 0), admin_id());
+        $r = InterviewAssignment::markNoShow((int)($_POST['assignment_id'] ?? 0), admin_id());
         if (!$r['ok']) flash('danger', $r['error']);
         else flash('warning', $r['final'] ? 'Second no-show: the application was rejected and the applicant notified.'
                                           : 'No-show recorded. The applicant is back in the waiting list for their one reschedule.');
@@ -168,9 +168,9 @@ final class InterviewController
     /** B4 Rubric form for an attendee. */
     public function score(): void
     {
-        $assignment = Interview::assignment((int)($_GET['id'] ?? 0));
+        $assignment = InterviewAssignment::assignment((int)($_GET['id'] ?? 0));
         if (!$assignment) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
-        $evaluation = Interview::evaluation((int)$assignment['id']);
+        $evaluation = InterviewScore::evaluation((int)$assignment['id']);
         $editable = $assignment['attendance'] === 'Scheduled'
             || ($assignment['attendance'] === 'Attended' && $assignment['app_status'] === 'Interviewed');
         render('admin/interview_score', compact('assignment', 'evaluation', 'editable'), 'Interview score · ' . $assignment['full_name']);
@@ -180,9 +180,9 @@ final class InterviewController
     {
         $id = (int)($_POST['assignment_id'] ?? 0);
         require_post('admin/interview-score&id=' . $id);
-        $r = Interview::saveScore($id, $_POST, (string)($_POST['remarks'] ?? ''), admin_id());
+        $r = InterviewScore::saveScore($id, $_POST, (string)($_POST['remarks'] ?? ''), admin_id());
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/interview-score&id=' . $id); }
-        $a = Interview::assignment($id);
+        $a = InterviewAssignment::assignment($id);
         flash('success', "Score saved: {$r['total']} / 100. The applicant is now waiting for the final decision.");
         redirect('admin/interview-schedule&id=' . (int)$a['schedule_id']);
     }
@@ -192,7 +192,7 @@ final class InterviewController
     {
         $program = $this->programFromRequest();
         $programs = Program::options();
-        $ranking = $program ? Interview::ranking((int)$program['id']) : [];
+        $ranking = $program ? InterviewScore::ranking((int)$program['id']) : [];
         $slots = (int)($program['slots_available'] ?? 0);
         $slotsUsed = $program ? Program::slotsUsed((int)$program['id']) : 0;
         $nextWaitlisted = null;

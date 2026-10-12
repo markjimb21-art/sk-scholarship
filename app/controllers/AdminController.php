@@ -8,6 +8,9 @@ require_once BASE_PATH . '/app/models/ApplicationSearch.php';
 require_once BASE_PATH . '/app/models/Document.php';
 require_once BASE_PATH . '/app/models/DocumentStorage.php';
 require_once BASE_PATH . '/app/models/Interview.php';
+require_once BASE_PATH . '/app/models/InterviewSlots.php';
+require_once BASE_PATH . '/app/models/InterviewAssignment.php';
+require_once BASE_PATH . '/app/models/InterviewScore.php';
 require_once BASE_PATH . '/app/models/Program.php';
 require_once BASE_PATH . '/app/models/Scholar.php';
 require_once BASE_PATH . '/app/models/Term.php';
@@ -321,7 +324,7 @@ final class AdminController
             'daily_digest_enabled'     => (string)($rows['daily_digest_enabled'] ?? '1'),
             'daily_digest_sent_on'     => (string)($rows['daily_digest_sent_on'] ?? ''),
             'admin_event_emails'       => (string)($rows['admin_event_emails'] ?? '0'),
-            'interview_suggestion_window_days' => (string)Interview::suggestionWindowDays(),
+            'interview_suggestion_window_days' => (string)InterviewSlots::suggestionWindowDays(),
         ];
         $mailStatus = Notification::mailConfigStatus();
         $holidays = Holiday::recent();

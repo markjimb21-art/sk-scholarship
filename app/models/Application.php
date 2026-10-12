@@ -82,8 +82,8 @@ final class Application
         $app['education']  = Applicant::education($applicantId);
         $app['family']     = Applicant::familyBackground($applicantId);
         $app['documents']  = Document::byApplication($id);
-        $app['interview']  = Interview::assignmentByApplication($id);
-        $app['evaluation'] = $app['interview'] ? Interview::evaluation((int)$app['interview']['id']) : null;
+        $app['interview']  = InterviewAssignment::assignmentByApplication($id);
+        $app['evaluation'] = $app['interview'] ? InterviewScore::evaluation((int)$app['interview']['id']) : null;
         return $app;
     }
 

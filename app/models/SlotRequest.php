@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * Applicant interview slot requests (docs/PROCESS.md §3a). A Qualified applicant (also after a first no-show) picks one of
- * the current top suggestions (Interview::suggestSlots). The request stays Pending until an admin confirms it — the
+ * the current top suggestions (InterviewSlots::suggestSlots). The request stays Pending until an admin confirms it — the
  * ONLY way it moves the application to Interview Scheduled, through the existing assign transition (capacity and the
  * one-reschedule rule are enforced there) — or declines it. The applicant is notified either way.
  */
@@ -82,7 +82,7 @@ final class SlotRequest
             'schedule_id' => (int)($pick['schedule_id'] ?? 0) ?: null,
             'date' => (string)($pick['date'] ?? ''), 'start' => (string)($pick['start'] ?? ''),
         ];
-        $slot = Interview::isCurrentSuggestion((int)$app['program_id'], $item, self::APPLICANT_CHOICES);
+        $slot = InterviewSlots::isCurrentSuggestion((int)$app['program_id'], $item, self::APPLICANT_CHOICES);
         if (!$slot) return ['ok' => false, 'error' => 'That slot is no longer available. Please pick one of the slots shown now.'];
 
         $pdo = Database::conn();
@@ -110,7 +110,7 @@ final class SlotRequest
 
     /**
      * Admin confirms (one click): the picked schedule — or, for a free block, the program's Open schedule at that time or a
-     * new one at $venue with $capacity — and the application is assigned through Interview::scheduleApplication().
+     * new one at $venue with $capacity — and the application is assigned through InterviewAssignment::scheduleApplication().
      * If the slot can't be used any more, the request is declined with the reason and the applicant is told.
      */
     public static function confirm(int $id, string $venue, int $capacity, int $adminId): array
@@ -118,8 +118,8 @@ final class SlotRequest
         $req = self::find($id);
         if (!$req || $req['status'] !== 'Pending') return ['ok' => false, 'error' => 'This request is no longer pending.'];
         $r = $req['schedule_id']
-            ? Interview::scheduleApplication((int)$req['application_id'], (int)$req['schedule_id'], $adminId)
-            : Interview::scheduleApplicationAt((int)$req['application_id'], [
+            ? InterviewAssignment::scheduleApplication((int)$req['application_id'], (int)$req['schedule_id'], $adminId)
+            : InterviewAssignment::scheduleApplicationAt((int)$req['application_id'], [
                 'interview_date' => $req['proposed_date'], 'start_time' => substr($req['proposed_start'], 0, 5),
                 'end_time' => substr($req['proposed_end'], 0, 5), 'venue' => $venue, 'max_slots' => $capacity,
             ], $adminId);

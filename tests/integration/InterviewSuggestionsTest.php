@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Interview::suggestSlots — existing Open schedules with room first, then free 2-hour blocks: Monday–Saturday,
+ * InterviewSlots::suggestSlots — existing Open schedules with room first, then free 2-hour blocks: Monday–Saturday,
  * business hours, from the day after application_end, never on holidays or another program's interview day, never
  * overlapping an Open schedule. Seed week (@mon = first Monday after application_end): Monday 08–10 taken by
  * schedule 4, Tuesday holiday, Wednesday program 2's day, Thursday 13–15 a CANCELLED schedule (blocks nothing).
@@ -14,7 +14,7 @@ final class InterviewSuggestionsTest extends DatabaseTestCase
 
     public static function setUpBeforeClass(): void
     {
-        self::$all = Interview::suggestSlots(1, 60);
+        self::$all = InterviewSlots::suggestSlots(1, 60);
         self::$mon = (string)self::value('SELECT interview_date FROM interview_schedules WHERE id = 4');
     }
 
@@ -41,7 +41,7 @@ final class InterviewSuggestionsTest extends DatabaseTestCase
     public function testEveryBlockFollowsTheRules(): void
     {
         $end = (string)self::value('SELECT application_end FROM scholarship_programs WHERE id = 1');
-        $holidays = Interview::holidays(date('Y-m-d'), '2100-01-01');
+        $holidays = InterviewSlots::holidays(date('Y-m-d'), '2100-01-01');
         $otherDay = (string)self::value('SELECT interview_date FROM interview_schedules WHERE id = 5');
         $open = Database::conn()->query("SELECT interview_date, start_time, end_time FROM interview_schedules WHERE status = 'Open'")->fetchAll();
         $blocks = array_filter(self::$all, static fn($s) => $s['kind'] === 'block');
@@ -50,7 +50,7 @@ final class InterviewSuggestionsTest extends DatabaseTestCase
         foreach ($blocks as $b) {
             $this->assertGreaterThan($end, $b['date'], 'starts after application_end');
             $this->assertNotSame('7', date('N', strtotime($b['date'])), 'never on Sunday');
-            $this->assertContains([$b['start'], $b['end']], Interview::SUGGESTION_BLOCKS, 'a business-hours block');
+            $this->assertContains([$b['start'], $b['end']], InterviewSlots::SUGGESTION_BLOCKS, 'a business-hours block');
             $this->assertArrayNotHasKey($b['date'], $holidays, 'never on a holiday');
             $this->assertNotSame($otherDay, $b['date'], "never on another program's interview day");
             foreach ($open as $s) {
@@ -71,15 +71,15 @@ final class InterviewSuggestionsTest extends DatabaseTestCase
 
     public function testLimitAndWithoutSchedules(): void
     {
-        $five = Interview::suggestSlots(1, 5);
+        $five = InterviewSlots::suggestSlots(1, 5);
         $this->assertCount(5, $five);
         $this->assertSame('schedule', $five[0]['kind']);
-        foreach (Interview::suggestSlots(1, 10, $why, false) as $s) $this->assertSame('block', $s['kind']);
+        foreach (InterviewSlots::suggestSlots(1, 10, $why, false) as $s) $this->assertSame('block', $s['kind']);
     }
 
     public function testUnknownProgram(): void
     {
-        $this->assertSame([], Interview::suggestSlots(999, 5, $why));
+        $this->assertSame([], InterviewSlots::suggestSlots(999, 5, $why));
         $this->assertSame('Program not found.', $why);
     }
 }

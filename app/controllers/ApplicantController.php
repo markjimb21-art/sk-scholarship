@@ -8,6 +8,9 @@ require_once BASE_PATH . '/app/models/ApplicationSearch.php';
 require_once BASE_PATH . '/app/models/Document.php';
 require_once BASE_PATH . '/app/models/DocumentStorage.php';
 require_once BASE_PATH . '/app/models/Interview.php';
+require_once BASE_PATH . '/app/models/InterviewSlots.php';
+require_once BASE_PATH . '/app/models/InterviewAssignment.php';
+require_once BASE_PATH . '/app/models/InterviewScore.php';
 require_once BASE_PATH . '/app/models/Program.php';
 require_once BASE_PATH . '/app/models/Scholar.php';
 require_once BASE_PATH . '/app/models/Term.php';
@@ -62,7 +65,7 @@ final class ApplicantController
         $app = Application::currentForApplicant((int)$applicant['id']);
         $openProgram = Program::open();
         $scholar = $app && $app['status'] === 'Approved' ? Scholar::forApplication((int)$app['id']) : null;
-        $interview = $app ? Interview::assignmentByApplication((int)$app['id']) : null;
+        $interview = $app ? InterviewAssignment::assignmentByApplication((int)$app['id']) : null;
         $term = $scholar ? Term::current((int)$scholar['id']) : null;
         $renewal = $term ? Renewal::forTerm((int)$term['id']) : null;
 
@@ -73,7 +76,7 @@ final class ApplicantController
         $slotRequest = $app ? SlotRequest::latestFor((int)$app['id']) : null;
         $slotChoices = [];
         if ($app && $app['status'] === 'Qualified' && !($slotRequest && $slotRequest['status'] === 'Pending')) {
-            $slotChoices = Interview::suggestSlots((int)$app['program_id'], SlotRequest::APPLICANT_CHOICES);
+            $slotChoices = InterviewSlots::suggestSlots((int)$app['program_id'], SlotRequest::APPLICANT_CHOICES);
         }
 
         render('applicant/dashboard', compact('applicant', 'app', 'openProgram', 'scholar', 'interview', 'term', 'renewal', 'journey',

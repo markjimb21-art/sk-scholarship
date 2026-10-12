@@ -31,6 +31,7 @@ require_once __DIR__ . '/../core/Helpers.php';
 require_once __DIR__ . '/../core/AuditLog.php';
 require_once __DIR__ . '/../core/Notification.php';
 require_once __DIR__ . '/../app/models/Interview.php';
+require_once __DIR__ . '/../app/models/InterviewAssignment.php';
 require_once __DIR__ . '/../app/models/Program.php';
 require_once __DIR__ . '/../app/models/Budget.php';
 require_once __DIR__ . '/../app/models/Term.php';
@@ -54,12 +55,12 @@ try {
     // Window bounds come from PHP (Asia/Manila) rather than MySQL NOW(), whose timezone may differ.
     $until = date('Y-m-d H:i:s', strtotime($now) + $hours * 3600);
     // interview_reminder_hours = 0 turns interview reminders off (deadline reminders below still run).
-    $due = Interview::remindersDue($now, $hours === 0 ? $now : $until);
+    $due = InterviewAssignment::remindersDue($now, $hours === 0 ? $now : $until);
 
     $sent = 0;
     foreach ($due as $row) {
         $id = (int)$row['id'];
-        if (!Interview::claimReminder($id, $now)) continue;   // another run already took it
+        if (!InterviewAssignment::claimReminder($id, $now)) continue;   // another run already took it
 
         $message = 'Reminder: your scholarship interview is on ' . Interview::describe($row) . '.'
             . "\nBring a valid ID and arrive 15 minutes early. Application code: {$row['application_code']}."
@@ -70,7 +71,7 @@ try {
                 "Interview reminder sent for {$row['interview_date']} {$row['start_time']}");
             $sent++;
         } catch (Throwable $e) {
-            Interview::releaseReminder($id);   // let the next run retry
+            InterviewAssignment::releaseReminder($id);   // let the next run retry
             out("FAILED reminder for interview #$id: " . $e->getMessage());
         }
     }

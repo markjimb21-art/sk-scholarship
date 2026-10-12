@@ -21,7 +21,7 @@ final class ScreeningController
 
         $eligibility = ApplicationEligibility::evaluate($app);
         $scholar = Scholar::forApplication((int)$app['id']);
-        $attempts = Interview::attemptsForApplication((int)$app['id']);
+        $attempts = InterviewAssignment::attemptsForApplication((int)$app['id']);
         $auditTrail = AuditLog::forApplication((int)$app['id']);
 
         // School ID / Enrollment Form: the applicant's newest version (maybe from a claim or renewal). History: every
