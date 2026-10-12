@@ -11,6 +11,74 @@ final class Interview
 {
     /* ---------------- reading ---------------- */
 
+    /* ---- Interview reminders (bin/send_reminders.php): a row is CLAIMED before its reminder is sent, so it is sent once ---- */
+
+    /** Still-waiting interview attempts starting after $from and no later than $until, not yet reminded. */
+    public static function remindersDue(string $from, string $until): array
+    {
+        $stmt = Database::conn()->prepare(
+            "SELECT ia.id, ia.application_id, ia.reschedule_count, s.interview_date, s.start_time, s.end_time, s.venue,
+                    a.application_code, ap.user_id
+             FROM interview_assignments ia
+             JOIN interview_schedules s ON s.id = ia.schedule_id
+             JOIN applications a ON a.id = ia.application_id
+             JOIN applicants ap ON ap.id = a.applicant_id
+             WHERE ia.attendance = 'Scheduled'
+               AND a.status = 'Interview Scheduled'
+               AND s.status <> 'Cancelled'
+               AND ia.reminder_sent_at IS NULL
+               AND TIMESTAMP(s.interview_date, s.start_time) > ?
+               AND TIMESTAMP(s.interview_date, s.start_time) <= ?
+             ORDER BY s.interview_date, s.start_time"
+        );
+        $stmt->execute([$from, $until]);
+        return $stmt->fetchAll();
+    }
+
+    /** Claim one reminder; false when another run already took it. */
+    public static function claimReminder(int $assignmentId, string $now): bool
+    {
+        $stmt = Database::conn()->prepare("UPDATE interview_assignments SET reminder_sent_at = ? WHERE id = ? AND reminder_sent_at IS NULL");
+        $stmt->execute([$now, $assignmentId]);
+        return $stmt->rowCount() === 1;
+    }
+
+    /** Give a claimed reminder back after a failure, so the next run retries. */
+    public static function releaseReminder(int $assignmentId): void
+    {
+        Database::conn()->prepare("UPDATE interview_assignments SET reminder_sent_at = NULL WHERE id = ?")->execute([$assignmentId]);
+    }
+
+    /** How many interviews the application has missed (No-show attempts). */
+    public static function missedCount(int $applicationId): int
+    {
+        $stmt = Database::conn()->prepare("SELECT COUNT(*) FROM interview_assignments WHERE application_id = ? AND attendance = 'No-show'");
+        $stmt->execute([$applicationId]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    /** The venue of the program's most recent schedule ('' when none), to pre-fill a new schedule. */
+    public static function lastVenue(int $programId): string
+    {
+        $stmt = Database::conn()->prepare("SELECT venue FROM interview_schedules WHERE program_id = ? ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$programId]);
+        return (string)($stmt->fetchColumn() ?: '');
+    }
+
+    /** Every interview attempt of an application with its schedule and score, oldest first (application page). */
+    public static function attemptsForApplication(int $applicationId): array
+    {
+        $stmt = Database::conn()->prepare(
+            "SELECT ia.*, s.interview_date, s.start_time, s.end_time, s.venue, s.status AS schedule_status, ev.total_score
+             FROM interview_assignments ia
+             JOIN interview_schedules s ON s.id = ia.schedule_id
+             LEFT JOIN interview_evaluations ev ON ev.assignment_id = ia.id
+             WHERE ia.application_id = ? ORDER BY ia.id"
+        );
+        $stmt->execute([$applicationId]);
+        return $stmt->fetchAll();
+    }
+
     /** The application's current (latest) interview assignment with its schedule, if any. */
     public static function assignmentByApplication(int $applicationId): ?array
     {

@@ -382,6 +382,20 @@ final class TermSchedule
         return array_values(array_filter(array_map(static fn($id) => self::find((int)$id), $stmt->fetchAll(PDO::FETCH_COLUMN))));
     }
 
+    /** Claim a window's deadline reminder before sending it; false when another run already took it. */
+    public static function claimDeadlineReminder(int $id, string $now): bool
+    {
+        $stmt = Database::conn()->prepare("UPDATE term_schedules SET deadline_reminder_sent_at = ? WHERE id = ? AND deadline_reminder_sent_at IS NULL");
+        $stmt->execute([$now, $id]);
+        return $stmt->rowCount() === 1;
+    }
+
+    /** Give a claimed deadline reminder back after a failure, so the next run retries. */
+    public static function releaseDeadlineReminder(int $id): void
+    {
+        Database::conn()->prepare("UPDATE term_schedules SET deadline_reminder_sent_at = NULL WHERE id = ?")->execute([$id]);
+    }
+
     /** Academic years offered in the form: every known year plus the one after the latest (renewals go into it). */
     public static function academicYearOptions(): array
     {

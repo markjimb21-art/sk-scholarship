@@ -14,6 +14,9 @@ require_once BASE_PATH . '/app/models/TermSchedule.php';
 require_once BASE_PATH . '/app/models/Analytics.php';
 require_once BASE_PATH . '/app/models/SlotRequest.php';
 require_once BASE_PATH . '/app/models/RecordHistory.php';
+require_once BASE_PATH . '/app/models/User.php';
+require_once BASE_PATH . '/app/models/Setting.php';
+require_once BASE_PATH . '/app/models/Holiday.php';
 
 /**
  * Admin area router + the shared admin pages. Only the admin role reaches this (public/index.php).
@@ -136,20 +139,17 @@ final class AdminController
     /** "Needs your action" counters (each links to its queue) + slots and budget of the selected program. */
     public function dashboard(): void
     {
-        $pdo = Database::conn();
-        $count = static fn(string $sql, array $p = []): int => (int)(($s = $pdo->prepare($sql)) && $s->execute($p) ? $s->fetchColumn() : 0);
         $today = date('Y-m-d');
+        $n = Analytics::queueCounts($today);
         $counters = [
-            ['Applications to screen', $count("SELECT COUNT(*) FROM applications WHERE status = 'Submitted'"), 'admin/screening', 'bi-inbox', 'Applications with status Submitted'],
-            ['Qualified, no schedule', $count("SELECT COUNT(*) FROM applications WHERE status = 'Qualified'"), 'admin/interviews', 'bi-calendar-plus', 'Applications with status Qualified'],
-            ['Interviews today', $count("SELECT COUNT(*) FROM interview_assignments ia JOIN interview_schedules s ON s.id = ia.schedule_id
-                                         WHERE ia.attendance = 'Scheduled' AND s.status = 'Open' AND s.interview_date = ?", [$today]),
-                'admin/interviews', 'bi-people', 'Applicants still marked Scheduled on a schedule dated today'],
-            ['Slot requests to confirm', $count("SELECT COUNT(*) FROM slot_requests WHERE status = 'Pending'"), 'admin/interviews', 'bi-hand-index', 'Interview slots applicants picked, waiting for your confirmation'],
-            ['Awaiting a decision', $count("SELECT COUNT(*) FROM applications WHERE status = 'Interviewed'"), 'admin/decisions', 'bi-clipboard-check', 'Applications with status Interviewed'],
-            ['Claims to verify', $count("SELECT COUNT(*) FROM scholar_terms WHERE claim_status = 'Submitted'"), 'admin/claims', 'bi-file-earmark-check', 'Semester claims with status Submitted'],
-            ['Verified, to release', $count("SELECT COUNT(*) FROM scholar_terms WHERE claim_status = 'Verified'"), 'admin/releases', 'bi-cash-coin', 'Semester claims with status Verified'],
-            ['Renewals to review', $count("SELECT COUNT(*) FROM renewal_requests WHERE status = 'Submitted'"), 'admin/renewals', 'bi-arrow-repeat', 'Renewal requests with status Submitted'],
+            ['Applications to screen', $n['to_screen'], 'admin/screening', 'bi-inbox', 'Applications with status Submitted'],
+            ['Qualified, no schedule', $n['qualified'], 'admin/interviews', 'bi-calendar-plus', 'Applications with status Qualified'],
+            ['Interviews today', $n['interviews_today'], 'admin/interviews', 'bi-people', 'Applicants still marked Scheduled on a schedule dated today'],
+            ['Slot requests to confirm', $n['slot_requests'], 'admin/interviews', 'bi-hand-index', 'Interview slots applicants picked, waiting for your confirmation'],
+            ['Awaiting a decision', $n['to_decide'], 'admin/decisions', 'bi-clipboard-check', 'Applications with status Interviewed'],
+            ['Claims to verify', $n['claims_to_verify'], 'admin/claims', 'bi-file-earmark-check', 'Semester claims with status Submitted'],
+            ['Verified, to release', $n['to_release'], 'admin/releases', 'bi-cash-coin', 'Semester claims with status Verified'],
+            ['Renewals to review', $n['renewals'], 'admin/renewals', 'bi-arrow-repeat', 'Renewal requests with status Submitted'],
         ];
 
         // Only the queues this staff role may open.
@@ -177,12 +177,8 @@ final class AdminController
     public function notifications(): void
     {
         $userId = admin_id();
-        if (!empty($_GET['mark_read'])) {
-            Database::conn()->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?")->execute([$userId]);
-        }
-        $stmt = Database::conn()->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 100");
-        $stmt->execute([$userId]);
-        render('applicant/notifications', ['notifications' => $stmt->fetchAll()], 'Notifications');
+        if (!empty($_GET['mark_read'])) Notification::markAllRead($userId);
+        render('applicant/notifications', ['notifications' => Notification::forUser($userId)], 'Notifications');
     }
 
     /** Read-only list of every application (the database of applications), filterable. */
@@ -235,33 +231,16 @@ final class AdminController
 
     public function users(): void
     {
-        $pdo = Database::conn();
         $q = trim((string)($_GET['q'] ?? ''));
         $role = in_array($_GET['role'] ?? '', [...self::STAFF, 'applicant'], true) ? $_GET['role'] : '';
-        $sql = "SELECT u.id, u.full_name, u.email, u.contact_number, u.is_active, u.email_verified, u.last_login, u.created_at, r.role_name
-                FROM users u JOIN roles r ON r.id = u.role_id WHERE 1=1";
-        $params = [];
-        if ($q !== '')  { $sql .= " AND (u.full_name LIKE :q1 OR u.email LIKE :q2)"; $params['q1'] = $params['q2'] = "%$q%"; }
-        if ($role !== '') { $sql .= " AND r.role_name = :role"; $params['role'] = $role; }
-        $stmt = $pdo->prepare($sql . " ORDER BY r.role_name, u.full_name LIMIT 200");
-        $stmt->execute($params);
-        $users = $stmt->fetchAll();
+        $users = User::search($q, $role);
         render('admin/users', compact('users', 'q', 'role'), 'Users');
-    }
-
-    /** Active admins other than $exceptId (an admin can never remove the last one). */
-    private static function otherActiveAdmins(int $exceptId): int
-    {
-        $stmt = Database::conn()->prepare("SELECT COUNT(*) FROM users u JOIN roles r ON r.id = u.role_id WHERE r.role_name = 'admin' AND u.is_active = 1 AND u.id <> ?");
-        $stmt->execute([$exceptId]);
-        return (int)$stmt->fetchColumn();
     }
 
     /** Create or edit a STAFF account (admin, reviewer, treasurer); applicants register themselves. Role changes are audit-logged. */
     public function userSave(): void
     {
         require_post('admin/users');
-        $pdo = Database::conn();
         $id = (int)($_POST['id'] ?? 0);
         $roleName = (string)($_POST['role'] ?? '');
         if (!in_array($roleName, self::STAFF, true)) { flash('danger', 'Choose a role: admin, reviewer or treasurer.'); redirect('admin/users'); }
@@ -271,21 +250,16 @@ final class AdminController
         $password = (string)($_POST['password'] ?? '');
 
         if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) { flash('danger', 'Name and a valid e-mail are required.'); redirect('admin/users'); }
-        $dup = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id <> ?");
-        $dup->execute([$email, $id]);
-        if ($dup->fetch()) { flash('danger', 'That e-mail is already used.'); redirect('admin/users'); }
+        if (User::emailTaken($email, $id)) { flash('danger', 'That e-mail is already used.'); redirect('admin/users'); }
 
         if ($id > 0) {
-            $cur = $pdo->prepare("SELECT r.role_name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ?");
-            $cur->execute([$id]);
-            $oldRole = $cur->fetchColumn();
+            $oldRole = User::roleName($id);
             if (!in_array($oldRole, self::STAFF, true)) { flash('danger', 'Only staff accounts are managed here.'); redirect('admin/users'); }
             if ($oldRole !== $roleName) {
                 if ($id === admin_id()) { flash('danger', 'You cannot change your own role.'); redirect('admin/users'); }
-                if ($oldRole === 'admin' && self::otherActiveAdmins($id) === 0) { flash('danger', 'This is the last active admin — make someone else admin first.'); redirect('admin/users'); }
+                if ($oldRole === 'admin' && User::otherActiveAdmins($id) === 0) { flash('danger', 'This is the last active admin — make someone else admin first.'); redirect('admin/users'); }
             }
-            $pdo->prepare("UPDATE users SET full_name = ?, email = ?, contact_number = ?, role_id = (SELECT id FROM roles WHERE role_name = ?) WHERE id = ?")
-                ->execute([$name, $email, $contact, $roleName, $id]);
+            User::updateStaff($id, $name, $email, $contact, $roleName);
             AuditLog::write('user_updated', 'users', $id, "Updated account $email");
             if ($oldRole !== $roleName) {
                 AuditLog::write('user_role_changed', 'users', $id, "Role of $email changed from $oldRole to $roleName", ['role' => $oldRole], ['role' => $roleName, 'by' => admin_id()]);
@@ -294,11 +268,7 @@ final class AdminController
         } else {
             if ($problems = password_problems($password)) { flash('danger', password_rule_message($problems)); redirect('admin/users'); }
             if ($password !== (string)($_POST['password_confirm'] ?? '')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
-            $pdo->prepare(
-                "INSERT INTO users (role_id, full_name, email, password_hash, contact_number, is_active, email_verified)
-                 VALUES ((SELECT id FROM roles WHERE role_name = ?), ?, ?, ?, ?, 1, 1)"
-            )->execute([$roleName, $name, $email, password_hash($password, PASSWORD_DEFAULT), $contact]);
-            $newId = (int)$pdo->lastInsertId();
+            $newId = User::createStaff($roleName, $name, $email, $password, $contact);
             AuditLog::write('user_created', 'users', $newId, "Created $roleName account $email", null, ['role' => $roleName, 'by' => admin_id()]);
             flash('success', ucfirst($roleName) . ' account created.');
         }
@@ -310,16 +280,13 @@ final class AdminController
         require_post('admin/users');
         $id = (int)($_POST['id'] ?? 0);
         if ($id === admin_id()) { flash('danger', 'You cannot deactivate your own account.'); redirect('admin/users'); }
-        $pdo = Database::conn();
-        $stmt = $pdo->prepare("SELECT u.is_active, u.email, r.role_name FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ?");
-        $stmt->execute([$id]);
-        $row = $stmt->fetch();
+        $row = User::status($id);
         if (!$row) { flash('danger', 'User not found.'); redirect('admin/users'); }
-        if ($row['is_active'] && $row['role_name'] === 'admin' && self::otherActiveAdmins($id) === 0) {
+        if ($row['is_active'] && $row['role_name'] === 'admin' && User::otherActiveAdmins($id) === 0) {
             flash('danger', 'This is the last active admin, so it can’t be deactivated.'); redirect('admin/users');
         }
         $new = $row['is_active'] ? 0 : 1;
-        $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ?")->execute([$new, $id]);
+        User::setActive($id, $new);
         AuditLog::write('user_status_changed', 'users', $id, ($new ? 'Activated' : 'Deactivated') . " {$row['email']}");
         flash('success', $new ? 'Account activated.' : 'Account deactivated.');
         redirect('admin/users');
@@ -332,8 +299,7 @@ final class AdminController
         $password = (string)($_POST['new_password'] ?? '');
         if ($problems = password_problems($password)) { flash('danger', password_rule_message($problems)); redirect('admin/users'); }
         if ($password !== (string)($_POST['new_password_confirm'] ?? '')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
-        Database::conn()->prepare("UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?")
-            ->execute([password_hash($password, PASSWORD_DEFAULT), $id]);
+        User::resetPassword($id, $password);
         AuditLog::write('user_password_reset', 'users', $id, 'Admin reset the password');
         flash('success', 'Password reset.');
         redirect('admin/users');
@@ -344,7 +310,7 @@ final class AdminController
     /** Only settings that do something: e-mail on/off, reminder hours, Send Test Email. */
     public function settings(): void
     {
-        $rows = Database::conn()->query("SELECT setting_key, setting_value FROM system_settings")->fetchAll(PDO::FETCH_KEY_PAIR);
+        $rows = Setting::all();
         $settings = [
             'email_notifications'      => (string)($rows['email_notifications'] ?? '1'),
             'interview_reminder_hours' => (string)($rows['interview_reminder_hours'] ?? '24'),
@@ -354,9 +320,7 @@ final class AdminController
             'interview_suggestion_window_days' => (string)Interview::suggestionWindowDays(),
         ];
         $mailStatus = Notification::mailConfigStatus();
-        $holidays = Database::conn()->query(
-            "SELECT * FROM holidays WHERE holiday_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) ORDER BY holiday_date"
-        )->fetchAll();
+        $holidays = Holiday::recent();
         render('admin/settings', compact('settings', 'mailStatus', 'holidays'), 'Settings');
     }
 
@@ -370,10 +334,7 @@ final class AdminController
             'admin_event_emails'       => !empty($_POST['admin_event_emails']) ? '1' : '0',
             'interview_suggestion_window_days' => (string)max(7, min(180, (int)($_POST['interview_suggestion_window_days'] ?? 60))),
         ];
-        $stmt = Database::conn()->prepare(
-            "INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
-        );
-        foreach ($values as $k => $v) $stmt->execute([$k, $v]);
+        Setting::saveMany($values);
         AuditLog::write('settings_updated', 'system_settings', null, 'Settings saved', null, $values);
         flash('success', 'Settings saved.');
         redirect('admin/settings');
@@ -388,15 +349,9 @@ final class AdminController
         $d = DateTime::createFromFormat('!Y-m-d', $date);
         if (!$d || $d->format('Y-m-d') !== $date) { flash('danger', 'Choose a valid date.'); redirect('admin/settings'); }
         if ($name === '') { flash('danger', 'Give the holiday a name.'); redirect('admin/settings'); }
-        $pdo = Database::conn();
-        try {
-            $pdo->prepare("INSERT INTO holidays (holiday_date, name, created_by) VALUES (?, ?, ?)")->execute([$date, mb_substr($name, 0, 120), admin_id()]);
-        } catch (PDOException $e) {
-            if ((int)($e->errorInfo[1] ?? 0) !== 1062) throw $e;
-            flash('danger', 'That date is already a holiday.');
-            redirect('admin/settings');
-        }
-        AuditLog::write('holiday_added', 'holidays', (int)$pdo->lastInsertId(), "Holiday $date: $name");
+        $holidayId = Holiday::add($date, $name, admin_id());
+        if ($holidayId === null) { flash('danger', 'That date is already a holiday.'); redirect('admin/settings'); }
+        AuditLog::write('holiday_added', 'holidays', $holidayId, "Holiday $date: $name");
         flash('success', 'Holiday added. Interview suggestions skip it.');
         redirect('admin/settings');
     }
@@ -406,11 +361,9 @@ final class AdminController
     {
         require_post('admin/settings');
         $id = (int)($_POST['id'] ?? 0);
-        $stmt = Database::conn()->prepare("SELECT * FROM holidays WHERE id = ?");
-        $stmt->execute([$id]);
-        $h = $stmt->fetch();
+        $h = Holiday::find($id);
         if ($h) {
-            Database::conn()->prepare("DELETE FROM holidays WHERE id = ?")->execute([$id]);
+            Holiday::delete($id);
             AuditLog::write('holiday_removed', 'holidays', $id, "Removed holiday {$h['holiday_date']}: {$h['name']}", $h);
         }
         flash('success', 'Holiday removed.');
@@ -436,7 +389,6 @@ final class AdminController
 
     public function auditLogs(): void
     {
-        $pdo = Database::conn();
         $filters = [
             'q'           => trim((string)($_GET['q'] ?? '')),
             'action'      => (string)($_GET['action'] ?? ''),
@@ -445,30 +397,14 @@ final class AdminController
             'date_from'   => (string)($_GET['date_from'] ?? ''),
             'date_to'     => (string)($_GET['date_to'] ?? ''),
         ];
-        $where = '';
-        $params = [];
-        if ($filters['q'] !== '')           { $where .= " AND (al.description LIKE :q1 OR al.action LIKE :q2)"; $params['q1'] = $params['q2'] = '%' . $filters['q'] . '%'; }
-        if ($filters['action'] !== '')      { $where .= " AND al.action = :a"; $params['a'] = $filters['action']; }
-        if ($filters['entity_type'] !== '') { $where .= " AND al.entity_type = :et"; $params['et'] = $filters['entity_type']; }
-        if ($filters['user_id'] !== '')     { $where .= " AND al.user_id = :uid"; $params['uid'] = (int)$filters['user_id']; }
-        if ($filters['date_from'] !== '')   { $where .= " AND DATE(al.created_at) >= :df"; $params['df'] = $filters['date_from']; }
-        if ($filters['date_to'] !== '')     { $where .= " AND DATE(al.created_at) <= :dt"; $params['dt'] = $filters['date_to']; }
-
         $page = max(1, (int)($_GET['page'] ?? 1));
         $limit = 50;
-        $stmt = $pdo->prepare("SELECT al.*, u.full_name AS actor_name, u.email AS actor_email
-                               FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id
-                               WHERE 1=1 $where ORDER BY al.created_at DESC, al.id DESC LIMIT $limit OFFSET " . (($page - 1) * $limit));
-        $stmt->execute($params);
-        $logs = $stmt->fetchAll();
-        $cnt = $pdo->prepare("SELECT COUNT(*) FROM audit_logs al WHERE 1=1 $where");
-        $cnt->execute($params);
-        $total = (int)$cnt->fetchColumn();
+        $logs = AuditLog::search($filters, $limit, ($page - 1) * $limit);
+        $total = AuditLog::count($filters);
         $pages = max(1, (int)ceil($total / $limit));
 
-        $actions     = $pdo->query("SELECT DISTINCT action FROM audit_logs ORDER BY action")->fetchAll();
-        $entityTypes = $pdo->query("SELECT DISTINCT entity_type FROM audit_logs WHERE entity_type IS NOT NULL ORDER BY entity_type")->fetchAll();
-        $users       = $pdo->query("SELECT id, full_name FROM users ORDER BY full_name")->fetchAll();
+        [$actions, $entityTypes] = AuditLog::filterOptions();
+        $users = User::options();
         render('admin/audit_Logs', compact('filters', 'logs', 'total', 'page', 'pages', 'actions', 'entityTypes', 'users'), 'Audit Logs');
     }
 }

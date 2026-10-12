@@ -220,6 +220,26 @@ final class Term
 
     /* ---------------- admin side: B7 verify, B8 release ---------------- */
 
+    /** Release history (Releases page), newest first, at most 300; filters: program_id, academic_year ('' = all). */
+    public static function releaseHistory(array $filters): array
+    {
+        $sql = "SELECT r.*, t.academic_year, t.semester, s.scholar_code, u.full_name, sp.program_name, st.full_name AS released_by
+                FROM scholarship_releases r
+                JOIN scholar_terms t ON t.id = r.term_id
+                JOIN scholars s ON s.id = r.scholar_id
+                JOIN scholarship_programs sp ON sp.id = s.program_id
+                JOIN applicants ap ON ap.id = s.applicant_id
+                JOIN users u ON u.id = ap.user_id
+                LEFT JOIN users st ON st.id = r.staff_id
+                WHERE 1=1";
+        $params = [];
+        if ($filters['program_id'] !== '')    { $sql .= " AND s.program_id = :pid"; $params['pid'] = (int)$filters['program_id']; }
+        if ($filters['academic_year'] !== '') { $sql .= " AND t.academic_year = :ay"; $params['ay'] = $filters['academic_year']; }
+        $stmt = Database::conn()->prepare($sql . " ORDER BY r.release_date DESC, r.id DESC LIMIT 300");
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    }
+
     /** Semesters with a given claim status (queues), oldest submission first. */
     public static function byClaimStatus(string $status, ?int $programId = null): array
     {

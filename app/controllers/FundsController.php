@@ -84,21 +84,7 @@ final class FundsController
     {
         $ready = Term::byClaimStatus('Verified');
         $filters = ['program_id' => (string)($_GET['program_id'] ?? ''), 'academic_year' => (string)($_GET['academic_year'] ?? '')];
-        $sql = "SELECT r.*, t.academic_year, t.semester, s.scholar_code, u.full_name, sp.program_name, st.full_name AS released_by
-                FROM scholarship_releases r
-                JOIN scholar_terms t ON t.id = r.term_id
-                JOIN scholars s ON s.id = r.scholar_id
-                JOIN scholarship_programs sp ON sp.id = s.program_id
-                JOIN applicants ap ON ap.id = s.applicant_id
-                JOIN users u ON u.id = ap.user_id
-                LEFT JOIN users st ON st.id = r.staff_id
-                WHERE 1=1";
-        $params = [];
-        if ($filters['program_id'] !== '')    { $sql .= " AND s.program_id = :pid"; $params['pid'] = (int)$filters['program_id']; }
-        if ($filters['academic_year'] !== '') { $sql .= " AND t.academic_year = :ay"; $params['ay'] = $filters['academic_year']; }
-        $stmt = Database::conn()->prepare($sql . " ORDER BY r.release_date DESC, r.id DESC LIMIT 300");
-        $stmt->execute($params);
-        $history = $stmt->fetchAll();
+        $history = Term::releaseHistory($filters);
         $historyTotal = array_sum(array_map(static fn($r) => (float)$r['amount'], $history));
         $programs = Program::options();
         $years = Budget::academicYears();
@@ -196,9 +182,7 @@ final class FundsController
         $scholar = Scholar::find((int)($_GET['id'] ?? 0));
         if (!$scholar) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
         $terms = Term::forScholar((int)$scholar['id']);
-        $stmt = Database::conn()->prepare("SELECT * FROM renewal_requests WHERE scholar_id = ? ORDER BY id DESC");
-        $stmt->execute([(int)$scholar['id']]);
-        $renewals = $stmt->fetchAll();
+        $renewals = Renewal::forScholar((int)$scholar['id']);
         $totalReleased = array_sum(array_map(static fn($t) => (float)($t['released_amount'] ?? 0), $terms));
         $currentDocs = $docHistory = [];
         foreach (VERSIONED_DOCUMENT_TYPES as $type) {

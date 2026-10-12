@@ -35,6 +35,7 @@ require_once __DIR__ . '/../app/models/Program.php';
 require_once __DIR__ . '/../app/models/Budget.php';
 require_once __DIR__ . '/../app/models/Term.php';
 require_once __DIR__ . '/../app/models/TermSchedule.php';
+require_once __DIR__ . '/../app/models/Setting.php';
 
 if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
@@ -46,38 +47,19 @@ function out(string $message): void
 }
 
 try {
-    $pdo = Database::conn();
     $now = date('Y-m-d H:i:s');
 
-    $setting = $pdo->query("SELECT setting_value FROM system_settings WHERE setting_key = 'interview_reminder_hours'")->fetchColumn();
-    $hours = ($setting === false || $setting === null || $setting === '') ? 24 : max(0, (int)$setting);
+    $setting = Setting::raw('interview_reminder_hours');
+    $hours = ($setting === null || $setting === '') ? 24 : max(0, (int)$setting);
     // Window bounds come from PHP (Asia/Manila) rather than MySQL NOW(), whose timezone may differ.
     $until = date('Y-m-d H:i:s', strtotime($now) + $hours * 3600);
-    $stmt = $pdo->prepare(
-        "SELECT ia.id, ia.application_id, ia.reschedule_count, s.interview_date, s.start_time, s.end_time, s.venue,
-                a.application_code, ap.user_id
-         FROM interview_assignments ia
-         JOIN interview_schedules s ON s.id = ia.schedule_id
-         JOIN applications a ON a.id = ia.application_id
-         JOIN applicants ap ON ap.id = a.applicant_id
-         WHERE ia.attendance = 'Scheduled'
-           AND a.status = 'Interview Scheduled'
-           AND s.status <> 'Cancelled'
-           AND ia.reminder_sent_at IS NULL
-           AND TIMESTAMP(s.interview_date, s.start_time) > ?
-           AND TIMESTAMP(s.interview_date, s.start_time) <= ?
-         ORDER BY s.interview_date, s.start_time"
-    );
     // interview_reminder_hours = 0 turns interview reminders off (deadline reminders below still run).
-    $stmt->execute($hours === 0 ? [$now, $now] : [$now, $until]);
+    $due = Interview::remindersDue($now, $hours === 0 ? $now : $until);
 
-    $claim   = $pdo->prepare("UPDATE interview_assignments SET reminder_sent_at = ? WHERE id = ? AND reminder_sent_at IS NULL");
-    $release = $pdo->prepare("UPDATE interview_assignments SET reminder_sent_at = NULL WHERE id = ?");
     $sent = 0;
-    foreach ($stmt->fetchAll() as $row) {
+    foreach ($due as $row) {
         $id = (int)$row['id'];
-        $claim->execute([$now, $id]);
-        if ($claim->rowCount() !== 1) continue;   // another run already took it
+        if (!Interview::claimReminder($id, $now)) continue;   // another run already took it
 
         $message = 'Reminder: your scholarship interview is on ' . Interview::describe($row) . '.'
             . "\nBring a valid ID and arrive 15 minutes early. Application code: {$row['application_code']}."
@@ -88,7 +70,7 @@ try {
                 "Interview reminder sent for {$row['interview_date']} {$row['start_time']}");
             $sent++;
         } catch (Throwable $e) {
-            $release->execute([$id]);   // let the next run retry
+            Interview::releaseReminder($id);   // let the next run retry
             out("FAILED reminder for interview #$id: " . $e->getMessage());
         }
     }
@@ -98,18 +80,15 @@ try {
     // Claim (release) and renewal windows: one reminder TERM_SCHEDULE_REMINDER_HOURS before the deadline to every
     // scholar who hasn't submitted yet. The window is claimed (deadline_reminder_sent_at) before sending, so re-runs and
     // overlapping runs never repeat it; editing the deadline clears it (TermSchedule::save).
-    $claimSchedule   = $pdo->prepare("UPDATE term_schedules SET deadline_reminder_sent_at = ? WHERE id = ? AND deadline_reminder_sent_at IS NULL");
-    $releaseSchedule = $pdo->prepare("UPDATE term_schedules SET deadline_reminder_sent_at = NULL WHERE id = ?");
     $windows = 0;
     $scholars = 0;
     foreach (TermSchedule::dueForReminder($now, TERM_SCHEDULE_REMINDER_HOURS) as $row) {
-        $claimSchedule->execute([$now, (int)$row['id']]);
-        if ($claimSchedule->rowCount() !== 1) continue;
+        if (!TermSchedule::claimDeadlineReminder((int)$row['id'], $now)) continue;
         try {
             $scholars += TermSchedule::notifyAffected($row, 'reminder');
             $windows++;
         } catch (Throwable $e) {
-            $releaseSchedule->execute([(int)$row['id']]);
+            TermSchedule::releaseDeadlineReminder((int)$row['id']);
             out("FAILED deadline reminder for window #{$row['id']}: " . $e->getMessage());
         }
     }
@@ -122,12 +101,9 @@ try {
     if (setting('daily_digest_enabled', '1') !== '1') {
         out('Daily digest is turned off in Settings.');
     } else {
-        $pdo->prepare("INSERT IGNORE INTO system_settings (setting_key, setting_value, setting_type, description)
-                       VALUES ('daily_digest_sent_on', '', 'string', 'Last day the daily interview digest was sent')")->execute();
+        Setting::ensureDigestDayRow();
         $previous = (string)setting('daily_digest_sent_on', '');
-        $claimDay = $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'daily_digest_sent_on' AND setting_value = ?");
-        $claimDay->execute([$today, $previous]);
-        if ($previous === $today || $claimDay->rowCount() !== 1) {
+        if ($previous === $today || !Setting::claimDigestDay($today, $previous)) {
             out('Daily digest already sent today.');
         } else {
             try {
@@ -158,7 +134,7 @@ try {
                     "Daily digest for $today: " . count($day) . " schedule(s), $applicants applicant(s) notified");
                 out("Daily digest sent: " . count($day) . " schedule(s), $applicants applicant(s).");
             } catch (Throwable $e) {
-                $pdo->prepare("UPDATE system_settings SET setting_value = ? WHERE setting_key = 'daily_digest_sent_on'")->execute([$previous]);
+                Setting::releaseDigestDay($previous);
                 out('FAILED daily digest: ' . $e->getMessage());
             }
         }

@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once BASE_PATH . '/app/models/User.php';
+
 final class AuthController
 {
     public function login(): void {
@@ -122,9 +124,7 @@ final class AuthController
         if (!$result['ok']) return $result; // cooldown active; caller decides what to show
 
         $emailSent = false;
-        $stmt = Database::conn()->prepare("SELECT full_name, email FROM users WHERE id = ?");
-        $stmt->execute([$userId]);
-        $user = $stmt->fetch();
+        $user = User::contact($userId);
         if ($user) {
             $subject = $purpose === 'registration' ? 'Verify your ' . APP_NAME_SHORT . ' account' : 'Your password reset code';
             $intro = $purpose === 'registration'
@@ -163,7 +163,7 @@ final class AuthController
             $result = Otp::verify($userId, 'registration', $code);
 
             if ($result['ok']) {
-                Database::conn()->prepare("UPDATE users SET email_verified = 1 WHERE id = ?")->execute([$userId]);
+                User::markEmailVerified($userId);
                 AuditLog::write('registration_otp_verified', 'users', $userId, 'E-mail verified');
                 Notification::send($userId, 'Email Verified', 'Your e-mail has been verified. Your ' . APP_NAME_SHORT . ' account is now active.', 'success', url('login'));
                 unset($_SESSION['otp_user_id'], $_SESSION['otp_purpose']);
@@ -180,9 +180,7 @@ final class AuthController
             redirect('verify-otp');
         }
 
-        $stmt = Database::conn()->prepare("SELECT email FROM users WHERE id = ?");
-        $stmt->execute([$userId]);
-        $email = (string)($stmt->fetchColumn() ?: '');
+        $email = User::email($userId);
         require VIEW_PATH . '/auth/verify_otp.php';
     }
 
@@ -211,9 +209,7 @@ final class AuthController
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             verify_csrf();
             $email = strtolower(trim((string)($_POST['email'] ?? '')));
-            $stmt = Database::conn()->prepare("SELECT id FROM users WHERE email = ? AND is_active = 1 LIMIT 1");
-            $stmt->execute([$email]);
-            $userId = $stmt->fetchColumn();
+            $userId = User::activeIdByEmail($email);
 
             // Always the same response and the same redirect, whether or not the e-mail exists —
             // this alone never reveals account existence.
@@ -286,18 +282,12 @@ final class AuthController
                 redirect('reset-password');
             }
 
-            $pdo = Database::conn();
-            $pdo->prepare(
-                "UPDATE users SET password_hash = ?,
-                 failed_attempts = 0, locked_until = NULL WHERE id = ?"
-            )->execute([password_hash($pw, PASSWORD_DEFAULT), $userId]);
+            User::resetPassword($userId, $pw);
 
             AuditLog::write('password_reset_completed', 'users', $userId, 'Password reset via OTP');
             unset($_SESSION['otp_reset_verified_for'], $_SESSION['otp_user_id'], $_SESSION['otp_purpose']);
 
-            $stmt = $pdo->prepare("SELECT full_name, email FROM users WHERE id = ?");
-            $stmt->execute([$userId]);
-            if ($user = $stmt->fetch()) {
+            if ($user = User::contact($userId)) {
                 $html = Notification::brand('Your password was changed', $user['full_name'],
                     '<p>Your ' . APP_NAME_SHORT . ' account password was just changed. If this was not you, contact the SK office immediately.</p>');
                 $confirmSent = Notification::sendMail($user['email'], $user['full_name'], 'Your ' . APP_NAME_SHORT . ' password was changed', $html,

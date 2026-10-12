@@ -33,4 +33,19 @@ final class Database
         }
         return self::$instance;
     }
+
+    /** Run $fn inside one transaction: committed when it returns, rolled back (and rethrown) when it throws. */
+    public static function transaction(callable $fn): mixed
+    {
+        $pdo = self::conn();
+        $pdo->beginTransaction();
+        try {
+            $result = $fn();
+            $pdo->commit();
+            return $result;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            throw $e;
+        }
+    }
 }

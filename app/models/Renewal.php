@@ -37,6 +37,14 @@ final class Renewal
         return $stmt->fetch() ?: null;
     }
 
+    /** Every renewal request of a scholar, newest first (scholar page). */
+    public static function forScholar(int $scholarId): array
+    {
+        $stmt = Database::conn()->prepare("SELECT * FROM renewal_requests WHERE scholar_id = ? ORDER BY id DESC");
+        $stmt->execute([$scholarId]);
+        return $stmt->fetchAll();
+    }
+
     /** The renewal request made from a semester, if any. */
     public static function forTerm(int $termId): ?array
     {

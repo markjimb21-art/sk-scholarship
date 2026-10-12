@@ -13,6 +13,8 @@ require_once BASE_PATH . '/app/models/Budget.php';
 require_once BASE_PATH . '/app/models/TermSchedule.php';
 require_once BASE_PATH . '/app/models/SlotRequest.php';
 require_once BASE_PATH . '/app/models/RecordHistory.php';
+require_once BASE_PATH . '/app/models/User.php';
+require_once BASE_PATH . '/app/models/Lookup.php';
 
 /** Applicant / scholar side of docs/PROCESS.md (A1 is in AuthController). */
 final class ApplicantController
@@ -217,12 +219,11 @@ final class ApplicantController
     private function application(): void
     {
         $applicant = $this->applicant();
-        $pdo = Database::conn();
 
         $app = Application::currentForApplicant((int)$applicant['id']);
         $openProgram = Program::open();
         $personal = Applicant::personalInfo((int)$applicant['id']) ?? [];
-        $personal['address_unit'] = $this->splitAddressUnit($personal['complete_address'] ?? '');
+        $personal['address_unit'] = Applicant::addressUnit($personal['complete_address'] ?? '');
         $education = Applicant::education((int)$applicant['id']) ?? [];
         $family = Applicant::familyBackground((int)$applicant['id']) ?? [];
         $documents = $app ? Document::byApplication((int)$app['id']) : [];
@@ -232,9 +233,9 @@ final class ApplicantController
         // Returned with flags: only these fields/documents may change (enforced again in autosave/upload).
         $flags = $app && $app['status'] === 'Returned' ? Application::flags($app) : [];
 
-        $puroks = $pdo->query("SELECT id, purok_name FROM puroks ORDER BY purok_name")->fetchAll();
-        $schools = $pdo->query("SELECT school_name FROM schools WHERE is_active = 1 ORDER BY school_name")->fetchAll();
-        $courses = $pdo->query("SELECT course_name FROM courses WHERE is_active = 1 ORDER BY course_name")->fetchAll();
+        $puroks = Lookup::puroks();
+        $schools = Lookup::schools();
+        $courses = Lookup::courses();
 
         $pageTitle = 'My Application';
         $pageScripts = [asset('js/application-autosave.js'), asset('js/application-review.js')];
@@ -257,15 +258,7 @@ final class ApplicantController
         $program = Program::open();
         if (!$program) return [null, 'No scholarship program is accepting applications right now.'];
 
-        $pdo = Database::conn();
-        $code = generate_code('APP');
-        $pdo->prepare("INSERT INTO applications (application_code, applicant_id, program_id, status) VALUES (?, ?, ?, 'Draft')")
-            ->execute([$code, (int)$applicant['id'], (int)$program['id']]);
-        $appId = (int)$pdo->lastInsertId();
-        $ins = $pdo->prepare("INSERT INTO documents (application_id, document_type, file_path, original_filename, status) VALUES (?, ?, '', '', 'Not Submitted')");
-        foreach (DOCUMENT_TYPES as $type) $ins->execute([$appId, $type]);
-        AuditLog::write('application_draft_created', 'applications', $appId, "Draft started for {$program['program_name']}");
-        return [Application::find($appId), null];
+        return [Application::find(Application::createDraft((int)$applicant['id'], $program)), null];
     }
 
     /** A2 autosave: saves one section; always JSON. */
@@ -279,27 +272,25 @@ final class ApplicantController
             json_response(['success' => false, 'message' => 'Unknown step.'], 400);
         }
         $applicant = $this->applicant();
-        $pdo = Database::conn();
+        $app = $error = null;
         try {
-            $pdo->beginTransaction();
-            [$app, $error] = $this->editableApplication($applicant);
-            if (!$app) {
-                $pdo->rollBack();
-                json_response(['success' => false, 'message' => $error]);
-            }
-            $post = $this->lockUnflagged($app, $step, (int)$applicant['id'], $_POST);
-            $userId = (int)Auth::user()['id'];
-            if ($post !== null) match ($step) {
-                'personal'  => $this->savePersonal((int)$applicant['id'], $post),
-                'education' => $this->saveEducation((int)$applicant['id'], $post, $userId),
-                'family'    => $this->saveFamily((int)$applicant['id'], $post, $userId),
-            };
-            $pdo->commit();
+            // One transaction: the Draft (created on the first save) and the step's data are saved together or not at all.
+            Database::transaction(function () use ($applicant, $step, &$app, &$error): void {
+                [$app, $error] = $this->editableApplication($applicant);
+                if (!$app) return;   // nothing was written
+                $post = $this->lockUnflagged($app, $step, (int)$applicant['id'], $_POST);
+                $userId = (int)Auth::user()['id'];
+                if ($post !== null) match ($step) {
+                    'personal'  => Applicant::savePersonal((int)$applicant['id'], $post),
+                    'education' => Applicant::saveEducation((int)$applicant['id'], $post, $userId),
+                    'family'    => Applicant::saveFamily((int)$applicant['id'], $post, $userId),
+                };
+            });
         } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
             error_log('Autosave failed: ' . $e->getMessage());
             json_response(['success' => false, 'message' => 'Unable to save to the server.']);
         }
+        if (!$app) json_response(['success' => false, 'message' => $error]);
         json_response(['success' => true, 'saved_at' => date('Y-m-d H:i:s'), 'status' => $app['status'], 'application_id' => (int)$app['id']]);
     }
 
@@ -322,37 +313,6 @@ final class ApplicantController
     }
 
     /**
-     * Composes the stored Complete Address as "<unit> / <purok/subdivision> / BARANGAY ESTEFANIA / BACOLOD CITY".
-     * The purok name is looked up server-side from the `puroks` table by id (never taken as free text from the
-     * client), and the barangay/city suffix is ALWAYS this hardcoded constant pair — so a manually crafted
-     * request can neither spoof the purok name nor register an address outside the scholarship's service area.
-     */
-    private function composeAddress(string $unit, string $purokName): string
-    {
-        $parts = array_values(array_filter([up($unit), $purokName], fn($v) => $v !== ''));
-        $parts[] = ADDRESS_BARANGAY;
-        $parts[] = ADDRESS_CITY;
-        return implode(' / ', $parts);
-    }
-
-    private function purokName(?int $purokId): string
-    {
-        if (!$purokId) return '';
-        $stmt = Database::conn()->prepare("SELECT purok_name FROM puroks WHERE id = ?");
-        $stmt->execute([$purokId]);
-        return up((string)($stmt->fetchColumn() ?: ''));
-    }
-
-    /** Unit/house-number part of a stored address, for pre-filling the form (legacy free-form addresses give ''). */
-    private function splitAddressUnit(string $full): string
-    {
-        $suffix = ' / ' . ADDRESS_BARANGAY . ' / ' . ADDRESS_CITY;
-        if (!str_ends_with(strtoupper($full), strtoupper($suffix))) return '';
-        $parts = array_map('trim', explode(' / ', substr($full, 0, strlen($full) - strlen($suffix)), 2));
-        return $parts[0] ?? '';
-    }
-
-    /**
      * Returned WITH flagged fields: every field of $step that was NOT flagged is reset to its stored value, so the data the
      * SK office accepted stays exactly as submitted whatever the browser sends (server-side lock). Returns null when the
      * step has no flagged field at all (nothing may be saved). Drafts and unflagged returns pass $post through.
@@ -369,146 +329,13 @@ final class ApplicantController
             'education' => Applicant::education($applicantId) ?? [],
             'family'    => Applicant::familyBackground($applicantId) ?? [],
         };
-        if ($step === 'personal') $stored['address_unit'] = $this->splitAddressUnit($stored['complete_address'] ?? '');
+        if ($step === 'personal') $stored['address_unit'] = Applicant::addressUnit($stored['complete_address'] ?? '');
         foreach (array_keys($fields) as $f) {
             if (in_array($f, $flagged, true)) continue;
             $v = $stored[$f] ?? '';
             $post[$f] = in_array($f, ['previous_scholarship', 'current_scholarship'], true) ? ((int)$v ? '1' : '') : (string)$v;
         }
         return $post;
-    }
-
-    /** A body measurement from the form: a number within [$min, $max] rounded to 1 decimal, else null. */
-    private static function measurement($value, float $min, float $max): ?float
-    {
-        $v = trim((string)$value);
-        if (!is_numeric($v) || (float)$v < $min || (float)$v > $max) return null;
-        return round((float)$v, 1);
-    }
-
-    private function savePersonal(int $applicantId, array $post): void
-    {
-        // date_of_birth is NOT NULL; autosave fires before the applicant reaches it, so wait until it is given.
-        if (trim((string)($post['date_of_birth'] ?? '')) === '') return;
-        $purokId = ($post['purok_id'] ?? '') !== '' ? (int)$post['purok_id'] : null;
-        $bloodType = (string)($post['blood_type'] ?? '');
-        $citizenship = mb_substr(up($post['citizenship'] ?? ''), 0, 50);
-        Database::conn()->prepare(
-            "INSERT INTO applicants_personal_information
-                (applicant_id, first_name, middle_name, last_name, suffix, date_of_birth, complete_address, purok_id, contact_number,
-                 height_cm, weight_kg, blood_type, religion, citizenship, sex)
-             VALUES (:applicant_id, :first_name, :middle_name, :last_name, :suffix, :date_of_birth, :complete_address, :purok_id, :contact_number,
-                 :height_cm, :weight_kg, :blood_type, :religion, :citizenship, :sex)
-             ON DUPLICATE KEY UPDATE
-                first_name = VALUES(first_name), middle_name = VALUES(middle_name), last_name = VALUES(last_name),
-                suffix = VALUES(suffix), date_of_birth = VALUES(date_of_birth), complete_address = VALUES(complete_address),
-                purok_id = VALUES(purok_id), contact_number = VALUES(contact_number),
-                height_cm = VALUES(height_cm), weight_kg = VALUES(weight_kg),
-                blood_type = VALUES(blood_type), religion = VALUES(religion), citizenship = VALUES(citizenship), sex = VALUES(sex)"
-        )->execute([
-            // Only a listed blood type is stored; anything else (including a crafted value) is saved as "not given".
-            // Height 50–250 cm and weight 20–300 kg; blank or anything outside (or not a number) is stored as "not given".
-            'height_cm'        => self::measurement($post['height_cm'] ?? '', 50, 250),
-            'weight_kg'        => self::measurement($post['weight_kg'] ?? '', 20, 300),
-            'blood_type'       => in_array($bloodType, BLOOD_TYPES, true) ? $bloodType : null,
-            'religion'         => mb_substr(up($post['religion'] ?? ''), 0, 80) ?: null,
-            'citizenship'      => $citizenship !== '' ? $citizenship : 'FILIPINO',
-            'sex'              => in_array($post['sex'] ?? '', SEX_OPTIONS, true) ? $post['sex'] : null,
-            'applicant_id'     => $applicantId,
-            'first_name'       => up($post['first_name'] ?? ''),
-            'middle_name'      => up($post['middle_name'] ?? ''),
-            'last_name'        => up($post['last_name'] ?? ''),
-            'suffix'           => up($post['suffix'] ?? ''),
-            'date_of_birth'    => $post['date_of_birth'],
-            'complete_address' => $this->composeAddress($post['address_unit'] ?? '', $this->purokName($purokId)),
-            'purok_id'         => $purokId,
-            'contact_number'   => digits_only($post['contact_number'] ?? ''),
-        ]);
-    }
-
-    /** Education: one record per applicant, UPDATED in place (never deleted); key-field changes go to record_history. */
-    private function saveEducation(int $applicantId, array $post, int $userId = 0): void
-    {
-        // GWA on the Philippine 1.00 (highest) – 5.00 scale; anything else is stored as NULL.
-        $ga = trim((string)($post['general_average'] ?? ''));
-        $ga = (is_numeric($ga) && (float)$ga >= 1 && (float)$ga <= 5) ? round((float)$ga, 2) : null;
-        $yearLevel = in_array($post['year_level'] ?? '', YEAR_LEVELS, true) ? $post['year_level'] : '1st Year';
-
-        $pdo = Database::conn();
-        $old = Applicant::education($applicantId);
-        $values = [
-            'school_name'                  => trim($post['school_name'] ?? ''),
-            'year_level'                   => $yearLevel,
-            'year_level_other'             => trim($post['year_level_other'] ?? ''),
-            'course_name'                  => trim($post['course_name'] ?? ''),
-            'major'                        => trim($post['major'] ?? '') ?: null,
-            'general_average'              => $ga,
-            'previous_scholarship'         => !empty($post['previous_scholarship']) ? 1 : 0,
-            'previous_scholarship_details' => trim($post['previous_scholarship_details'] ?? ''),
-            'current_scholarship'          => !empty($post['current_scholarship']) ? 1 : 0,
-            'current_scholarship_details'  => trim($post['current_scholarship_details'] ?? ''),
-        ];
-        if ($old) {
-            $assign = implode(', ', array_map(static fn($k) => "`$k` = :$k", array_keys($values)));
-            $pdo->prepare("UPDATE education_records SET $assign WHERE id = :id")->execute($values + ['id' => (int)$old['id']]);
-            RecordHistory::record('education_records', (int)$old['id'], $applicantId, $old, $values, $userId);
-            return;
-        }
-        $pdo->prepare(
-            "INSERT INTO education_records
-                (applicant_id, school_name, year_level, year_level_other, course_name, major, general_average,
-                 previous_scholarship, previous_scholarship_details, current_scholarship, current_scholarship_details)
-             VALUES (:applicant_id, :school_name, :year_level, :year_level_other, :course_name, :major, :general_average,
-                     :previous_scholarship, :previous_scholarship_details, :current_scholarship, :current_scholarship_details)"
-        )->execute(['applicant_id' => $applicantId] + $values);
-    }
-
-    /** Family background: upserted in place (one row per applicant); income changes go to record_history. */
-    private function saveFamily(int $applicantId, array $post, int $userId = 0): void
-    {
-        $status = static fn($v) => in_array($v, ['Available', 'Deceased', 'Unknown', 'Not Applicable'], true) ? $v : 'Available';
-        $fi = max(0.0, (float)($post['father_income'] ?? 0));
-        $mi = max(0.0, (float)($post['mother_income'] ?? 0));
-        $old = Applicant::familyBackground($applicantId);
-        if ($old) {
-            RecordHistory::record('family_background', (int)$old['id'], $applicantId, $old,
-                ['father_income' => $fi, 'mother_income' => $mi, 'total_family_income' => $fi + $mi], $userId);
-        }
-        Database::conn()->prepare(
-            "INSERT INTO family_background
-                (applicant_id, father_name, father_age, father_occupation, father_address, father_contact, father_income, father_status,
-                 mother_name, mother_age, mother_occupation, mother_address, mother_contact, mother_income, mother_status,
-                 total_family_income, family_size)
-             VALUES (:applicant_id, :father_name, :father_age, :father_occupation, :father_address, :father_contact, :father_income, :father_status,
-                     :mother_name, :mother_age, :mother_occupation, :mother_address, :mother_contact, :mother_income, :mother_status,
-                     :total_family_income, :family_size)
-             ON DUPLICATE KEY UPDATE
-                father_name = VALUES(father_name), father_age = VALUES(father_age), father_occupation = VALUES(father_occupation),
-                father_address = VALUES(father_address), father_contact = VALUES(father_contact),
-                father_income = VALUES(father_income), father_status = VALUES(father_status),
-                mother_name = VALUES(mother_name), mother_age = VALUES(mother_age), mother_occupation = VALUES(mother_occupation),
-                mother_address = VALUES(mother_address), mother_contact = VALUES(mother_contact),
-                mother_income = VALUES(mother_income), mother_status = VALUES(mother_status),
-                total_family_income = VALUES(total_family_income), family_size = VALUES(family_size)"
-        )->execute([
-            'applicant_id'        => $applicantId,
-            'father_name'         => trim($post['father_name'] ?? ''),
-            'father_age'          => ($post['father_age'] ?? '') !== '' ? (int)$post['father_age'] : null,
-            'father_occupation'   => trim($post['father_occupation'] ?? ''),
-            'father_address'      => trim($post['father_address'] ?? ''),
-            'father_contact'      => digits_only($post['father_contact'] ?? ''),
-            'father_income'       => $fi,
-            'father_status'       => $status($post['father_status'] ?? ''),
-            'mother_name'         => trim($post['mother_name'] ?? ''),
-            'mother_age'          => ($post['mother_age'] ?? '') !== '' ? (int)$post['mother_age'] : null,
-            'mother_occupation'   => trim($post['mother_occupation'] ?? ''),
-            'mother_address'      => trim($post['mother_address'] ?? ''),
-            'mother_contact'      => digits_only($post['mother_contact'] ?? ''),
-            'mother_income'       => $mi,
-            'mother_status'       => $status($post['mother_status'] ?? ''),
-            'total_family_income' => $fi + $mi,
-            'family_size'         => ($post['family_size'] ?? '') !== '' ? (int)$post['family_size'] : null,
-        ]);
     }
 
     /**
@@ -581,12 +408,7 @@ final class ApplicantController
     {
         $applicant = $this->applicant();
         $doc = Document::find((int)($_GET['id'] ?? 0));
-        $owned = false;
-        if ($doc && $doc['file_path'] !== '') {
-            $stmt = Database::conn()->prepare("SELECT 1 FROM applications WHERE id = ? AND applicant_id = ?");
-            $stmt->execute([$doc['application_id'], $applicant['id']]);
-            $owned = (bool)$stmt->fetchColumn();
-        }
+        $owned = $doc && $doc['file_path'] !== '' && Application::isOwnedBy((int)$doc['application_id'], (int)$applicant['id']);
         if (!$owned) { http_response_code(404); die('Document not found.'); }
         Document::sendApplicationDocument($doc, isset($_GET['download']));
     }
@@ -698,12 +520,10 @@ final class ApplicantController
     {
         $userId = (int)Auth::user()['id'];
         if (!empty($_GET['mark_read'])) {
-            Database::conn()->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?")->execute([$userId]);
+            Notification::markAllRead($userId);
             json_response(['ok' => true]);
         }
-        $stmt = Database::conn()->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 100");
-        $stmt->execute([$userId]);
-        $notifications = $stmt->fetchAll();
+        $notifications = Notification::forUser($userId);
         $pageTitle = 'Notifications';
         require VIEW_PATH . '/layouts/header.php';
         require VIEW_PATH . '/applicant/notifications.php';
@@ -715,7 +535,6 @@ final class ApplicantController
         $user = Auth::user();
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             verify_csrf();
-            $pdo = Database::conn();
             $name = trim($_POST['full_name'] ?? '');
             $contact = digits_only($_POST['contact_number'] ?? '');
             if ($name === '') { flash('danger', 'Full name required.'); redirect('applicant/profile'); }
@@ -723,10 +542,9 @@ final class ApplicantController
                 if ($problems = password_problems((string)$_POST['new_password'])) { flash('danger', password_rule_message($problems)); redirect('applicant/profile'); }
                 if ((string)$_POST['new_password'] !== (string)($_POST['new_password_confirm'] ?? '')) { flash('danger', 'The two new passwords do not match.'); redirect('applicant/profile'); }
                 if (!password_verify($_POST['current_password'] ?? '', $user['password_hash'])) { flash('danger', 'Current password incorrect.'); redirect('applicant/profile'); }
-                $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?")
-                    ->execute([password_hash($_POST['new_password'], PASSWORD_DEFAULT), $user['id']]);
+                User::changePassword((int)$user['id'], (string)$_POST['new_password']);
             }
-            $pdo->prepare("UPDATE users SET full_name = ?, contact_number = ? WHERE id = ?")->execute([$name, $contact, $user['id']]);
+            User::updateProfile((int)$user['id'], $name, $contact);
             AuditLog::write('profile_updated', 'users', (int)$user['id'], 'Profile updated');
             flash('success', 'Profile updated.');
             redirect('applicant/profile');

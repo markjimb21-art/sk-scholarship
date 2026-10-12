@@ -108,18 +108,14 @@ final class InterviewController
         $app = $appId ? Application::withDetails($appId) : null;
         if (!$app) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
         $currentAssignment = Interview::assignmentByApplication($appId);
-        $stmt = Database::conn()->prepare("SELECT COUNT(*) FROM interview_assignments WHERE application_id = ? AND attendance = 'No-show'");
-        $stmt->execute([$appId]);
-        $missed = (int)$stmt->fetchColumn();
+        $missed = Interview::missedCount($appId);
         $why = null;
         $suggestions = Interview::suggestSlots((int)$app['program_id'], 8, $why);
         if (($currentAssignment['attendance'] ?? '') === 'Scheduled') {   // don't suggest the schedule they are already on
             $suggestions = array_values(array_filter($suggestions, static fn($s) => (int)$s['schedule_id'] !== (int)$currentAssignment['schedule_id']));
         }
         $pending = SlotRequest::pendingFor($appId);
-        $stmt = Database::conn()->prepare("SELECT venue FROM interview_schedules WHERE program_id = ? ORDER BY id DESC LIMIT 1");
-        $stmt->execute([(int)$app['program_id']]);
-        $defaultVenue = (string)($stmt->fetchColumn() ?: '');
+        $defaultVenue = Interview::lastVenue((int)$app['program_id']);
         $schedulable = in_array($app['status'], ['Qualified', 'Interview Scheduled'], true)
             && !($app['status'] === 'Interview Scheduled' && ($currentAssignment['attendance'] ?? '') !== 'Scheduled');
         render('admin/interview_reschedule', compact('app', 'currentAssignment', 'missed', 'suggestions', 'why', 'pending', 'defaultVenue', 'schedulable'),

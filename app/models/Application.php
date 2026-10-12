@@ -137,6 +137,28 @@ final class Application
         return $stmt->fetch() ?: null;
     }
 
+    /** A new Draft for $program with its 5 empty document rows (the applicant's first save). Returns the new id. */
+    public static function createDraft(int $applicantId, array $program): int
+    {
+        $pdo = Database::conn();
+        $code = generate_code('APP');
+        $pdo->prepare("INSERT INTO applications (application_code, applicant_id, program_id, status) VALUES (?, ?, ?, 'Draft')")
+            ->execute([$code, $applicantId, (int)$program['id']]);
+        $appId = (int)$pdo->lastInsertId();
+        $ins = $pdo->prepare("INSERT INTO documents (application_id, document_type, file_path, original_filename, status) VALUES (?, ?, '', '', 'Not Submitted')");
+        foreach (DOCUMENT_TYPES as $type) $ins->execute([$appId, $type]);
+        AuditLog::write('application_draft_created', 'applications', $appId, "Draft started for {$program['program_name']}");
+        return $appId;
+    }
+
+    /** Does application $applicationId belong to applicant $applicantId? */
+    public static function isOwnedBy(int $applicationId, int $applicantId): bool
+    {
+        $stmt = Database::conn()->prepare("SELECT 1 FROM applications WHERE id = ? AND applicant_id = ?");
+        $stmt->execute([$applicationId, $applicantId]);
+        return (bool)$stmt->fetchColumn();
+    }
+
     /** Every application except the current one, newest first (read-only history). */
     public static function pastForApplicant(int $applicantId, ?array $current): array
     {

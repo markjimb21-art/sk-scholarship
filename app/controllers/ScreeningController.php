@@ -21,15 +21,8 @@ final class ScreeningController
 
         $eligibility = Application::eligibility($app);
         $scholar = Scholar::forApplication((int)$app['id']);
-        $attempts = $this->attempts((int)$app['id']);
-        $audit = Database::conn()->prepare(
-            "SELECT al.*, u.full_name AS actor FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id
-             WHERE (al.entity_type = 'applications' AND al.entity_id = ?)
-                OR (al.entity_type = 'documents' AND al.entity_id IN (SELECT id FROM documents WHERE application_id = ?))
-             ORDER BY al.created_at DESC, al.id DESC LIMIT 50"
-        );
-        $audit->execute([(int)$app['id'], (int)$app['id']]);
-        $auditTrail = $audit->fetchAll();
+        $attempts = Interview::attemptsForApplication((int)$app['id']);
+        $auditTrail = AuditLog::forApplication((int)$app['id']);
 
         // School ID / Enrollment Form: the applicant's newest version (maybe from a claim or renewal). History: every
         // version of every document type, including replaced and invalid ones.
@@ -45,19 +38,6 @@ final class ScreeningController
             'Application ' . $app['application_code']);
     }
 
-    /** Every interview attempt of the application, with its score. */
-    private function attempts(int $applicationId): array
-    {
-        $stmt = Database::conn()->prepare(
-            "SELECT ia.*, s.interview_date, s.start_time, s.end_time, s.venue, s.status AS schedule_status, ev.total_score
-             FROM interview_assignments ia
-             JOIN interview_schedules s ON s.id = ia.schedule_id
-             LEFT JOIN interview_evaluations ev ON ev.assignment_id = ia.id
-             WHERE ia.application_id = ? ORDER BY ia.id"
-        );
-        $stmt->execute([$applicationId]);
-        return $stmt->fetchAll();
-    }
 
     /** Qualify for interview | Return for correction (remarks) | Reject (reason). */
     public function decide(): void

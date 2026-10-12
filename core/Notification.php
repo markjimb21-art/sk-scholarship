@@ -270,4 +270,15 @@ HTML;
         $stmt->execute([$userId]);
         return (int)$stmt->fetchColumn();
     }
+
+    /** The newest 100 notifications of one user (the Notifications page). */
+    public static function forUser(int $userId): array {
+        $stmt = Database::conn()->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 100");
+        $stmt->execute([$userId]);
+        return $stmt->fetchAll();
+    }
+
+    public static function markAllRead(int $userId): void {
+        Database::conn()->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?")->execute([$userId]);
+    }
 }
