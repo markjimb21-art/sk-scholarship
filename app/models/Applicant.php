@@ -4,6 +4,12 @@ declare(strict_types=1);
 /** The applicant's profile (one per account): personal information, education and family background. */
 final class Applicant
 {
+    /** The applicants row of the signed-in user (created if missing). */
+    public static function current(): array
+    {
+        return self::forUser((int)Auth::user()['id']);
+    }
+
     /** The applicants row for a user account, created if it is missing (older accounts). */
     public static function forUser(int $userId): array
     {

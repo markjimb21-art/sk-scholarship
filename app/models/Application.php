@@ -137,6 +137,23 @@ final class Application
         return $stmt->fetch() ?: null;
     }
 
+    /**
+     * The current application if it is editable, creating a Draft for the OPEN program when there is none.
+     * Returns [app|null, error|null].
+     */
+    public static function editableFor(array $applicant): array
+    {
+        $app = Application::currentForApplicant((int)$applicant['id']);
+        if ($app) {
+            return Application::isEditable($app) ? [$app, null] : [null, 'This application can no longer be edited.'];
+        }
+        if (Scholar::hasActive((int)$applicant['id'])) return [null, 'You already have an active scholarship.'];
+        $program = Program::open();
+        if (!$program) return [null, 'No scholarship program is accepting applications right now.'];
+
+        return [Application::find(Application::createDraft((int)$applicant['id'], $program)), null];
+    }
+
     /** A new Draft for $program with its 5 empty document rows (the applicant's first save). Returns the new id. */
     public static function createDraft(int $applicantId, array $program): int
     {

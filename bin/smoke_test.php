@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * Smoke test: rebuilds the TEST database, runs the application on PHP's built-in server, signs in as every kind of
- * user and requests every route in the route tables. Fails on any HTTP 500, PHP warning/notice/fatal (in the page or
+ * user and requests every route in the route tables (AdminController::ROUTES, ApplicantController::ROUTES). Fails on any HTTP 500, PHP warning/notice/fatal (in the page or
  * the server log), and on any staff route that the access map says should be hidden but isn't (or the reverse).
  *
  *   php bin/smoke_test.php
@@ -33,6 +33,7 @@ require $root . '/core/Helpers.php';
 require $root . '/core/Auth.php';
 require $root . '/core/AuditLog.php';
 require $root . '/app/controllers/AdminController.php';
+require $root . '/app/controllers/ApplicantController.php';
 require $root . '/tests/support/TestServer.php';
 require $root . '/tests/support/HttpClient.php';
 
@@ -83,11 +84,7 @@ $applicantParams = [
 ];
 
 $staffRoutes = array_keys((new ReflectionClassConstant(AdminController::class, 'ROUTES'))->getValue());
-// Applicant routes = the case labels of ApplicantController::handle() (only that method's switch).
-preg_match('/function handle\(.*?default:/s', (string)file_get_contents($root . '/app/controllers/ApplicantController.php'), $handle);
-preg_match_all("/case '([^']+)':/", $handle[0] ?? '', $m);
-$applicantRoutes = $m[1];
-if (count($applicantRoutes) < 10) { fwrite(STDERR, "Could not read the applicant routes.\n"); exit(1); }
+$applicantRoutes = array_keys(ApplicantController::ROUTES);
 
 $server = new TestServer();
 $server->start();
