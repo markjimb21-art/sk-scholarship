@@ -194,7 +194,7 @@ final class Report
         [$active, $ended] = array_map('intval', $scholars->fetch(PDO::FETCH_NUM));
 
         $peso = static fn($v) => $v === null ? 'No budget' : '₱' . number_format((float)$v, 2);
-        $counts = Analytics::stageCounts($pid);
+        $counts = AnalyticsFunnel::stageCounts($pid);
         $ay = $program['academic_year'];
         $rows = [
             ['Academic year', $ay],
@@ -206,11 +206,11 @@ final class Report
         $rows[] = ['Scholars active / ended', "$active / $ended"];
         $rows[] = ['Amount per semester', $peso($program['amount_per_semester'])];
         $rows[] = ['Cash released' . ($from || $to ? ' (in date range)' : ''), $peso($released->fetchColumn())];
-        $rows[] = ["Budget remaining ($ay)", $peso(Analytics::remaining($pid, $ay))];
-        $rows[] = ["Committed ($ay)", $peso(Analytics::committed($pid, $ay))];
-        $rows[] = ['Projected scholars', number_format(Analytics::projectedScholars($pid)['value'], 1)];
-        $rows[] = ["Projected need ($ay)", $peso(Analytics::projectedNeed($pid, $ay))];
-        $surplus = Analytics::surplus($pid, $ay);
+        $rows[] = ["Budget remaining ($ay)", $peso(AnalyticsBudget::remaining($pid, $ay))];
+        $rows[] = ["Committed ($ay)", $peso(AnalyticsBudget::committed($pid, $ay))];
+        $rows[] = ['Projected scholars', number_format(AnalyticsFunnel::projectedScholars($pid)['value'], 1)];
+        $rows[] = ["Projected need ($ay)", $peso(AnalyticsBudget::projectedNeed($pid, $ay))];
+        $surplus = AnalyticsBudget::surplus($pid, $ay);
         $rows[] = ['Surplus / shortfall', $surplus === null ? 'No budget' : ($surplus < 0 ? 'Shortfall ' : 'Surplus ') . $peso(abs($surplus))];
 
         return ['title' => $title . ' — ' . $program['program_name'], 'headers' => ['Figure', 'Value'], 'rows' => $rows,
@@ -232,28 +232,28 @@ final class Report
         $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
         $peso = static fn($v) => $v === null ? '—' : '₱' . number_format((float)$v, 2);
         $rows = [];
-        foreach (Analytics::PROFILE_DIMENSIONS as $dim => $label) {
-            foreach (Analytics::profileBreakdown($pid, $dim) as $r) {
+        foreach (AnalyticsProfiles::PROFILE_DIMENSIONS as $dim => $label) {
+            foreach (AnalyticsProfiles::profileBreakdown($pid, $dim) as $r) {
                 $rows[] = ["Profile — $label", $r['group'], $r['applicants'], $r['approved'], $pct($r['rate'])];
             }
         }
-        $gv = Analytics::gwaApplicantsVsScholars($pid);
+        $gv = AnalyticsProfiles::gwaApplicantsVsScholars($pid);
         $rows[] = ['Academic', 'Average GWA of applicants', $gv['applicants']['n'], '', $gwa($gv['applicants']['avg'])];
         $rows[] = ['Academic', 'Average GWA of approved scholars', $gv['scholars']['n'], '', $gwa($gv['scholars']['avg'])];
-        foreach (Analytics::avgGwaBySemester($pid) as $sem => $g) $rows[] = ['Academic — average GWA per semester', $sem, $g['n'], '', $gwa($g['avg'])];
-        $atRisk = Analytics::atRiskScholars($pid);
+        foreach (AnalyticsProfiles::avgGwaBySemester($pid) as $sem => $g) $rows[] = ['Academic — average GWA per semester', $sem, $g['n'], '', $gwa($g['avg'])];
+        $atRisk = AnalyticsProfiles::atRiskScholars($pid);
         $rows[] = ['Academic', 'Scholars below the minimum GWA (' . $gwa($program['min_gpa']) . ')', count($atRisk), '', ''];
         foreach ($atRisk as $s) $rows[] = ['Academic — at risk', "{$s['full_name']} ({$s['scholar_code']})", $s['semester'], '', $gwa($s['gwa'])];
-        foreach (Analytics::gwaTrend($pid) as $s) {
+        foreach (AnalyticsProfiles::gwaTrend($pid) as $s) {
             $rows[] = ['Academic — GWA trend', "{$s['full_name']} ({$s['scholar_code']})", $gwa($s['first']) . ' → ' . $gwa($s['last']), '', $s['trend']];
         }
-        $aps = Analytics::avgReleasedPerScholar($pid, $ay);
+        $aps = AnalyticsBudget::avgReleasedPerScholar($pid, $ay);
         $rows[] = ["Funds ($ay)", 'Released', '', '', $peso(Budget::actualReleased($pid, $ay))];
-        $rows[] = ["Funds ($ay)", 'Committed', '', '', $peso(Analytics::committed($pid, $ay))];
-        $rows[] = ["Funds ($ay)", 'Release rate (released ÷ total budget)', '', '', $pct(Analytics::releaseRate($pid, $ay))];
+        $rows[] = ["Funds ($ay)", 'Committed', '', '', $peso(AnalyticsBudget::committed($pid, $ay))];
+        $rows[] = ["Funds ($ay)", 'Release rate (released ÷ total budget)', '', '', $pct(AnalyticsBudget::releaseRate($pid, $ay))];
         $rows[] = ["Funds ($ay)", 'Average released per scholar', $aps['scholars'], '', $peso($aps['avg'])];
-        foreach (Analytics::releasedByMonth($pid, $ay) as $m => $v) $rows[] = ["Funds ($ay) — released per month", $m, '', '', $peso($v)];
-        foreach (Analytics::releasedBySemester($pid) as $sem => $v) $rows[] = ['Funds — released per semester', $sem, '', '', $peso($v)];
+        foreach (AnalyticsBudget::releasedByMonth($pid, $ay) as $m => $v) $rows[] = ["Funds ($ay) — released per month", $m, '', '', $peso($v)];
+        foreach (AnalyticsBudget::releasedBySemester($pid) as $sem => $v) $rows[] = ['Funds — released per semester', $sem, '', '', $peso($v)];
 
         return ['title' => $title . ' — ' . $program['program_name'],
                 'headers' => ['Section', 'Item', 'Applicants / count', 'Approved', 'Rate / value'], 'rows' => $rows,

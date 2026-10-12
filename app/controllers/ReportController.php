@@ -2,7 +2,12 @@
 declare(strict_types=1);
 
 require_once BASE_PATH . '/app/models/Report.php';
-require_once BASE_PATH . '/app/models/Analytics.php';
+require_once BASE_PATH . '/app/models/WorkQueues.php';
+require_once BASE_PATH . '/app/models/AnalyticsFunnel.php';
+require_once BASE_PATH . '/app/models/AnalyticsBudget.php';
+require_once BASE_PATH . '/app/models/AnalyticsInterviews.php';
+require_once BASE_PATH . '/app/models/AnalyticsClaims.php';
+require_once BASE_PATH . '/app/models/AnalyticsProfiles.php';
 
 /** Reports (PDF/CSV, docs/PROCESS.md §5) and Data Analytics (§6). */
 final class ReportController
@@ -47,42 +52,42 @@ final class ReportController
         if ($program) {
             $pid = (int)$program['id'];
             $ay = in_array($_GET['academic_year'] ?? '', $years, true) ? $_GET['academic_year'] : $program['academic_year'];
-            $counts = Analytics::stageCounts($pid);
-            $conversion = Analytics::conversionRates($pid);
-            $projected = Analytics::projectedScholars($pid);
+            $counts = AnalyticsFunnel::stageCounts($pid);
+            $conversion = AnalyticsFunnel::conversionRates($pid);
+            $projected = AnalyticsFunnel::projectedScholars($pid);
             $budget = Budget::forProgramYear($pid, $ay);
             $data = [
                 'ay' => $ay,
                 'counts' => $counts,
                 'conversion' => $conversion,
                 'projected' => $projected,
-                'slotsRemaining' => Analytics::slotsRemaining($pid),
-                'waitlisted' => Analytics::waitlistedAvailable($pid),
+                'slotsRemaining' => AnalyticsFunnel::slotsRemaining($pid),
+                'waitlisted' => AnalyticsFunnel::waitlistedAvailable($pid),
                 'budget' => $budget,
-                'committed' => Analytics::committed($pid, $ay),
-                'projectedNeed' => Analytics::projectedNeed($pid, $ay),
-                'remaining' => Analytics::remaining($pid, $ay),
-                'surplus' => Analytics::surplus($pid, $ay),
-                'extraFundable' => Analytics::extraFundable($pid, $ay),
-                'attendance' => Analytics::attendanceRate($pid),
-                'noShow' => Analytics::noShowByAttempt($pid),
-                'scores' => Analytics::scoreSummary($pid),
-                'onTime' => Analytics::onTimeRate($pid, $ay),
-                'overdue' => Analytics::overdueCount($pid, $ay),
-                'avgDays' => Analytics::avgDaysToSubmit($pid, $ay),
+                'committed' => AnalyticsBudget::committed($pid, $ay),
+                'projectedNeed' => AnalyticsBudget::projectedNeed($pid, $ay),
+                'remaining' => AnalyticsBudget::remaining($pid, $ay),
+                'surplus' => AnalyticsBudget::surplus($pid, $ay),
+                'extraFundable' => AnalyticsBudget::extraFundable($pid, $ay),
+                'attendance' => AnalyticsInterviews::attendanceRate($pid),
+                'noShow' => AnalyticsInterviews::noShowByAttempt($pid),
+                'scores' => AnalyticsInterviews::scoreSummary($pid),
+                'onTime' => AnalyticsClaims::onTimeRate($pid, $ay),
+                'overdue' => AnalyticsClaims::overdueCount($pid, $ay),
+                'avgDays' => AnalyticsClaims::avgDaysToSubmit($pid, $ay),
                 // (5) profiles, (6) academic performance, (7) fund utilization
-                'profiles' => array_combine(array_keys(Analytics::PROFILE_DIMENSIONS),
-                    array_map(static fn($d) => Analytics::profileBreakdown($pid, $d), array_keys(Analytics::PROFILE_DIMENSIONS))),
-                'gwaVs' => Analytics::gwaApplicantsVsScholars($pid),
-                'gwaSemesters' => Analytics::gwaSemesters($pid, $ay),
-                'gwaPerScholar' => Analytics::gwaPerScholar($pid, $ay),
-                'gwaBySemester' => Analytics::avgGwaBySemester($pid),
-                'atRisk' => Analytics::atRiskScholars($pid),
-                'gwaTrend' => Analytics::gwaTrend($pid),
-                'releasedBySemester' => Analytics::releasedBySemester($pid),
-                'releasedByMonth' => Analytics::releasedByMonth($pid, $ay),
-                'releaseRate' => Analytics::releaseRate($pid, $ay),
-                'avgPerScholar' => Analytics::avgReleasedPerScholar($pid, $ay),
+                'profiles' => array_combine(array_keys(AnalyticsProfiles::PROFILE_DIMENSIONS),
+                    array_map(static fn($d) => AnalyticsProfiles::profileBreakdown($pid, $d), array_keys(AnalyticsProfiles::PROFILE_DIMENSIONS))),
+                'gwaVs' => AnalyticsProfiles::gwaApplicantsVsScholars($pid),
+                'gwaSemesters' => AnalyticsProfiles::gwaSemesters($pid, $ay),
+                'gwaPerScholar' => AnalyticsProfiles::gwaPerScholar($pid, $ay),
+                'gwaBySemester' => AnalyticsProfiles::avgGwaBySemester($pid),
+                'atRisk' => AnalyticsProfiles::atRiskScholars($pid),
+                'gwaTrend' => AnalyticsProfiles::gwaTrend($pid),
+                'releasedBySemester' => AnalyticsBudget::releasedBySemester($pid),
+                'releasedByMonth' => AnalyticsBudget::releasedByMonth($pid, $ay),
+                'releaseRate' => AnalyticsBudget::releaseRate($pid, $ay),
+                'avgPerScholar' => AnalyticsBudget::avgReleasedPerScholar($pid, $ay),
             ];
         }
         render('admin/analytics', compact('program', 'programs', 'years', 'data') + ['pageScripts' => [asset('js/sk-charts.js')]], 'Data Analytics');

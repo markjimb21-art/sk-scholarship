@@ -18,7 +18,12 @@ require_once BASE_PATH . '/app/models/TermDocument.php';
 require_once BASE_PATH . '/app/models/Renewal.php';
 require_once BASE_PATH . '/app/models/Budget.php';
 require_once BASE_PATH . '/app/models/TermSchedule.php';
-require_once BASE_PATH . '/app/models/Analytics.php';
+require_once BASE_PATH . '/app/models/WorkQueues.php';
+require_once BASE_PATH . '/app/models/AnalyticsFunnel.php';
+require_once BASE_PATH . '/app/models/AnalyticsBudget.php';
+require_once BASE_PATH . '/app/models/AnalyticsInterviews.php';
+require_once BASE_PATH . '/app/models/AnalyticsClaims.php';
+require_once BASE_PATH . '/app/models/AnalyticsProfiles.php';
 require_once BASE_PATH . '/app/models/SlotRequest.php';
 require_once BASE_PATH . '/app/models/RecordHistory.php';
 require_once BASE_PATH . '/app/models/User.php';
@@ -147,7 +152,7 @@ final class AdminController
     public function dashboard(): void
     {
         $today = date('Y-m-d');
-        $n = Analytics::queueCounts($today);
+        $n = WorkQueues::queueCounts($today);
         $counters = [
             ['Applications to screen', $n['to_screen'], 'admin/screening', 'bi-inbox', 'Applications with status Submitted'],
             ['Qualified, no schedule', $n['qualified'], 'admin/interviews', 'bi-calendar-plus', 'Applications with status Qualified'],
@@ -172,9 +177,9 @@ final class AdminController
 
         // Charts for the selected program (numbers shown in a table next to each chart).
         $charts = $program ? [
-            'status'  => Analytics::stageCounts((int)$program['id']),
-            'months'  => Analytics::releasedByMonth((int)$program['id']),
-            'gwa'     => Analytics::scholarsByGwaBand((int)$program['id']),
+            'status'  => AnalyticsFunnel::stageCounts((int)$program['id']),
+            'months'  => AnalyticsBudget::releasedByMonth((int)$program['id']),
+            'gwa'     => AnalyticsProfiles::scholarsByGwaBand((int)$program['id']),
         ] : null;
 
         render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'todayInterviews', 'charts', 'showBudget')

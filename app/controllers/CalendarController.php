@@ -4,7 +4,7 @@ declare(strict_types=1);
 /**
  * Admin calendar (docs/CHANGE_PLAN_3.md §1): interview schedules and claim/renewal windows on one read-only calendar.
  * Every colour and state comes from the same functions the list pages use: Interview::displayStatus() (Interviews list)
- * and Analytics::overdue() → TermSchedule::missedDeadline() (Claims/Renewals → Missed deadline).
+ * and AnalyticsClaims::overdue() → TermSchedule::missedDeadline() (Claims/Renewals → Missed deadline).
  */
 final class CalendarController
 {
@@ -59,7 +59,7 @@ final class CalendarController
 
         // Windows with at least one scholar in the Missed-deadline list are overdue (one shared function).
         $overdue = [];
-        foreach (Analytics::overdue($programId) as $m) $overdue[(int)$m['schedule']['id']] = ($overdue[(int)$m['schedule']['id']] ?? 0) + 1;
+        foreach (AnalyticsClaims::overdue($programId) as $m) $overdue[(int)$m['schedule']['id']] = ($overdue[(int)$m['schedule']['id']] ?? 0) + 1;
         foreach (TermSchedule::inRange($from, $to, $programId) as $w) {
             $events[] = $this->deadlineEvent($w, $overdue[(int)$w['id']] ?? 0);
             if ($w['planned_date']) $events[] = $this->plannedEvent($w);

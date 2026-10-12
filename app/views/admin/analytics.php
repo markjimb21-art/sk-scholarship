@@ -50,7 +50,7 @@ $pct = static fn($r) => $r === null ? 'no data' : number_format($r * 100, 1) . '
       <table class="table table-sm small align-middle mb-2">
         <thead><tr><th>Stage</th><th class="text-end">Now in stage</th><th class="text-end">Rate</th><th class="text-end">Expected approvals</th></tr></thead>
         <tbody>
-          <?php foreach (Analytics::OPEN_STAGES as $s): ?>
+          <?php foreach (AnalyticsFunnel::OPEN_STAGES as $s): ?>
             <tr>
               <td><?= e(APP_STATUS_LABELS[$s]) ?></td>
               <td class="text-end"><?= (int)$c[$s] ?></td>
@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
   }
-  bar('funnelChart', <?= js_json(array_map(static fn($s) => $s, Analytics::STAGES)) ?>, <?= js_json(array_values($c)) ?>, false);
+  bar('funnelChart', <?= js_json(array_map(static fn($s) => $s, AnalyticsFunnel::STAGES)) ?>, <?= js_json(array_values($c)) ?>, false);
   bar('budgetChart', ['Total budget', 'Released', 'Committed', 'Projected need'],
       <?= js_json([(float)($data['budget']['total_budget'] ?? 0), (float)($data['budget']['released'] ?? 0), round($data['committed'], 2), round($data['projectedNeed'], 2)]) ?>, true);
   bar('scoreChart', <?= js_json(array_keys($sc['bands'])) ?>, <?= js_json(array_values($sc['bands'])) ?>, false);

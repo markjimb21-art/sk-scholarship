@@ -9,7 +9,7 @@ $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
   now Approved; <strong>approval rate</strong> = approved ÷ applicants (still-pending applications count as not approved yet).
   Profile data is the applicant’s current form data.</p>
 <div class="row g-3">
-  <?php foreach (Analytics::PROFILE_DIMENSIONS as $dim => $label): $rows = $data['profiles'][$dim]; ?>
+  <?php foreach (AnalyticsProfiles::PROFILE_DIMENSIONS as $dim => $label): $rows = $data['profiles'][$dim]; ?>
     <div class="col-lg-6">
       <div class="card border-0 shadow-sm h-100"><div class="card-body">
         <h6 class="fw-semibold mb-2">By <?= e(lcfirst($label)) ?></h6>
