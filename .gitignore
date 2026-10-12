@@ -11,3 +11,7 @@ storage/term-documents/
 backup_*.sql
 /*.sql
 *.sql.gz
+
+# Test tools (tests/composer.json) and PHPUnit cache: installed locally, never committed
+tests/vendor/
+tests/.phpunit.cache/

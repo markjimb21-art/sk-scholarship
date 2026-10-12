@@ -200,6 +200,7 @@ Types: 3 untyped parameters remain: `ApplicantController::measurement($value)`, 
 | **B4** | **Admin "Reset password" reports success for a user that doesn't exist.** | `AdminController::userReset` runs the UPDATE and audit-logs without checking the id (0 rows changed → still "Password reset.") | Misleading message and a bogus audit row (crafted request only) |
 | **B5** | **The OTP e-mail still prints the code in the old navy** `#0d3b66`. | `AuthController.php:134` inline style | Off-brand (the rest of the e-mail uses the new tokens) |
 | **B6** | **Sign out is a GET link** (`?r=logout`). | `public/index.php` `case 'logout'` | Another site could sign a user out (low severity) |
+| **B7** | **An error after a page has started returns HTTP 200**, not 500. *(Found in Stage 1, while proving the smoke test catches errors.)* | `public/index.php` exception handler: `http_response_code(500)` only when `!headers_sent()`; by the time a view throws, the layout has already been sent | In production the user sees half a page with the error page appended; monitoring sees a "successful" request |
 
 ---
 

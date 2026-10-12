@@ -4,7 +4,8 @@ declare(strict_types=1);
 // Paths
 define('BASE_PATH', dirname(__DIR__));
 define('PUBLIC_PATH', BASE_PATH . '/public');
-define('STORAGE_PATH', BASE_PATH . '/storage');
+// The automated tests point STORAGE_PATH at a temporary folder so they never write into the real storage/.
+define('STORAGE_PATH', getenv('STORAGE_PATH') ?: BASE_PATH . '/storage');
 define('DOCUMENT_PATH', STORAGE_PATH . '/documents');            // PRIVATE application documents, outside the web root
 define('TERM_DOCUMENT_PATH', STORAGE_PATH . '/term-documents');  // PRIVATE claim/renewal documents, outside the web root
 define('VIEW_PATH', BASE_PATH . '/app/views');

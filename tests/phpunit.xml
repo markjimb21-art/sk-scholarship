@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Run from the project root:  tests/vendor/bin/phpunit -c tests/phpunit.xml   (install once: composer -d tests install) -->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="bootstrap.php"
+         cacheDirectory=".phpunit.cache"
+         colors="true"
+         failOnWarning="true"
+         failOnNotice="true"
+         failOnDeprecation="true"
+         failOnRisky="true"
+         executionOrder="default">
+    <php>
+        <!-- force="true": these win over the real environment and over .env, so a test can never reach sk_scholarship. -->
+        <env name="DB_NAME" value="sk_scholarship_test" force="true"/>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="MAIL_HOST" value="127.0.0.1" force="true"/>
+        <env name="MAIL_PORT" value="9" force="true"/>
+        <env name="MAIL_ENCRYPTION" value="none" force="true"/>
+        <env name="MAIL_USER" value="" force="true"/>
+        <env name="MAIL_FROM" value="noreply@test.local" force="true"/>
+        <ini name="error_reporting" value="-1"/>
+    </php>
+    <testsuites>
+        <testsuite name="unit">
+            <directory>unit</directory>
+        </testsuite>
+        <testsuite name="integration">
+            <directory>integration</directory>
+        </testsuite>
+        <testsuite name="http">
+            <directory>http</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

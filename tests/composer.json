@@ -1,0 +1,12 @@
+{
+    "name": "sk-edukabataan/tests",
+    "description": "Test tools only. Installed into tests/vendor (git-ignored); the application's own vendor/ is never touched.",
+    "type": "project",
+    "license": "proprietary",
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
