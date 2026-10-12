@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require_once BASE_PATH . '/app/models/Applicant.php';
 require_once BASE_PATH . '/app/models/Application.php';
+require_once BASE_PATH . '/app/models/ApplicationEligibility.php';
+require_once BASE_PATH . '/app/models/ApplicationSearch.php';
 require_once BASE_PATH . '/app/models/Document.php';
 require_once BASE_PATH . '/app/models/DocumentStorage.php';
 require_once BASE_PATH . '/app/models/Interview.php';

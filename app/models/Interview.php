@@ -727,7 +727,7 @@ final class Interview
         $rows = $stmt->fetchAll();
         foreach ($rows as $i => &$r) {
             $r['rank'] = $i + 1;
-            $r['eligibility'] = Application::eligibility($r);
+            $r['eligibility'] = ApplicationEligibility::evaluate($r);
         }
         unset($r);
         return $rows;

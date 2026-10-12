@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require_once BASE_PATH . '/app/models/Applicant.php';
 require_once BASE_PATH . '/app/models/Application.php';
+require_once BASE_PATH . '/app/models/ApplicationEligibility.php';
+require_once BASE_PATH . '/app/models/ApplicationSearch.php';
 require_once BASE_PATH . '/app/models/Document.php';
 require_once BASE_PATH . '/app/models/DocumentStorage.php';
 require_once BASE_PATH . '/app/models/Interview.php';
@@ -193,8 +195,8 @@ final class AdminController
         ];
         $page = max(1, (int)($_GET['page'] ?? 1));
         $limit = 25;
-        $rows = Application::search($filters, $limit, ($page - 1) * $limit);
-        $total = Application::count($filters);
+        $rows = ApplicationSearch::search($filters, $limit, ($page - 1) * $limit);
+        $total = ApplicationSearch::count($filters);
         $pages = max(1, (int)ceil($total / $limit));
         $programs = Program::options();
         render('admin/applications', compact('filters', 'page', 'rows', 'total', 'pages', 'programs'), 'Applications');

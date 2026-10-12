@@ -8,7 +8,7 @@ final class ScreeningController
     public function queue(): void
     {
         $programId = !empty($_GET['program_id']) ? (int)$_GET['program_id'] : null;
-        $rows = Application::search(['status' => 'Submitted', 'program_id' => $programId], 200);
+        $rows = ApplicationSearch::search(['status' => 'Submitted', 'program_id' => $programId], 200);
         $programs = Program::options();
         render('admin/screening', compact('rows', 'programs', 'programId'), 'Screening');
     }
@@ -19,7 +19,7 @@ final class ScreeningController
         $app = Application::withDetails((int)($_GET['id'] ?? 0));
         if (!$app) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
 
-        $eligibility = Application::eligibility($app);
+        $eligibility = ApplicationEligibility::evaluate($app);
         $scholar = Scholar::forApplication((int)$app['id']);
         $attempts = Interview::attemptsForApplication((int)$app['id']);
         $auditTrail = AuditLog::forApplication((int)$app['id']);
