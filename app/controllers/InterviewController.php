@@ -21,7 +21,7 @@ final class InterviewController
         // The New-schedule form suggests free blocks only; existing schedules with room are listed beside it.
         $suggestions = $program ? InterviewSlots::suggestSlots((int)$program['id'], 5, $noSuggestionReason, false) : [];
         $slotRequests = $program ? SlotRequest::pending((int)$program['id']) : [];
-        render('admin/interviews', compact('program', 'programs', 'schedules', 'waiting', 'suggestions', 'noSuggestionReason', 'slotRequests'), 'Interviews');
+        render('admin/interviews', compact('program', 'programs', 'schedules', 'waiting', 'suggestions', 'noSuggestionReason', 'slotRequests') + ['pageScripts' => [asset('js/pages/interviews.js')]], 'Interviews');
     }
 
     /** One schedule: assigned applicants with attendance/score actions, and bulk-assign within capacity. */
@@ -32,7 +32,7 @@ final class InterviewController
         $assignments = Interview::assignmentsBySchedule((int)$schedule['id']);
         $waiting = Interview::qualifiedWithoutSchedule((int)$schedule['program_id']);
         $free = max(0, (int)$schedule['max_slots'] - (int)$schedule['assigned_count']);
-        render('admin/interview_schedule', compact('schedule', 'assignments', 'waiting', 'free'),
+        render('admin/interview_schedule', compact('schedule', 'assignments', 'waiting', 'free') + ['pageScripts' => [asset('js/pages/interview-schedule.js')]],
             'Interview · ' . date('M d, Y', strtotime($schedule['interview_date'])));
     }
 
@@ -118,7 +118,7 @@ final class InterviewController
         $defaultVenue = Interview::lastVenue((int)$app['program_id']);
         $schedulable = in_array($app['status'], ['Qualified', 'Interview Scheduled'], true)
             && !($app['status'] === 'Interview Scheduled' && ($currentAssignment['attendance'] ?? '') !== 'Scheduled');
-        render('admin/interview_reschedule', compact('app', 'currentAssignment', 'missed', 'suggestions', 'why', 'pending', 'defaultVenue', 'schedulable'),
+        render('admin/interview_reschedule', compact('app', 'currentAssignment', 'missed', 'suggestions', 'why', 'pending', 'defaultVenue', 'schedulable') + ['pageScripts' => [asset('js/pages/interview-reschedule.js')]],
             'Schedule interview · ' . ($app['applicant']['full_name'] ?? ''));
     }
 
@@ -173,7 +173,7 @@ final class InterviewController
         $evaluation = InterviewScore::evaluation((int)$assignment['id']);
         $editable = $assignment['attendance'] === 'Scheduled'
             || ($assignment['attendance'] === 'Attended' && $assignment['app_status'] === 'Interviewed');
-        render('admin/interview_score', compact('assignment', 'evaluation', 'editable'), 'Interview score · ' . $assignment['full_name']);
+        render('admin/interview_score', compact('assignment', 'evaluation', 'editable') + ['pageScripts' => [asset('js/pages/interview-score.js')]], 'Interview score · ' . $assignment['full_name']);
     }
 
     public function scoreSave(): void
@@ -199,7 +199,7 @@ final class InterviewController
         foreach ($ranking as $r) {
             if ($r['status'] === 'Waitlisted') { $nextWaitlisted = $r; break; }
         }
-        render('admin/decisions', compact('program', 'programs', 'ranking', 'slots', 'slotsUsed', 'nextWaitlisted'), 'Final Decisions');
+        render('admin/decisions', compact('program', 'programs', 'ranking', 'slots', 'slotsUsed', 'nextWaitlisted') + ['pageScripts' => [asset('js/pages/decisions.js')]], 'Final Decisions');
     }
 
     /** Approve | Waitlist | Reject (reason). */

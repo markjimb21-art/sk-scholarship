@@ -16,7 +16,7 @@ final class ReportController
     {
         $reports = Report::CATALOG;
         $programs = Program::options();
-        render('admin/reports', compact('reports', 'programs'), 'Reports');
+        render('admin/reports', compact('reports', 'programs') + ['pageScripts' => [asset('js/pages/reports.js')]], 'Reports');
     }
 
     public function generate(): void
@@ -90,7 +90,7 @@ final class ReportController
                 'avgPerScholar' => AnalyticsBudget::avgReleasedPerScholar($pid, $ay),
             ];
         }
-        render('admin/analytics', compact('program', 'programs', 'years', 'data') + ['pageScripts' => [asset('js/sk-charts.js')]], 'Data Analytics');
+        render('admin/analytics', compact('program', 'programs', 'years', 'data') + ['pageScripts' => [asset('js/sk-charts.js'), asset('js/pages/analytics.js')]], 'Data Analytics');
     }
 
     private static function streamCsv(array $report): void

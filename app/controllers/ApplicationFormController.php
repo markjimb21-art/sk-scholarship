@@ -27,6 +27,7 @@ final class ApplicationFormController
 
         $pageScripts = [asset('js/application/shared.js'), asset('js/application/field-autosave.js'), asset('js/application/steps.js'),
                         asset('js/application/document-upload.js'), asset('js/application/review.js')];
+        if ($flags) $pageScripts[] = asset('js/application/flags.js');   // last: it must lock fields before app.js's DOMContentLoaded code
         render('applicant/application_form', compact('applicant', 'app', 'openProgram', 'personal', 'education', 'family', 'documents',
             'editable', 'completeness', 'flags', 'puroks', 'schools', 'courses', 'pageScripts'), 'My Application');
     }

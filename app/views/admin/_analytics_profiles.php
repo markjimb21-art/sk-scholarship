@@ -139,25 +139,9 @@ $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
     <?php endif; ?>
   </div></div></div>
 </div>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  if (!window.SKCharts) return;
-  // (5) applicants (blue) vs approved (orange) per group — same colours in every profile chart.
-  var profiles = <?= js_json(array_map(static fn($rows) => ['labels' => array_column($rows, 'group'), 'applicants' => array_column($rows, 'applicants'), 'approved' => array_column($rows, 'approved')], $data['profiles'])) ?>;
-  Object.keys(profiles).forEach(function (dim) {
-    var p = profiles[dim];
-    if (!p.labels.length) return;
-    SKCharts.bar('profile_' + dim, p.labels, [{ label: 'Applicants', data: p.applicants }, { label: 'Approved', data: p.approved }],
-      { horizontal: true, integer: true, xTitle: 'Applications' });
-  });
-  // (6) average GWA per semester; lower is better, so the axis is reversed (better = higher on the chart).
-  SKCharts.line('gwaTrendChart', <?= js_json(array_keys($data['gwaBySemester'])) ?>,
-    [{ label: 'Average GWA', data: <?= js_json(array_map(static fn($g) => round($g['avg'], 2), array_values($data['gwaBySemester']))) ?> }],
-    { reverse: true, yMin: 1, xTitle: 'Semester', yTitle: 'Average GWA (axis reversed: higher = better)' });
-  // (7) fund utilization over time
-  SKCharts.bar('releasedMonthChart', <?= js_json(array_map(static fn($m) => date('M Y', strtotime($m . '-01')), array_keys($data['releasedByMonth']))) ?>,
-    [{ label: 'Released', data: <?= js_json(array_values($data['releasedByMonth'])) ?> }], { money: true, xTitle: 'Release month', yTitle: 'Pesos' });
-  SKCharts.bar('releasedSemChart', <?= js_json(array_keys($data['releasedBySemester'])) ?>,
-    [{ label: 'Released', data: <?= js_json(array_values($data['releasedBySemester'])) ?> }], { money: true, xTitle: 'Semester', yTitle: 'Pesos' });
-});
-</script>
+<script type="application/json" id="profileChartData"><?= js_json([
+  'profiles' => array_map(static fn($rows) => ['labels' => array_column($rows, 'group'), 'applicants' => array_column($rows, 'applicants'), 'approved' => array_column($rows, 'approved')], $data['profiles']),
+  'gwaTrend' => ['labels' => array_keys($data['gwaBySemester']), 'values' => array_map(static fn($g) => round($g['avg'], 2), array_values($data['gwaBySemester']))],
+  'releasedByMonth' => ['labels' => array_map(static fn($m) => date('M Y', strtotime($m . '-01')), array_keys($data['releasedByMonth'])), 'values' => array_values($data['releasedByMonth'])],
+  'releasedBySemester' => ['labels' => array_keys($data['releasedBySemester']), 'values' => array_values($data['releasedBySemester'])],
+]) ?></script>

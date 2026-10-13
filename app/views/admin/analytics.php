@@ -9,13 +9,13 @@ $pct = static fn($r) => $r === null ? 'no data' : number_format($r * 100, 1) . '
   </div>
   <?php if ($programs): ?>
   <form method="GET" action="<?= url('admin/analytics') ?>" class="d-flex gap-2 align-items-end flex-wrap">
-    <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" onchange="this.form.submit()">
+    <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" data-autosubmit>
       <?php foreach ($programs as $p): ?>
         <option value="<?= (int)$p['id'] ?>" <?= $program && (int)$program['id'] === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option>
       <?php endforeach; ?>
     </select></div>
     <?php if ($data): ?>
-    <div><label class="form-label" for="f_academic_year">Academic year</label><select id="f_academic_year" name="academic_year" class="form-select form-select-sm" onchange="this.form.submit()" title="Academic year for the budget analysis">
+    <div><label class="form-label" for="f_academic_year">Academic year</label><select id="f_academic_year" name="academic_year" class="form-select form-select-sm" data-autosubmit title="Academic year for the budget analysis">
       <?php foreach ($years as $y): ?><option value="<?= e($y) ?>" <?= $data['ay'] === $y ? 'selected' : '' ?>>A.Y. <?= e($y) ?></option><?php endforeach; ?>
     </select></div>
     <?php endif; ?>
@@ -179,30 +179,9 @@ $pct = static fn($r) => $r === null ? 'no data' : number_format($r * 100, 1) . '
 
 <?php require VIEW_PATH . '/admin/_analytics_profiles.php'; ?>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  if (!window.Chart) return;
-  // One series per chart: one hue, no legend; thin bars with a rounded data end; recessive grid; value on hover.
-  var hue = '#2a78d6', ink = '#52514e', grid = 'rgba(0,0,0,.06)';
-  function bar(id, labels, values, money) {
-    var fmt = function (v) { return money ? '₱' + Number(v).toLocaleString('en-PH', {minimumFractionDigits: 2}) : String(v); };
-    new Chart(document.getElementById(id), {
-      type: 'bar',
-      data: { labels: labels, datasets: [{ data: values, backgroundColor: hue, maxBarThickness: 24, borderRadius: 4, borderSkipped: 'start' }] },
-      options: {
-        indexAxis: 'y', maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return fmt(c.parsed.x); } } } },
-        scales: {
-          x: { beginAtZero: true, grid: { color: grid }, ticks: { color: ink, precision: 0, callback: function (v) { return money ? '₱' + Number(v).toLocaleString('en-PH') : v; } } },
-          y: { grid: { display: false }, ticks: { color: ink } }
-        }
-      }
-    });
-  }
-  bar('funnelChart', <?= js_json(array_map(static fn($s) => $s, AnalyticsFunnel::STAGES)) ?>, <?= js_json(array_values($c)) ?>, false);
-  bar('budgetChart', ['Total budget', 'Released', 'Committed', 'Projected need'],
-      <?= js_json([(float)($data['budget']['total_budget'] ?? 0), (float)($data['budget']['released'] ?? 0), round($data['committed'], 2), round($data['projectedNeed'], 2)]) ?>, true);
-  bar('scoreChart', <?= js_json(array_keys($sc['bands'])) ?>, <?= js_json(array_values($sc['bands'])) ?>, false);
-});
-</script>
+<script type="application/json" id="analyticsChartData"><?= js_json([
+  'funnel' => ['labels' => AnalyticsFunnel::STAGES, 'values' => array_values($c)],
+  'budget' => [(float)($data['budget']['total_budget'] ?? 0), (float)($data['budget']['released'] ?? 0), round($data['committed'], 2), round($data['projectedNeed'], 2)],
+  'scores' => ['labels' => array_keys($sc['bands']), 'values' => array_values($sc['bands'])],
+]) ?></script>
 <?php endif; ?>

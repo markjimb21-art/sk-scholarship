@@ -14,7 +14,7 @@
     <div class="card border-0 shadow-sm h-100"><div class="card-body">
       <h6 class="fw-semibold">Decision</h6>
       <?php if ($canDecide && $req['scholar_status'] === 'Active'): ?>
-        <form method="POST" action="<?= url('admin/renewals/decide') ?>" class="d-inline" onsubmit="return confirm('Approve? This opens <?= e($req['academic_year'] . ' ' . $req['semester']) ?> for the scholar.');">
+        <form method="POST" action="<?= url('admin/renewals/decide') ?>" class="d-inline" data-confirm="Approve? This opens <?= e($req['academic_year'] . ' ' . $req['semester']) ?> for the scholar.">
           <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="decision" value="approve">
           <button class="btn btn-success"><i class="bi bi-check-circle"></i> Approved — open <?= e($req['academic_year'] . ' ' . $req['semester']) ?></button>
         </form>

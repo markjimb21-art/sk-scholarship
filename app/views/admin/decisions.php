@@ -5,7 +5,7 @@
     <p class="text-muted small mb-0">Ranked by interview total (highest first); ties go to the lower family income, then the better GWA.</p>
   </div>
   <form method="GET" action="<?= url('admin/decisions') ?>">
-    <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" onchange="this.form.submit()">
+    <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" data-autosubmit>
       <?php foreach ($programs as $p): ?>
         <option value="<?= (int)$p['id'] ?>" <?= $program && (int)$program['id'] === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option>
       <?php endforeach; ?>
@@ -31,7 +31,7 @@
 <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
   <div><strong>A slot is free.</strong> Promote the next waitlisted applicant, <strong><?= e($nextWaitlisted['full_name']) ?></strong>
     (rank <?= (int)$nextWaitlisted['rank'] ?>, score <?= e(number_format((float)$nextWaitlisted['total_score'], 2)) ?>)?</div>
-  <form method="POST" action="<?= url('admin/decisions/decide') ?>" onsubmit="return confirm('Approve <?= e(addslashes($nextWaitlisted['full_name'])) ?>? This creates the scholar and opens Semester 1.');">
+  <form method="POST" action="<?= url('admin/decisions/decide') ?>" data-confirm="Approve <?= e($nextWaitlisted['full_name']) ?>? This creates the scholar and opens Semester 1.">
     <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$nextWaitlisted['id'] ?>"><input type="hidden" name="decision" value="approve">
     <button class="btn btn-success btn-sm">Promote and approve</button>
   </form>
@@ -57,7 +57,7 @@
             <td><span class="badge bg-<?= e(APP_STATUS_COLORS[$r['status']]) ?>"><?= e($r['status']) ?></span></td>
             <td class="text-end text-nowrap">
               <?php if (Application::can('approve', $r['status'])): ?>
-                <form method="POST" action="<?= url('admin/decisions/decide') ?>" class="d-inline" onsubmit="return confirm('Approve this applicant? This creates the scholar and opens Semester 1.');">
+                <form method="POST" action="<?= url('admin/decisions/decide') ?>" class="d-inline" data-confirm="Approve this applicant? This creates the scholar and opens Semester 1.">
                   <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="decision" value="approve">
                   <button class="btn btn-sm btn-success" <?= $full ? 'disabled title="All slots are filled."' : '' ?>>Approve</button>
                 </form>
@@ -70,7 +70,7 @@
               <?php endif; ?>
               <?php if (Application::can('reject', $r['status'])): ?>
                 <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectModal"
-                        onclick="document.getElementById('rejectId').value = <?= (int)$r['id'] ?>; document.getElementById('rejectName').textContent = <?= e(js_json($r['full_name'])) ?>;">Reject</button>
+                        data-reject-id="<?= (int)$r['id'] ?>" data-reject-name="<?= e($r['full_name']) ?>">Reject</button>
               <?php endif; ?>
             </td>
           </tr>

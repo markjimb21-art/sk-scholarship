@@ -34,7 +34,8 @@ final class CalendarController
         $today = date('Y-m-d');
         $weekEnd = date('Y-m-d', strtotime('sunday this week'));
         render('admin/calendar', compact('programs', 'programId', 'today', 'weekEnd') + [
-            'pageScripts' => [asset('vendor/fullcalendar/core.global.min.js'), asset('vendor/fullcalendar/daygrid.global.min.js')],
+            'pageScripts' => [asset('vendor/fullcalendar/core.global.min.js'), asset('vendor/fullcalendar/daygrid.global.min.js'),
+                            asset('js/pages/calendar.js')],
         ], 'Calendar');
     }
 

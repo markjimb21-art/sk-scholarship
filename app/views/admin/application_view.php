@@ -70,7 +70,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
       <div class="card-body">
         <h6 class="fw-semibold mb-3">Screening decision</h6>
         <?php if ($screening): ?>
-          <form method="POST" action="<?= url('admin/screening/decide') ?>" class="mb-2" onsubmit="return confirm('Qualify this applicant for an interview?');">
+          <form method="POST" action="<?= url('admin/screening/decide') ?>" class="mb-2" data-confirm="Qualify this applicant for an interview?">
             <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$app['id'] ?>"><input type="hidden" name="decision" value="qualify">
             <button class="btn btn-success w-100"><i class="bi bi-check-circle"></i> Qualify for interview</button>
           </form>
@@ -137,7 +137,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
               <?php $invTable = $isNewer ? $cur['source_table'] : 'documents'; $invId = $isNewer ? (int)$cur['id'] : (int)$d['id']; ?>
               <details class="small mt-2">
                 <summary class="text-danger">Mark this file invalid…</summary>
-                <form method="POST" action="<?= url('admin/documents/invalidate') ?>" class="mt-1" onsubmit="return confirm('Remove this file? The record is kept, marked Invalid with your reason.');">
+                <form method="POST" action="<?= url('admin/documents/invalidate') ?>" class="mt-1" data-confirm="Remove this file? The record is kept, marked Invalid with your reason.">
                   <?= csrf_field() ?><input type="hidden" name="table" value="<?= e($invTable) ?>"><input type="hidden" name="id" value="<?= $invId ?>">
                   <input type="hidden" name="back" value="<?= e('admin/application&id=' . (int)$app['id']) ?>">
                   <label class="form-label" for="invReason<?= $invId ?>">Why is this file invalid?</label>

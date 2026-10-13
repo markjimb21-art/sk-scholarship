@@ -100,14 +100,4 @@ $moving = $app['status'] === 'Interview Scheduled';
     </form>
   </div>
 </div>
-<script>
-document.querySelectorAll('[data-slot-date]').forEach(function (b) {
-  b.addEventListener('click', function () {
-    document.getElementById('rsDate').value = b.dataset.slotDate;
-    document.getElementById('rsStart').value = b.dataset.slotStart;
-    document.getElementById('rsEnd').value = b.dataset.slotEnd;
-    document.getElementById('rsDate').focus();
-  });
-});
-</script>
 <?php endif; ?>

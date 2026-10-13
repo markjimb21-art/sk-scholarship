@@ -19,7 +19,7 @@ $minGwa = $term['min_gpa'] !== null ? (float)$term['min_gpa'] : 0.0;
         <form method="POST" action="<?= url('admin/claims/decide') ?>" class="mb-3">
           <?= csrf_field() ?><input type="hidden" name="term_id" value="<?= (int)$term['id'] ?>"><input type="hidden" name="decision" value="verify">
           <label class="form-label">GWA shown on the Grades <span class="text-danger">*</span></label>
-          <input type="number" name="gwa" id="gwaInput" class="form-control mb-1" min="1" max="5" step="0.01" required>
+          <input type="number" name="gwa" id="gwaInput" class="form-control mb-1" min="1" max="5" step="0.01" required data-min-gwa="<?= e(js_json($minGwa)) ?>">
           <div class="form-text mb-2">Program minimum: <?= $minGwa > 0 ? e(number_format($minGwa, 2)) . ' or better (1.00 is highest)' : 'none' ?>.</div>
           <div id="gwaWarning" class="alert alert-warning py-2 small d-none">This GWA is below the program minimum. You decide — nothing happens automatically.</div>
           <button class="btn btn-success"><i class="bi bi-check-circle"></i> Verified</button>
@@ -67,11 +67,4 @@ $minGwa = $term['min_gpa'] !== null ? (float)$term['min_gpa'] : 0.0;
     </form>
   </div>
 </div>
-<script>
-(function () {
-  var min = <?= json_encode($minGwa) ?>, input = document.getElementById('gwaInput'), warn = document.getElementById('gwaWarning');
-  if (!input || !min) return;
-  input.addEventListener('input', function () { var v = parseFloat(input.value); warn.classList.toggle('d-none', isNaN(v) || v <= min); });
-})();
-</script>
 <?php endif; ?>

@@ -9,7 +9,7 @@
       <?php endif; ?>
     </p>
   </div>
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#programModal" onclick="openProgramModal()">
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#programModal" data-program-modal>
     <i class="bi bi-plus-lg me-1"></i>Add Program
   </button>
 </div>
@@ -45,9 +45,9 @@
             </td>
             <td class="text-end text-nowrap">
               <button class="btn btn-sm btn-outline-primary" title="Edit" data-bs-toggle="modal" data-bs-target="#programModal"
-                      onclick='openProgramModal(<?= js_json($p) ?>)' aria-label="Edit program"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                      data-program-modal="<?= e(js_json($p)) ?>" aria-label="Edit program"><i class="bi bi-pencil" aria-hidden="true"></i></button>
               <form method="POST" action="<?= url('admin/program-toggle') ?>" class="d-inline"
-                    onsubmit="return confirm(<?= e(js_json(($p['is_active'] ? 'Close' : 'Open') . ' "' . $p['program_name'] . '"?')) ?>);">
+                    data-confirm="<?= e(($p['is_active'] ? 'Close' : 'Open') . ' "' . $p['program_name'] . '"?') ?>">
                 <?= csrf_field() ?>
                 <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
                 <button class="btn btn-sm btn-outline-<?= $p['is_active'] ? 'warning' : 'success' ?>"><?= $p['is_active'] ? 'Close' : 'Open' ?></button>
@@ -128,29 +128,3 @@
   </div>
 </div>
 
-<script>
-function openProgramModal(p) {
-  var set = function (id, v) { document.getElementById(id).value = (v === null || v === undefined) ? '' : v; };
-  set('programId', p ? p.id : '');
-  set('pName', p ? p.program_name : '');
-  set('pYear', p ? p.academic_year : '');
-  set('pStart', p ? p.application_start : '');
-  set('pEnd', p ? p.application_end : '');
-  set('pSlots', p ? p.slots_available : '');
-  set('pAmount', p ? p.amount_per_semester : '');
-  set('pMinGpa', p ? p.min_gpa : '');
-  set('pMaxIncome', p ? p.max_family_income : '');
-  set('pMaxAge', p ? p.max_age : '');
-  document.getElementById('pActive').checked = p ? !!Number(p.is_active) : false;
-  document.getElementById('programModalTitle').textContent = p ? 'Edit Program' : 'Add Program';
-  checkProgramDates();
-}
-// Convenience only — the server re-validates everything.
-function checkProgramDates() {
-  var s = document.getElementById('pStart').value, e = document.getElementById('pEnd').value, bad = s && e && e < s;
-  document.getElementById('programDateError').classList.toggle('d-none', !bad);
-  document.getElementById('programSubmitBtn').disabled = bad;
-}
-document.getElementById('pStart').addEventListener('input', checkProgramDates);
-document.getElementById('pEnd').addEventListener('input', checkProgramDates);
-</script>

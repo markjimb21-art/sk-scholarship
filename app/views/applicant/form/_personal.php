@@ -1,6 +1,6 @@
 <?php /* Step I — Personal Information. Part of applicant/application_form.php; uses its variables. */ ?>
       <!-- STEP 1: PERSONAL -->
-      <form class="form-step" onsubmit="return false;" data-step="personal">
+      <form class="form-step" data-no-submit data-step="personal">
         <?= csrf_field() ?>
         <input type="hidden" name="step" value="personal">
         <h5 class="fw-semibold mb-3">I. Personal Information</h5>

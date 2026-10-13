@@ -10,7 +10,7 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
     <h4 class="fw-bold mb-0">Users</h4>
     <p class="text-muted small mb-0">Staff accounts (admin, reviewer, treasurer) are created here; applicants register themselves and verify their e-mail.</p>
   </div>
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick="openUserModal()"><i class="bi bi-person-plus"></i> Add staff</button>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" data-user-modal><i class="bi bi-person-plus"></i> Add staff</button>
 </div>
 
 <form method="GET" action="<?= url('admin/users') ?>" class="card border-0 shadow-sm mb-3">
@@ -40,10 +40,10 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
             <td><small class="text-muted"><?= $u['last_login'] ? e(date('M d, Y g:i A', strtotime($u['last_login']))) : 'Never' ?></small></td>
             <td class="text-end text-nowrap">
               <?php if ($u['role_name'] !== 'applicant'): ?>
-                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick='openUserModal(<?= js_json($u) ?>)' aria-label="Edit account"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#userModal" data-user-modal="<?= e(js_json($u)) ?>" aria-label="Edit account"><i class="bi bi-pencil" aria-hidden="true"></i></button>
               <?php endif; ?>
               <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#resetModal"
-                      onclick='document.getElementById("resetId").value = <?= (int)$u["id"] ?>; document.getElementById("resetEmail").textContent = <?= js_json($u["email"]) ?>;' aria-label="Reset password for <?= e($u['email']) ?>">
+                      data-reset-id="<?= (int)$u['id'] ?>" data-reset-email="<?= e($u['email']) ?>" aria-label="Reset password for <?= e($u['email']) ?>">
                 <i class="bi bi-key"></i></button>
               <?php if (!$self): ?>
                 <form method="POST" action="<?= url('admin/user-toggle') ?>" class="d-inline">
@@ -108,14 +108,3 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
   </div>
 </div>
 
-<script>
-function openUserModal(u) {
-  document.getElementById('userId').value = u ? u.id : '';
-  document.getElementById('userName').value = u ? u.full_name : '';
-  document.getElementById('userEmail').value = u ? u.email : '';
-  document.getElementById('userContact').value = u ? (u.contact_number || '') : '';
-  document.getElementById('userPasswordRow').style.display = u ? 'none' : '';
-  document.getElementById('userRole').value = u ? u.role_name : 'reviewer';
-  document.getElementById('userModalTitle').textContent = u ? 'Edit staff account' : 'Add staff';
-}
-</script>

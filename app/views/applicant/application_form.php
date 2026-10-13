@@ -89,26 +89,5 @@ $program = $app ?: $openProgram;
   </div>
 </div>
 <?php if ($flags): ?>
-<script>
-// Returned with flagged items: highlight them and lock everything else (the server keeps unflagged values regardless).
-document.addEventListener('DOMContentLoaded', function () {
-  var flags = <?= js_json($flags) ?>, fields = <?= js_json(array_map('array_keys', RETURN_FLAG_FIELDS)) ?>;
-  Object.keys(fields).forEach(function (step) {
-    var form = document.querySelector('form[data-step="' + step + '"]');
-    if (!form) return;
-    fields[step].forEach(function (name) {
-      form.querySelectorAll('[name="' + name + '"]').forEach(function (el) {
-        if (flags.indexOf(step + '.' + name) !== -1) {
-          el.classList.add('is-invalid');
-          var note = document.createElement('div'); note.className = 'invalid-feedback d-block'; note.textContent = 'Flagged by the SK office — please correct.';
-          (el.closest('.col-12, [class*="col-"]') || el.parentNode).appendChild(note);
-        } else {
-          el.disabled = true;
-          el.title = 'Accepted as submitted';
-        }
-      });
-    });
-  });
-});
-</script>
+<script type="application/json" id="returnFlagData"><?= js_json(['flags' => $flags, 'fields' => array_map('array_keys', RETURN_FLAG_FIELDS)]) ?></script>
 <?php endif; ?>

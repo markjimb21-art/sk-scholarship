@@ -59,7 +59,7 @@
   <h5 class="fw-semibold mb-0">Program</h5>
   <?php if ($programs): ?>
   <form method="GET" action="<?= url('admin/dashboard') ?>">
-    <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" onchange="this.form.submit()">
+    <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" data-autosubmit>
       <?php foreach ($programs as $p): ?>
         <option value="<?= (int)$p['id'] ?>" <?= $program && (int)$program['id'] === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option>
       <?php endforeach; ?>

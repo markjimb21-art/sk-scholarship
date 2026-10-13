@@ -22,6 +22,6 @@ final class AuditController
 
         [$actions, $entityTypes] = AuditLog::filterOptions();
         $users = User::options();
-        render('admin/audit_Logs', compact('filters', 'logs', 'total', 'page', 'pages', 'actions', 'entityTypes', 'users'), 'Audit Logs');
+        render('admin/audit_Logs', compact('filters', 'logs', 'total', 'page', 'pages', 'actions', 'entityTypes', 'users') + ['pageScripts' => [asset('js/pages/audit-logs.js')]], 'Audit Logs');
     }
 }

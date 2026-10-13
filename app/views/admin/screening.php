@@ -4,7 +4,7 @@
     <p class="text-muted small mb-0"><?= count($rows) ?> submitted application(s) waiting, oldest first. Open one to qualify, return or reject it.</p>
   </div>
   <form method="GET" action="<?= url('admin/screening') ?>" class="d-flex gap-2 align-items-end flex-wrap">
-    <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" onchange="this.form.submit()">
+    <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" data-autosubmit>
       <option value="">All programs</option>
       <?php foreach ($programs as $p): ?>
         <option value="<?= (int)$p['id'] ?>" <?= $programId === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?></option>

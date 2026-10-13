@@ -50,7 +50,7 @@ $steps = ['Apply', 'Screening', 'Interview', 'Final result', 'Claim cash', 'Rene
     <h5 class="fw-semibold mb-2"><i class="bi bi-calendar-check"></i> Pick an interview slot</h5>
     <?php if ($slotRequest && $slotRequest['status'] === 'Pending'): ?>
       <p class="mb-2">You asked for <strong><?= e(SlotRequest::describe($slotRequest)) ?></strong>. The SK office will confirm it — we will e-mail you.</p>
-      <form method="POST" action="<?= url('applicant/slot-request/cancel') ?>" onsubmit="return confirm('Withdraw this request?');">
+      <form method="POST" action="<?= url('applicant/slot-request/cancel') ?>" data-confirm="Withdraw this request?">
         <?= csrf_field() ?><button class="btn btn-sm btn-outline-secondary">Withdraw request</button>
       </form>
     <?php else: ?>

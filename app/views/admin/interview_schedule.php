@@ -15,12 +15,12 @@ $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] 
   <div class="d-flex gap-2">
     <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editModal"><i class="bi bi-pencil"></i> Edit</button>
     <?php if ((int)$schedule['assigned_count'] === 0): ?>
-      <form method="POST" action="<?= url('admin/interview-schedule-delete') ?>" onsubmit="return confirm('Delete this empty schedule?');">
+      <form method="POST" action="<?= url('admin/interview-schedule-delete') ?>" data-confirm="Delete this empty schedule?">
         <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$schedule['id'] ?>">
         <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Delete</button>
       </form>
     <?php elseif (!$anyMarked): ?>
-      <form method="POST" action="<?= url('admin/interview-schedule-cancel') ?>" onsubmit="return confirm('Cancel this schedule? Everyone assigned goes back to the waiting list and is notified.');">
+      <form method="POST" action="<?= url('admin/interview-schedule-cancel') ?>" data-confirm="Cancel this schedule? Everyone assigned goes back to the waiting list and is notified.">
         <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$schedule['id'] ?>">
         <button class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle"></i> Cancel schedule</button>
       </form>
@@ -50,13 +50,13 @@ $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] 
                 <?php if ($started): ?>
                   <a class="btn btn-sm btn-success" href="<?= url('admin/interview-score&id=' . (int)$a['id']) ?>"><i class="bi bi-check2"></i> Attended — score</a>
                   <form method="POST" action="<?= url('admin/interview-no-show') ?>" class="d-inline"
-                        onsubmit="return confirm(<?= e(js_json((int)$a['reschedule_count'] ? 'This was their rescheduled interview. Marking a no-show REJECTS the application. Continue?' : 'Mark as no-show? They go back to the waiting list for one reschedule.')) ?>);">
+                        data-confirm="<?= e((int)$a['reschedule_count'] ? 'This was their rescheduled interview. Marking a no-show REJECTS the application. Continue?' : 'Mark as no-show? They go back to the waiting list for one reschedule.') ?>">
                     <?= csrf_field() ?><input type="hidden" name="assignment_id" value="<?= (int)$a['id'] ?>"><input type="hidden" name="schedule_id" value="<?= (int)$schedule['id'] ?>">
                     <button class="btn btn-sm btn-outline-danger">No-show</button>
                   </form>
                 <?php else: ?>
                   <a class="btn btn-sm btn-outline-primary" href="<?= url('admin/interview-reschedule&id=' . (int)$a['id']) ?>">Reschedule</a>
-                  <form method="POST" action="<?= url('admin/interview-unassign') ?>" class="d-inline" onsubmit="return confirm('Remove this applicant from the schedule? They are notified.');">
+                  <form method="POST" action="<?= url('admin/interview-unassign') ?>" class="d-inline" data-confirm="Remove this applicant from the schedule? They are notified.">
                     <?= csrf_field() ?><input type="hidden" name="assignment_id" value="<?= (int)$a['id'] ?>"><input type="hidden" name="schedule_id" value="<?= (int)$schedule['id'] ?>">
                     <button class="btn btn-sm btn-outline-secondary">Remove</button>
                   </form>
@@ -98,23 +98,11 @@ $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] 
     </ul>
     <div class="card-footer bg-white d-flex justify-content-between align-items-center">
       <span class="small text-muted" id="assignCount">0 selected (max <?= $free ?>)</span>
-      <button class="btn btn-primary" id="assignBtn" disabled><i class="bi bi-person-plus"></i> Assign and notify</button>
+      <button class="btn btn-primary" id="assignBtn" data-max="<?= (int)$free ?>" disabled><i class="bi bi-person-plus"></i> Assign and notify</button>
     </div>
   </form>
   <?php endif; ?>
 </div>
-<script>
-// Convenience only: the server re-checks capacity for every applicant.
-(function () {
-  var boxes = document.querySelectorAll('.assign-box'), btn = document.getElementById('assignBtn'), out = document.getElementById('assignCount'), max = <?= (int)$free ?>;
-  if (!btn) return;
-  boxes.forEach(function (b) { b.addEventListener('change', function () {
-    var n = document.querySelectorAll('.assign-box:checked').length;
-    out.textContent = n + ' selected (max ' + max + ')';
-    btn.disabled = n === 0 || n > max;
-  }); });
-})();
-</script>
 <?php endif; ?>
 
 <?php if (!$cancelled): ?>

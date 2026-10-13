@@ -58,7 +58,7 @@
                   <?php endif; ?>
                 </p>
                 <?php if ($editable && $docEditable && $hasFile): ?>
-                  <form method="POST" action="<?= url('applicant/documents/invalidate') ?>" class="small" onsubmit="return confirm('Remove this file? Use this only if you uploaded the wrong file. The record is kept.');">
+                  <form method="POST" action="<?= url('applicant/documents/invalidate') ?>" class="small" data-confirm="Remove this file? Use this only if you uploaded the wrong file. The record is kept.">
                     <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><input type="hidden" name="reason" value="Wrong file uploaded">
                     <button class="btn btn-link btn-sm text-danger p-0">This is the wrong file — remove it</button>
                   </form>

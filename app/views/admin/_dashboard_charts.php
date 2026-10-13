@@ -60,16 +60,9 @@ $gwaRows = array_filter($charts['gwa']);
   </div></div></div>
   <?php endif; ?>
 </div>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  if (!window.SKCharts) return;
-  SKCharts.bar('dashStatus', <?= js_json(array_map(static fn($s) => APP_STATUS_LABELS[$s] ?? $s, array_keys($status))) ?>,
-    [{ label: 'Applications', data: <?= js_json(array_values($status)) ?> }], { horizontal: true, integer: true, xTitle: 'Applications' });
-  SKCharts.bar('dashBudget', <?= js_json(array_keys($budgetRows)) ?>, [{ label: 'Amount', data: <?= js_json(array_values($budgetRows)) ?> }],
-    { horizontal: true, money: true, xTitle: 'Pesos' });
-  SKCharts.bar('dashMonths', <?= js_json(array_map(static fn($m) => date('M Y', strtotime($m . '-01')), array_keys($charts['months']))) ?>,
-    [{ label: 'Released', data: <?= js_json(array_values($charts['months'])) ?> }], { money: true, xTitle: 'Release month', yTitle: 'Pesos' });
-  SKCharts.bar('dashGwa', <?= js_json(array_keys($charts['gwa'])) ?>, [{ label: 'Scholars', data: <?= js_json(array_values($charts['gwa'])) ?> }],
-    { integer: true, xTitle: 'GWA band', yTitle: 'Active scholars' });
-});
-</script>
+<script type="application/json" id="dashboardChartData"><?= js_json([
+  'status' => ['labels' => array_map(static fn($s) => APP_STATUS_LABELS[$s] ?? $s, array_keys($status)), 'values' => array_values($status)],
+  'budget' => ['labels' => array_keys($budgetRows), 'values' => array_values($budgetRows)],
+  'months' => ['labels' => array_map(static fn($m) => date('M Y', strtotime($m . '-01')), array_keys($charts['months'])), 'values' => array_values($charts['months'])],
+  'gwa' => ['labels' => array_keys($charts['gwa']), 'values' => array_values($charts['gwa'])],
+]) ?></script>

@@ -4,7 +4,7 @@ $isRelease = $purpose === 'release';
 $stateColor = ['open' => 'success', 'not_open_yet' => 'info', 'deadline_passed' => 'warning', 'closed' => 'secondary', 'cancelled' => 'danger', 'not_created' => 'secondary'];
 $dt = static fn(?string $v): string => $v ? date('M d, Y g:i A', strtotime($v)) : '—';
 $local = static fn(?string $v): string => $v ? date('Y-m-d\TH:i', strtotime($v)) : '';
-$editId = (int)($_GET['edit'] ?? 0);
+$editId = (int)($_GET['edit'] ?? 0);   // opened straight away by pages/term-schedules.js
 ?>
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
@@ -16,7 +16,7 @@ $editId = (int)($_GET['edit'] ?? 0);
       Creating a window e-mails every scholar it applies to; a reminder goes out 48 hours before the deadline.
     </p>
   </div>
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#scheduleModal" onclick="openScheduleModal()"><i class="bi bi-plus-lg"></i> New window</button>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#scheduleModal" data-schedule-modal><i class="bi bi-plus-lg"></i> New window</button>
 </div>
 
 <?php if ($needed): ?>
@@ -26,7 +26,7 @@ $editId = (int)($_GET['edit'] ?? 0);
       <?php foreach ($needed as $n): ?>
         <li><?= e($n['program_name'] . ' — ' . $n['academic_year'] . ' ' . $n['semester']) ?> (<?= (int)$n['n'] ?> scholar(s))
           <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-bs-toggle="modal" data-bs-target="#scheduleModal"
-                  onclick='openScheduleModal(null, <?= js_json(['program_id' => (int)$n['program_id'], 'academic_year' => $n['academic_year'], 'semester' => $n['semester']]) ?>)'>Create window</button></li>
+                  data-schedule-prefill="<?= e(js_json(['program_id' => (int)$n['program_id'], 'academic_year' => $n['academic_year'], 'semester' => $n['semester']])) ?>">Create window</button></li>
       <?php endforeach; ?>
     </ul>
   </div>
@@ -52,7 +52,7 @@ $editId = (int)($_GET['edit'] ?? 0);
             <td><span class="badge bg-<?= e($stateColor[$s['state']]) ?>"><?= e(TermSchedule::STATE_LABELS[$s['state']]) ?></span></td>
             <td class="text-end">
               <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#scheduleModal" data-edit-id="<?= (int)$s['id'] ?>"
-                      onclick='openScheduleModal(<?= js_json(array_intersect_key($s, array_flip(['id', 'program_id', 'program_name', 'academic_year', 'semester', 'status', 'notes', 'planned_date'])) + ['opens_at' => $local($s['opens_at']), 'submission_deadline' => $local($s['submission_deadline'])]) ?>)'><i class="bi bi-pencil"></i></button>
+                      data-schedule-modal="<?= e(js_json(array_intersect_key($s, array_flip(['id', 'program_id', 'program_name', 'academic_year', 'semester', 'status', 'notes', 'planned_date'])) + ['opens_at' => $local($s['opens_at']), 'submission_deadline' => $local($s['submission_deadline'])])) ?>"><i class="bi bi-pencil"></i></button>
             </td>
           </tr>
           <?php if ($s['notes']): ?><tr><td></td><td colspan="7" class="small text-muted border-top-0 pt-0"><?= e($s['notes']) ?></td></tr><?php endif; ?>
@@ -64,7 +64,7 @@ $editId = (int)($_GET['edit'] ?? 0);
 
 <?php require VIEW_PATH . '/admin/_missed_deadlines.php'; ?>
 
-<div class="modal fade" id="scheduleModal" tabindex="-1">
+<div class="modal fade" id="scheduleModal" data-open-edit="<?= $editId ?>" tabindex="-1">
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/term-schedule-save') ?>" class="modal-content">
       <?= csrf_field() ?>
@@ -119,29 +119,3 @@ $editId = (int)($_GET['edit'] ?? 0);
     </form>
   </div>
 </div>
-<script>
-function openScheduleModal(s, prefill) {
-  var edit = !!s, v = function (id, val) { document.getElementById(id).value = val == null ? '' : val; };
-  v('schId', edit ? s.id : '');
-  document.getElementById('schTitle').textContent = edit ? 'Edit window' : 'New window';
-  document.getElementById('schFixed').classList.toggle('d-none', edit);
-  ['schProgram', 'schYear', 'schSemester'].forEach(function (id) { document.getElementById(id).disabled = edit; });
-  var fixed = document.getElementById('schFixedText');
-  fixed.classList.toggle('d-none', !edit);
-  fixed.textContent = edit ? s.program_name + ' — ' + s.academic_year + ' ' + s.semester : '';
-  var p = prefill || {};
-  if (!edit) { v('schProgram', p.program_id || ''); if (p.academic_year) v('schYear', p.academic_year); if (p.semester) v('schSemester', p.semester); }
-  v('schOpens', edit ? s.opens_at : '');
-  v('schDeadline', edit ? s.submission_deadline : '');
-  v('schPlanned', edit ? s.planned_date : '');
-  v('schNotes', edit ? s.notes : '');
-  v('schStatus', edit ? s.status : 'Open');
-  document.getElementById('schStatusWrap').classList.toggle('d-none', !edit);
-}
-<?php if ($editId): ?>
-document.addEventListener('DOMContentLoaded', function () {
-  var b = document.querySelector('[data-edit-id="<?= $editId ?>"]');
-  if (b) b.click();
-});
-<?php endif; ?>
-</script>

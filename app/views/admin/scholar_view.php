@@ -95,7 +95,7 @@
     <div class="card border-0 shadow-sm h-100"><div class="card-body">
       <h6 class="fw-semibold">End scholarship</h6>
       <?php if ($scholar['status'] === 'Active'): ?>
-        <form method="POST" action="<?= url('admin/scholar-end') ?>" onsubmit="return confirm('End this scholarship? The scholar can no longer claim or renew.');">
+        <form method="POST" action="<?= url('admin/scholar-end') ?>" data-confirm="End this scholarship? The scholar can no longer claim or renew.">
           <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$scholar['id'] ?>">
           <label class="form-label" for="endReason">Why is it ending?</label>
           <select name="reason" id="endReason" class="form-select mb-2" required>

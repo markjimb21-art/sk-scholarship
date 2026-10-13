@@ -45,7 +45,7 @@
         <?php foreach ($holidays as $h): ?>
           <li class="list-group-item d-flex justify-content-between align-items-center">
             <span><strong><?= e(date('D, M j, Y', strtotime($h['holiday_date']))) ?></strong> — <?= e($h['name']) ?></span>
-            <form method="POST" action="<?= url('admin/settings/holiday-delete') ?>" onsubmit="return confirm('Remove this holiday?');">
+            <form method="POST" action="<?= url('admin/settings/holiday-delete') ?>" data-confirm="Remove this holiday?">
               <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
               <button class="btn btn-sm btn-outline-danger" aria-label="Remove <?= e($h['name']) ?>"><i class="bi bi-x-lg"></i></button>
             </form>

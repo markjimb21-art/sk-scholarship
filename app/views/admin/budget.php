@@ -4,7 +4,7 @@
     <h4 class="fw-bold mb-0">Budget</h4>
     <p class="text-muted small mb-0">One budget per program and academic year. Releases are blocked without one.</p>
   </div>
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#budgetModal" onclick="openBudgetModal()"><i class="bi bi-plus-lg"></i> Add budget</button>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#budgetModal" data-budget-modal><i class="bi bi-plus-lg"></i> Add budget</button>
 </div>
 
 <div class="card border-0 shadow-sm mb-3">
@@ -25,9 +25,9 @@
             <td><?= e($peso($b['committed'])) ?></td>
             <td class="<?= $after < 0 ? 'text-danger fw-bold' : 'text-success' ?>"><?= e(($after < 0 ? 'Shortfall ' : 'Surplus ') . $peso(abs($after))) ?></td>
             <td class="text-end text-nowrap">
-              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#budgetModal" onclick='openBudgetModal(<?= js_json($b) ?>)' aria-label="Edit budget"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#budgetModal" data-budget-modal="<?= e(js_json($b)) ?>" aria-label="Edit budget"><i class="bi bi-pencil" aria-hidden="true"></i></button>
               <?php if ((float)$b['released'] == 0.0): ?>
-                <form method="POST" action="<?= url('admin/budget-delete') ?>" class="d-inline" onsubmit="return confirm('Delete this budget?');">
+                <form method="POST" action="<?= url('admin/budget-delete') ?>" class="d-inline" data-confirm="Delete this budget?">
                   <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
                   <button class="btn btn-sm btn-outline-danger" aria-label="Delete budget"><i class="bi bi-trash" aria-hidden="true"></i></button>
                 </form>
@@ -89,30 +89,3 @@
     </form>
   </div>
 </div>
-<script>
-function openBudgetModal(b) {
-  document.getElementById('budgetId').value = b ? b.id : '';
-  document.getElementById('budgetProgram').value = b ? b.program_id : '';
-  document.getElementById('budgetYear').value = b ? b.academic_year : '';
-  document.getElementById('budgetTotal').value = b ? b.total_budget : '';
-  document.getElementById('budgetTitle').textContent = b ? 'Edit budget' : 'Add budget';
-  showBudgetSuggestion();
-}
-// Shows the server-computed suggestion (Budget::suggestedTotal) for the chosen program; never fills the field by itself.
-function showBudgetSuggestion() {
-  var sel = document.getElementById('budgetProgram'), opt = sel.options[sel.selectedIndex],
-      box = document.getElementById('budgetSuggestion');
-  var has = !!(opt && opt.dataset.suggested);
-  box.classList.toggle('d-none', !has);
-  document.getElementById('budgetSuggestionText').textContent = has ? opt.dataset.suggestedText : '';
-}
-document.getElementById('budgetUseSuggestion').addEventListener('click', function () {
-  var sel = document.getElementById('budgetProgram'), opt = sel.options[sel.selectedIndex];
-  if (opt && opt.dataset.suggested) document.getElementById('budgetTotal').value = opt.dataset.suggested;
-});
-document.getElementById('budgetProgram').addEventListener('change', function () {
-  var y = document.getElementById('budgetYear'), opt = this.options[this.selectedIndex];
-  if (!y.value && opt && opt.dataset.year) y.value = opt.dataset.year;
-  showBudgetSuggestion();
-});
-</script>

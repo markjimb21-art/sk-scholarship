@@ -1,6 +1,6 @@
 <?php /* Step III — Family Background. Part of applicant/application_form.php; uses its variables. */ ?>
       <!-- STEP 3: FAMILY -->
-      <form class="form-step" onsubmit="return false;" data-step="family">
+      <form class="form-step" data-no-submit data-step="family">
         <?= csrf_field() ?>
         <input type="hidden" name="step" value="family">
         <h5 class="fw-semibold mb-3">III. Family Background</h5>

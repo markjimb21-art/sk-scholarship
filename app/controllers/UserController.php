@@ -9,7 +9,7 @@ final class UserController
         $q = trim((string)($_GET['q'] ?? ''));
         $role = in_array($_GET['role'] ?? '', [...AdminController::STAFF_ROLES, 'applicant'], true) ? $_GET['role'] : '';
         $users = User::search($q, $role);
-        render('admin/users', compact('users', 'q', 'role'), 'Users');
+        render('admin/users', compact('users', 'q', 'role') + ['pageScripts' => [asset('js/pages/users.js')]], 'Users');
     }
 
     /** Create or edit a STAFF account (admin, reviewer, treasurer); applicants register themselves. Role changes are audit-logged. */

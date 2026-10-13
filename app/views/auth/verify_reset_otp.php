@@ -1,6 +1,7 @@
 <?php
 $pageTitle = 'Enter Verification Code';
 $authHeading = 'Enter your verification code';
+$pageScripts = [asset('js/pages/otp-countdown.js')];
 require VIEW_PATH . '/layouts/auth_head.php';
 ?>
 <div class="auth-card">
@@ -27,20 +28,4 @@ require VIEW_PATH . '/layouts/auth_head.php';
   <hr class="my-4">
   <div class="auth-links"><p class="mb-0"><a href="<?= url('login') ?>">Back to sign in</a></p></div>
 </div>
-<script>
-(function () {
-  var total = 10 * 60, time = document.getElementById('otpTime');
-  var timer = setInterval(function () {
-    total--;
-    if (total <= 0) {
-      clearInterval(timer);
-      document.getElementById('otpCountdown').hidden = true;
-      document.getElementById('otpExpired').innerHTML = '<p class="field-error">The code has expired. Press "Resend Code" to get a new one.</p>';
-      return;
-    }
-    var m = Math.floor(total / 60), s = total % 60;
-    time.textContent = m + ':' + (s < 10 ? '0' : '') + s;
-  }, 1000);
-})();
-</script>
 <?php require VIEW_PATH . '/layouts/auth_foot.php'; ?>

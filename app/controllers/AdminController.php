@@ -183,7 +183,7 @@ final class AdminController
         ] : null;
 
         render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'todayInterviews', 'charts', 'showBudget')
-            + ['pageScripts' => [asset('js/sk-charts.js')]], 'Dashboard');
+            + ['pageScripts' => [asset('js/sk-charts.js'), asset('js/pages/dashboard.js')]], 'Dashboard');
     }
 
     public function notifications(): void
@@ -218,7 +218,7 @@ final class AdminController
         foreach ($programs as &$p) $p['slots_used'] = Program::slotsUsed((int)$p['id']);
         unset($p);
         $openProgram = Program::open();
-        render('admin/programs', compact('programs', 'openProgram'), 'Scholarship Programs');
+        render('admin/programs', compact('programs', 'openProgram') + ['pageScripts' => [asset('js/pages/programs.js')]], 'Scholarship Programs');
     }
 
     public function programSave(): void

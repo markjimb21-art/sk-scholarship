@@ -4,6 +4,7 @@
  *  - show/hide password ("eye") button on every password field — one function, skPasswordToggle();
  *  - live new-password checklist + "Passwords match" (the rule itself is checked again on the server);
  *  - sign-in pop-up when the email and/or password is empty;
+ *  - data-confirm / data-no-submit forms and data-autosubmit selects;
  *  - wide tables scroll sideways inside their card instead of widening the page.
  */
 (function () {
@@ -153,6 +154,19 @@
 
   /* ---------- Icons are decorative: the words next to them (or the control's aria-label) carry the meaning ---------- */
   document.querySelectorAll('i.bi:not([aria-hidden])').forEach(function (i) { i.setAttribute('aria-hidden', 'true'); });
+
+  /* ---------- Forms: confirm first, never submit, submit on change ----------
+     data-confirm="Question?" on a <form>: OK/Cancel dialog first; Cancel stops the submit.
+     data-no-submit on a <form>: Enter never submits it (the application wizard saves its fields by itself).
+     data-autosubmit on a <select>: picking an option submits its form (list filters). */
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (form.hasAttribute('data-no-submit')) { e.preventDefault(); return; }
+    if (form.hasAttribute('data-confirm') && !window.confirm(form.getAttribute('data-confirm'))) e.preventDefault();
+  });
+  document.addEventListener('change', function (e) {
+    if (e.target.matches('select[data-autosubmit]')) e.target.form.submit();
+  });
 
   /* ---------- Wide tables scroll inside their card ---------- */
   document.querySelectorAll('table.table').forEach(function (table) {

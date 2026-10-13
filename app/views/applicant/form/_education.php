@@ -1,6 +1,6 @@
 <?php /* Step II — Education. Part of applicant/application_form.php; uses its variables. */ ?>
       <!-- STEP 2: EDUCATION -->
-      <form class="form-step" onsubmit="return false;" data-step="education">
+      <form class="form-step" data-no-submit data-step="education">
         <?= csrf_field() ?>
         <input type="hidden" name="step" value="education">
         <h5 class="fw-semibold mb-3">II. Education</h5>

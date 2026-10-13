@@ -13,7 +13,7 @@ final class FundsController
         $years = Budget::academicYears();
         $suggestions = [];
         foreach ($programs as $p) $suggestions[(int)$p['id']] = Budget::suggestedTotal((int)$p['id']);
-        render('admin/budget', compact('budgets', 'programs', 'years', 'suggestions'), 'Budget');
+        render('admin/budget', compact('budgets', 'programs', 'years', 'suggestions') + ['pageScripts' => [asset('js/pages/budget.js')]], 'Budget');
     }
 
     public function budgetSave(): void
@@ -48,7 +48,7 @@ final class FundsController
         if (!$term) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
         $docs = TermDocument::forTerm((int)$term['id'], 'claim');
         $history = Term::forScholar((int)$term['scholar_id']);
-        render('admin/claim_view', compact('term', 'docs', 'history'), 'Claim · ' . $term['full_name']);
+        render('admin/claim_view', compact('term', 'docs', 'history') + ['pageScripts' => [asset('js/pages/claim-view.js')]], 'Claim · ' . $term['full_name']);
     }
 
     public function claimDecide(): void
@@ -145,7 +145,7 @@ final class FundsController
         $missed = TermSchedule::missedDeadline($purpose);
         $programs = Program::options();
         $years = TermSchedule::academicYearOptions();
-        render('admin/term_schedules', compact('purpose', 'schedules', 'needed', 'missed', 'programs', 'years'),
+        render('admin/term_schedules', compact('purpose', 'schedules', 'needed', 'missed', 'programs', 'years') + ['pageScripts' => [asset('js/pages/term-schedules.js')]],
             $purpose === 'release' ? 'Claim schedule' : 'Renewal schedule');
     }
 
