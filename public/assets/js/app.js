@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
       window.scrollTo({top: 0, behavior: 'smooth'});
     };
 
-    // The step on screen can be restored after a reload (application-autosave.js), so read it from the page.
+    // The step on screen can be restored after a reload (application/steps.js), so read it from the page.
     const visibleStep = () => {
       const i = Array.from(steps).findIndex(s => s.classList.contains('active'));
       return i >= 0 ? i : current;
@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     wizard.querySelectorAll('[data-goto]').forEach(btn => {
       btn.addEventListener('click', () => show(parseInt(btn.dataset.goto, 10) || 0));
     });
-    show(visibleStep()); // step I, or the step application-autosave.js restored after a refresh
+    show(visibleStep()); // step I, or the step application/steps.js restored after a refresh
   }
 
   // Notifications auto-mark on page

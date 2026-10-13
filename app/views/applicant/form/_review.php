@@ -1,4 +1,4 @@
-<?php /* Step V — Review & Submit (every field of steps I–IV, refreshed live by application-review.js). Part of applicant/application_form.php; uses its variables. */ ?>
+<?php /* Step V — Review & Submit (every field of steps I–IV, refreshed live by application/review.js). Part of applicant/application_form.php; uses its variables. */ ?>
       <!-- STEP 5: REVIEW & SUBMIT -->
       <div class="form-step" data-step="review">
         <h5 class="fw-semibold mb-3">V. Review & Submit</h5>
@@ -23,7 +23,7 @@
         </div>
 
 <?php
-        // Review of everything entered in steps I–IV. Rendered from the saved data here; application-review.js refreshes
+        // Review of everything entered in steps I–IV. Rendered from the saved data here; application/review.js refreshes
         // it from the form itself each time this step is opened, so it always matches what is on screen.
         $show = static fn($v): string => ($v === null || trim((string)$v) === '') ? '—' : (string)$v;
         $money = static fn($v): string => ($v === null || $v === '') ? '—' : '₱' . number_format((float)$v, 2);

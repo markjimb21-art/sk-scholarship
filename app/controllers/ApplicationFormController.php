@@ -25,7 +25,8 @@ final class ApplicationFormController
         $schools = Lookup::schools();
         $courses = Lookup::courses();
 
-        $pageScripts = [asset('js/application-autosave.js'), asset('js/application-review.js')];
+        $pageScripts = [asset('js/application/shared.js'), asset('js/application/field-autosave.js'), asset('js/application/steps.js'),
+                        asset('js/application/document-upload.js'), asset('js/application/review.js')];
         render('applicant/application_form', compact('applicant', 'app', 'openProgram', 'personal', 'education', 'family', 'documents',
             'editable', 'completeness', 'flags', 'puroks', 'schools', 'courses', 'pageScripts'), 'My Application');
     }
