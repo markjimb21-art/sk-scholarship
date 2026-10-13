@@ -1,0 +1,22 @@
+# Line endings. The repository stores LF, and code and docs are checked out with LF on every OS, so a Windows
+# checkout (core.autocrlf=true) no longer turns files into CRLF copies that look changed.
+* text=auto
+
+*.php  text eol=lf
+*.js   text eol=lf
+*.css  text eol=lf
+*.md   text eol=lf
+*.sql  text eol=lf
+
+# Binary: never converted, never diffed as text.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.pdf   binary
+*.ttf   binary
+*.woff  binary
+*.woff2 binary
+*.icc   binary
