@@ -45,6 +45,7 @@ final class ApplicantController
         'slot-request'         => ['ApplicantAccountController', 'requestSlot'],             // A4 pick a suggested interview slot
         'slot-request/cancel'  => ['ApplicantAccountController', 'cancelSlot'],
         'notifications'        => ['ApplicantAccountController', 'notifications'],
+        'notifications/mark-read' => ['ApplicantAccountController', 'markNotificationsRead'],
         'profile'              => ['ApplicantAccountController', 'profile'],
     ];
 

@@ -1,5 +1,5 @@
 <h4 class="fw-bold mb-3">Notifications</h4>
-<div class="list-group">
+<div class="list-group" data-notifications data-mark-read-url="<?= e(url($markReadUrl)) ?>" data-csrf="<?= e(csrf_token()) ?>">
   <?php if (!$notifications): ?><div class="list-group-item text-center text-muted py-4">No notifications yet.</div><?php endif; ?>
   <?php foreach ($notifications as $n): ?>
     <div class="list-group-item <?= $n['is_read'] ? '' : 'bg-light' ?>">

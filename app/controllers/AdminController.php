@@ -50,6 +50,7 @@ final class AdminController
         // Dashboard, records, account pages
         'dashboard'                 => ['AdminController', 'dashboard', self::STAFF],
         'notifications'             => ['AdminController', 'notifications', self::STAFF],
+        'notifications/mark-read'   => ['AdminController', 'markNotificationsRead', self::STAFF],
         'applications'              => ['AdminController', 'applications', self::REVIEW],
         // Calendar: interviews + claim/renewal windows (read-only)
         'calendar'                  => ['CalendarController', 'index', self::STAFF],
@@ -186,9 +187,16 @@ final class AdminController
 
     public function notifications(): void
     {
-        $userId = admin_id();
-        if (!empty($_GET['mark_read'])) Notification::markAllRead($userId);
-        render('applicant/notifications', ['notifications' => Notification::forUser($userId)], 'Notifications');
+        render('applicant/notifications', ['notifications' => Notification::forUser(admin_id()), 'markReadUrl' => 'admin/notifications/mark-read',
+            'pageScripts' => [asset('js/pages/notifications.js')]], 'Notifications');
+    }
+
+    /** Called by pages/notifications.js when the Notifications page opens; a POST with the CSRF token, never a GET. */
+    public function markNotificationsRead(): void
+    {
+        require_post('admin/notifications');
+        Notification::markAllRead(admin_id());
+        json_response(['ok' => true]);
     }
 
     /** Read-only list of every application (the database of applications), filterable. */

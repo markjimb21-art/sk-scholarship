@@ -27,13 +27,18 @@ final class ApplicantAccountController
 
     public function notifications(): void
     {
-        $userId = (int)Auth::user()['id'];
-        if (!empty($_GET['mark_read'])) {
-            Notification::markAllRead($userId);
-            json_response(['ok' => true]);
-        }
-        $notifications = Notification::forUser($userId);
-        render('applicant/notifications', compact('userId', 'notifications'), 'Notifications');
+        $notifications = Notification::forUser((int)Auth::user()['id']);
+        $markReadUrl = 'applicant/notifications/mark-read';
+        $pageScripts = [asset('js/pages/notifications.js')];
+        render('applicant/notifications', compact('notifications', 'markReadUrl', 'pageScripts'), 'Notifications');
+    }
+
+    /** Called by pages/notifications.js when the Notifications page opens; a POST with the CSRF token, never a GET. */
+    public function markNotificationsRead(): void
+    {
+        require_post('applicant/notifications');
+        Notification::markAllRead((int)Auth::user()['id']);
+        json_response(['ok' => true]);
     }
 
     public function profile(): void

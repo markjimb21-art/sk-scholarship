@@ -102,12 +102,10 @@ final class ApplicantWritePathsTest extends HttpTestCase
         $this->assertSame(404, $c->get("/applicant/term-documents/view&id=$theirTerm")->status);
     }
 
-    public function testNotificationsListAndMarkRead(): void
+    /** Marking them read (POST + CSRF since B1) is covered by NotificationsReadTest. */
+    public function testNotificationsList(): void
     {
         $c = self::signedIn('scholar@test.local');
         $this->assertStringContainsString('Your 2nd Semester claim was received.', $c->get('/applicant/notifications')->body);
-        $c->get('/applicant/notifications&mark_read=1');
-        $this->assertSame(['ok' => true], $c->json());
-        $this->assertSame(0, (int)self::value('SELECT COUNT(*) FROM notifications WHERE user_id = 11 AND is_read = 0'));
     }
 }

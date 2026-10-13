@@ -84,12 +84,11 @@ final class AdminWritePathsTest extends HttpTestCase
         $this->assertSame(200, $c->get('/admin/audit-logs&page=99&date_from=2020-01-01&date_to=2099-12-31&user_id=1&entity_type=applications')->status);
     }
 
-    public function testNotificationsListAndMarkRead(): void
+    /** Marking them read (POST + CSRF since B1) is covered by NotificationsReadTest. */
+    public function testNotificationsList(): void
     {
         $c = self::signedIn('admin@test.local');
         $this->assertStringContainsString('APP-TEST-0002 was submitted.', $c->get('/admin/notifications')->body);
-        $c->get('/admin/notifications&mark_read=1');
-        $this->assertSame(0, (int)self::value('SELECT COUNT(*) FROM notifications WHERE user_id = 1 AND is_read = 0'));
     }
 
     public function testDashboardCounters(): void

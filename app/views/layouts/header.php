@@ -25,10 +25,10 @@ $pageTitle = $pageTitle ?? 'Dashboard';
         <div class="ms-auto d-flex align-items-center gap-2 gap-sm-3">
           <span class="d-none d-md-inline-flex"><?php require VIEW_PATH . '/layouts/text_size.php'; ?></span>
           <a href="<?= url($roleName === 'applicant' ? 'applicant/notifications' : 'admin/notifications') ?>" class="position-relative nav-icon-btn"
-             aria-label="Notifications<?= $unread > 0 ? ' — ' . (int)$unread . ' unread' : '' ?>">
+             data-notification-bell aria-label="Notifications<?= $unread > 0 ? ' — ' . (int)$unread . ' unread' : '' ?>">
             <i class="bi bi-bell fs-4" aria-hidden="true"></i>
             <?php if ($unread > 0): ?>
-              <span class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill" aria-hidden="true">
+              <span class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill" data-unread-badge aria-hidden="true">
                 <?= $unread > 99 ? '99+' : $unread ?>
               </span>
             <?php endif; ?>

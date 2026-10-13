@@ -112,10 +112,4 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     show(visibleStep()); // step I, or the step application/steps.js restored after a refresh
   }
-
-  // Notifications auto-mark on page
-  const notifList = document.querySelector('[data-notifications]');
-  if (notifList) {
-    fetch(window.location.origin + '/sk-scholarship/public/index.php?r=applicant/notifications&mark_read=1', {method:'GET', credentials:'same-origin'});
-  }
 });
