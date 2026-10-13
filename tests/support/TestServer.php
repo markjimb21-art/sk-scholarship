@@ -14,7 +14,8 @@ final class TestServer
     public readonly string $errorLog;
     public readonly string $storage;
 
-    public function __construct()
+    /** $env: environment variables to add or override (e.g. APP_ENV, SK_TEST_FAULTS). */
+    public function __construct(private readonly array $env = [])
     {
         $probe = stream_socket_server('tcp://127.0.0.1:0');           // let the OS pick a free port
         $this->port = (int)substr(strrchr((string)stream_socket_get_name($probe, false), ':'), 1);
@@ -36,7 +37,7 @@ final class TestServer
             'BASE_URL' => $this->baseUrl,
             'STORAGE_PATH' => $this->storage,
             'MAIL_HOST' => '127.0.0.1', 'MAIL_PORT' => '9', 'MAIL_ENCRYPTION' => 'none', 'MAIL_USER' => '', 'MAIL_FROM' => 'noreply@test.local',
-        ]);
+        ], $this->env);
         $cmd = [PHP_BINARY, '-d', 'display_errors=1', '-d', 'html_errors=0', '-d', 'error_reporting=-1',
                 '-d', 'log_errors=1', '-d', 'error_log=' . $this->errorLog,
                 '-S', "127.0.0.1:{$this->port}", '-t', "$root/public", "$root/tests/support/router.php"];

@@ -20,17 +20,30 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 
-// Never leak stack traces / SQL / paths to the browser outside development.
-set_exception_handler(static function (Throwable $e): void {
-    error_log(sprintf('Unhandled %s: %s in %s:%d', get_class($e), $e->getMessage(), $e->getFile(), $e->getLine()));
-    if (!headers_sent()) {
-        http_response_code(500);
-    }
+// Every page is built in this buffer and sent when the request ends, so an error half-way through can still throw the
+// half-built page away and answer with a real 500 (otherwise the status is already sent as 200).
+ob_start();
+
+/** Discard what was printed, answer 500, show the error page. Never leak stack traces / SQL / paths outside development. */
+$errorResponse = static function (string $details): void {
+    while (ob_get_level() > 0) ob_end_clean();
+    if (!headers_sent()) http_response_code(500);
     if (APP_DEBUG) {
-        echo '<pre>' . htmlspecialchars((string)$e, ENT_QUOTES, 'UTF-8') . '</pre>';
+        echo '<pre>' . htmlspecialchars($details, ENT_QUOTES, 'UTF-8') . '</pre>';
         return;
     }
     require VIEW_PATH . '/errors/500.php';
+};
+set_exception_handler(static function (Throwable $e) use ($errorResponse): void {
+    error_log(sprintf('Unhandled %s: %s in %s:%d', get_class($e), $e->getMessage(), $e->getFile(), $e->getLine()));
+    $errorResponse((string)$e);
+});
+// Fatal errors (out of memory, time limit, …) never reach the exception handler; PHP has already logged them.
+register_shutdown_function(static function () use ($errorResponse): void {
+    $error = error_get_last();
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+        $errorResponse("{$error['message']} in {$error['file']}:{$error['line']}");
+    }
 });
 
 Auth::start();

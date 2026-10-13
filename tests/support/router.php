@@ -11,3 +11,5 @@ if (!isset($_GET['r']) && $path !== '/' && $path !== '/index.php') {
 }
 chdir($public);
 require $public . '/index.php';
+// ErrorAfterOutputTest starts its server with SK_TEST_FAULTS=1: fail here, after the page has been printed, on request.
+if (getenv('SK_TEST_FAULTS') === '1') require __DIR__ . '/fault_after_output.php';
