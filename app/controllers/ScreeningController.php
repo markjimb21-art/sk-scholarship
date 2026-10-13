@@ -7,7 +7,7 @@ final class ScreeningController
     /** Queue: Submitted applications, oldest first. */
     public function queue(): void
     {
-        $programId = !empty($_GET['program_id']) ? (int)$_GET['program_id'] : null;
+        $programId = get_id('program_id');
         $rows = ApplicationSearch::search(['status' => 'Submitted', 'program_id' => $programId], 200);
         $programs = Program::options();
         render('admin/screening', compact('rows', 'programs', 'programId'), 'Screening');
@@ -16,8 +16,8 @@ final class ScreeningController
     /** One application: form data, every document, the eligibility check, and the buttons its status allows. */
     public function view(): void
     {
-        $app = Application::withDetails((int)($_GET['id'] ?? 0));
-        if (!$app) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
+        $app = Application::withDetails(get_int('id'));
+        if (!$app) not_found();
 
         $eligibility = ApplicationEligibility::evaluate($app);
         $scholar = Scholar::forApplication((int)$app['id']);
@@ -42,13 +42,13 @@ final class ScreeningController
     /** Qualify for interview | Return for correction (remarks) | Reject (reason). */
     public function decide(): void
     {
-        $id = (int)($_POST['id'] ?? 0);
+        $id = post_int('id');
         require_post('admin/application&id=' . $id);
         $result = match ($_POST['decision'] ?? '') {
             'qualify' => Application::qualify($id, admin_id()),
-            'return'  => Application::returnForCorrection($id, admin_id(), (string)($_POST['remarks'] ?? ''),
+            'return'  => Application::returnForCorrection($id, admin_id(), post_str('remarks'),
                              array_map('strval', (array)($_POST['flags'] ?? [])), array_map('strval', (array)($_POST['invalid_docs'] ?? []))),
-            'reject'  => Application::reject($id, admin_id(), (string)($_POST['reason'] ?? '')),
+            'reject'  => Application::reject($id, admin_id(), post_str('reason')),
             default   => ['ok' => false, 'error' => 'Unknown decision.'],
         };
         if (!$result['ok']) {
@@ -70,11 +70,9 @@ final class ScreeningController
         if (!preg_match('#^admin/[a-z/-]+(&id=\d+)?$#', $back)) $back = 'admin/dashboard';
         require_post($back);
         // Application documents belong to the reviewer's work, claim/renewal documents to the treasurer's.
-        $table = (string)($_POST['table'] ?? '');
-        if (!AdminController::canAccess($table === 'term_documents' ? 'claims' : 'screening')) {
-            http_response_code(404); require VIEW_PATH . '/errors/404.php'; return;
-        }
-        $r = Document::markInvalid((string)($_POST['table'] ?? ''), (int)($_POST['id'] ?? 0), (string)($_POST['reason'] ?? ''), admin_id());
+        $table = post_str('table');
+        if (!AdminController::canAccess($table === 'term_documents' ? 'claims' : 'screening')) not_found();
+        $r = Document::markInvalid(post_str('table'), post_int('id'), post_str('reason'), admin_id());
         flash($r['ok'] ? 'warning' : 'danger', $r['ok'] ? 'Document marked invalid; its file was removed and the record kept.' : $r['error']);
         redirect($back);
     }
@@ -82,8 +80,8 @@ final class ScreeningController
     /** Stream an application document (admin can open any). */
     public function document(): void
     {
-        $doc = Document::find((int)($_GET['id'] ?? 0));
-        if (!$doc || $doc['file_path'] === '') { http_response_code(404); die('Document not found.'); }
+        $doc = Document::find(get_int('id'));
+        if (!$doc || $doc['file_path'] === '') not_found('Document not found.');
         Document::sendApplicationDocument($doc, isset($_GET['download']));
     }
 }

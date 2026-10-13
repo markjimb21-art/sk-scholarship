@@ -22,16 +22,16 @@ final class ReportController
     public function generate(): void
     {
         require_post('admin/reports');
-        $type = (string)($_POST['report_type'] ?? '');
+        $type = post_str('report_type');
         if (!isset(Report::CATALOG[$type])) { flash('danger', 'Unknown report.'); redirect('admin/reports'); }
         $isDate = static fn($d): bool => is_string($d) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1;
         $from = $isDate($_POST['date_from'] ?? null) ? $_POST['date_from'] : null;
         $to   = $isDate($_POST['date_to'] ?? null) ? $_POST['date_to'] : null;
-        $programId = !empty($_POST['program_id']) ? (int)$_POST['program_id'] : null;
+        $programId = post_id('program_id');
         $format = ($_POST['format'] ?? 'pdf') === 'csv' ? 'csv' : 'pdf';
 
         try {
-            $report = Report::build($type, $programId, $from, $to, (string)($_POST['status'] ?? ''));
+            $report = Report::build($type, $programId, $from, $to, post_str('status'));
         } catch (InvalidArgumentException $e) {
             flash('danger', $e->getMessage());
             redirect('admin/reports');
@@ -45,7 +45,7 @@ final class ReportController
     /** Possible scholars + possible budget for one program (and one academic year). */
     public function analytics(): void
     {
-        $program = Program::selected(!empty($_GET['program_id']) ? (int)$_GET['program_id'] : null);
+        $program = Program::fromRequest();
         $programs = Program::options();
         $years = Budget::academicYears();
         $data = null;

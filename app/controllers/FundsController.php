@@ -19,7 +19,7 @@ final class FundsController
     public function budgetSave(): void
     {
         require_post('admin/budget');
-        $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+        $id = post_id('id');
         $r = Budget::save($_POST, $id);
         flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? ($id ? 'Budget updated.' : 'Budget created.') : $r['error']);
         redirect('admin/budget');
@@ -28,7 +28,7 @@ final class FundsController
     public function budgetDelete(): void
     {
         require_post('admin/budget');
-        $r = Budget::delete((int)($_POST['id'] ?? 0));
+        $r = Budget::delete(post_int('id'));
         flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? 'Budget deleted.' : $r['error']);
         redirect('admin/budget');
     }
@@ -44,8 +44,8 @@ final class FundsController
 
     public function claimView(): void
     {
-        $term = Term::find((int)($_GET['id'] ?? 0));
-        if (!$term) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
+        $term = Term::find(get_int('id'));
+        if (!$term) not_found();
         $docs = TermDocument::forTerm((int)$term['id'], 'claim');
         $history = Term::forScholar((int)$term['scholar_id']);
         render('admin/claim_view', compact('term', 'docs', 'history') + ['pageScripts' => [asset('js/pages/claim-view.js')]], 'Claim · ' . $term['full_name']);
@@ -53,11 +53,11 @@ final class FundsController
 
     public function claimDecide(): void
     {
-        $id = (int)($_POST['term_id'] ?? 0);
+        $id = post_int('term_id');
         require_post('admin/claims/view&id=' . $id);
         $r = match ($_POST['decision'] ?? '') {
-            'verify'   => Term::verifyClaim($id, (string)($_POST['gwa'] ?? ''), admin_id()),
-            'resubmit' => Term::resubmitClaim($id, (string)($_POST['remarks'] ?? ''), (array)($_POST['types'] ?? []), admin_id(), !empty($_POST['invalid'])),
+            'verify'   => Term::verifyClaim($id, post_str('gwa'), admin_id()),
+            'resubmit' => Term::resubmitClaim($id, post_str('remarks'), (array)($_POST['types'] ?? []), admin_id(), post_bool('invalid')),
             default    => ['ok' => false, 'error' => 'Unknown decision.'],
         };
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/claims/view&id=' . $id); }
@@ -73,8 +73,8 @@ final class FundsController
     /** Admin can open any semester document. */
     public function termDocument(): void
     {
-        $doc = TermDocument::find((int)($_GET['id'] ?? 0));
-        if (!$doc) { http_response_code(404); die('Document not found.'); }
+        $doc = TermDocument::find(get_int('id'));
+        if (!$doc) not_found('Document not found.');
         DocumentStorage::send($doc['file_path'], $doc['original_filename'], $doc['type'], 'term_documents', (int)$doc['id'], isset($_GET['download']));
     }
 
@@ -83,7 +83,7 @@ final class FundsController
     public function releases(): void
     {
         $ready = Term::byClaimStatus('Verified');
-        $filters = ['program_id' => (string)($_GET['program_id'] ?? ''), 'academic_year' => (string)($_GET['academic_year'] ?? '')];
+        $filters = ['program_id' => get_str('program_id'), 'academic_year' => get_str('academic_year')];
         $history = Term::releaseHistory($filters);
         $historyTotal = array_sum(array_map(static fn($r) => (float)$r['amount'], $history));
         $programs = Program::options();
@@ -94,7 +94,7 @@ final class FundsController
     public function releaseSave(): void
     {
         require_post('admin/releases');
-        $r = Term::release((int)($_POST['term_id'] ?? 0), $_POST, admin_id());
+        $r = Term::release(post_int('term_id'), $_POST, admin_id());
         flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? 'Cash released. The scholar was notified.' : $r['error']);
         redirect('admin/releases');
     }
@@ -110,8 +110,8 @@ final class FundsController
 
     public function renewalView(): void
     {
-        $req = Renewal::find((int)($_GET['id'] ?? 0));
-        if (!$req) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
+        $req = Renewal::find(get_int('id'));
+        if (!$req) not_found();
         $docs = $req['from_term_id'] ? TermDocument::forTerm((int)$req['from_term_id'], 'renewal') : [];
         $history = Term::forScholar((int)$req['scholar_id']);
         render('admin/renewal_view', compact('req', 'docs', 'history'), 'Renewal · ' . $req['full_name']);
@@ -119,11 +119,11 @@ final class FundsController
 
     public function renewalDecide(): void
     {
-        $id = (int)($_POST['id'] ?? 0);
+        $id = post_int('id');
         require_post('admin/renewals/view&id=' . $id);
         $r = match ($_POST['decision'] ?? '') {
             'approve'  => Renewal::approve($id, admin_id()),
-            'resubmit' => Renewal::resubmit($id, (string)($_POST['remarks'] ?? ''), (array)($_POST['types'] ?? []), admin_id(), !empty($_POST['invalid'])),
+            'resubmit' => Renewal::resubmit($id, post_str('remarks'), (array)($_POST['types'] ?? []), admin_id(), post_bool('invalid')),
             default    => ['ok' => false, 'error' => 'Unknown decision.'],
         };
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/renewals/view&id=' . $id); }
@@ -154,7 +154,7 @@ final class FundsController
         $purpose = ($_POST['purpose'] ?? '') === 'renewal' ? 'renewal' : 'release';
         $back = "admin/$purpose-schedule";
         require_post($back);
-        $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+        $id = post_id('id');
         if ($id && ($old = TermSchedule::find($id))) $back = "admin/{$old['purpose']}-schedule";
         $r = TermSchedule::save($_POST, $id, admin_id());
         if (!$r['ok']) { flash('danger', $r['error']); redirect($back); }
@@ -168,9 +168,9 @@ final class FundsController
     public function scholars(): void
     {
         $filters = [
-            'q' => trim((string)($_GET['q'] ?? '')),
+            'q' => trim(get_str('q')),
             'status' => (string)($_GET['status'] ?? 'Active'),
-            'program_id' => (string)($_GET['program_id'] ?? ''),
+            'program_id' => get_str('program_id'),
         ];
         $rows = Scholar::search($filters);
         $programs = Program::options();
@@ -179,8 +179,8 @@ final class FundsController
 
     public function scholar(): void
     {
-        $scholar = Scholar::find((int)($_GET['id'] ?? 0));
-        if (!$scholar) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
+        $scholar = Scholar::find(get_int('id'));
+        if (!$scholar) not_found();
         $terms = Term::forScholar((int)$scholar['id']);
         $renewals = Renewal::forScholar((int)$scholar['id']);
         $totalReleased = array_sum(array_map(static fn($t) => (float)($t['released_amount'] ?? 0), $terms));
@@ -196,9 +196,9 @@ final class FundsController
 
     public function scholarEnd(): void
     {
-        $id = (int)($_POST['id'] ?? 0);
+        $id = post_int('id');
         require_post('admin/scholar&id=' . $id);
-        $r = Scholar::end($id, (string)($_POST['reason'] ?? ''), admin_id());
+        $r = Scholar::end($id, post_str('reason'), admin_id());
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/scholar&id=' . $id); }
         flash('warning', 'Scholarship ended. The scholar was notified.');
         if ($r['slot_freed'] && AdminController::canAccess('decisions')) {

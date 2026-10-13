@@ -6,7 +6,7 @@ final class UserController
 {
     public function users(): void
     {
-        $q = trim((string)($_GET['q'] ?? ''));
+        $q = trim(get_str('q'));
         $role = in_array($_GET['role'] ?? '', [...AdminController::STAFF_ROLES, 'applicant'], true) ? $_GET['role'] : '';
         $users = User::search($q, $role);
         render('admin/users', compact('users', 'q', 'role') + ['pageScripts' => [asset('js/pages/users.js')]], 'Users');
@@ -16,13 +16,13 @@ final class UserController
     public function userSave(): void
     {
         require_post('admin/users');
-        $id = (int)($_POST['id'] ?? 0);
-        $roleName = (string)($_POST['role'] ?? '');
+        $id = post_int('id');
+        $roleName = post_str('role');
         if (!in_array($roleName, AdminController::STAFF_ROLES, true)) { flash('danger', 'Choose a role: admin, reviewer or treasurer.'); redirect('admin/users'); }
-        $name = trim((string)($_POST['full_name'] ?? ''));
-        $email = strtolower(trim((string)($_POST['email'] ?? '')));
+        $name = trim(post_str('full_name'));
+        $email = strtolower(trim(post_str('email')));
         $contact = digits_only($_POST['contact_number'] ?? '');
-        $password = (string)($_POST['password'] ?? '');
+        $password = post_str('password');
 
         if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) { flash('danger', 'Name and a valid e-mail are required.'); redirect('admin/users'); }
         if (User::emailTaken($email, $id)) { flash('danger', 'That e-mail is already used.'); redirect('admin/users'); }
@@ -42,7 +42,7 @@ final class UserController
             flash('success', $oldRole !== $roleName ? "Account updated; role changed to $roleName." : 'Account updated.');
         } else {
             if ($problems = password_problems($password)) { flash('danger', password_rule_message($problems)); redirect('admin/users'); }
-            if ($password !== (string)($_POST['password_confirm'] ?? '')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
+            if ($password !== post_str('password_confirm')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
             $newId = User::createStaff($roleName, $name, $email, $password, $contact);
             AuditLog::write('user_created', 'users', $newId, "Created $roleName account $email", null, ['role' => $roleName, 'by' => admin_id()]);
             flash('success', ucfirst($roleName) . ' account created.');
@@ -53,7 +53,7 @@ final class UserController
     public function userToggle(): void
     {
         require_post('admin/users');
-        $id = (int)($_POST['id'] ?? 0);
+        $id = post_int('id');
         if ($id === admin_id()) { flash('danger', 'You cannot deactivate your own account.'); redirect('admin/users'); }
         $row = User::status($id);
         if (!$row) { flash('danger', 'User not found.'); redirect('admin/users'); }
@@ -70,10 +70,10 @@ final class UserController
     public function userReset(): void
     {
         require_post('admin/users');
-        $id = (int)($_POST['id'] ?? 0);
-        $password = (string)($_POST['new_password'] ?? '');
+        $id = post_int('id');
+        $password = post_str('new_password');
         if ($problems = password_problems($password)) { flash('danger', password_rule_message($problems)); redirect('admin/users'); }
-        if ($password !== (string)($_POST['new_password_confirm'] ?? '')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
+        if ($password !== post_str('new_password_confirm')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
         User::resetPassword($id, $password);
         AuditLog::write('user_password_reset', 'users', $id, 'Admin reset the password');
         flash('success', 'Password reset.');

@@ -21,6 +21,7 @@ php bin/smoke_test.php                             # every route, signed in as e
 | unit | `ApplicationTransitionTest` | the allowed status moves (docs/PROCESS.md §1), every action × every status |
 | unit | `DocumentValidationTest` | upload checks on the file CONTENT: PDF/JPG/PNG only, not empty, at most 5 MB, fakes refused |
 | unit | `FormatHelpersTest` | `peso()` and `fmt_date()`/`fmt_datetime()`/`fmt_long_date()` give exactly what the copies they replaced gave |
+| unit | `RequestHelpersTest` | `get_int()`, `post_str()`, `get_id()`, `post_bool()`… and `paginate()` give what the expressions they replaced gave |
 | unit | `PasswordRuleTest` | 8+ characters and 1 special character; the exact messages; Validator uses the same rule |
 | integration | `ApplicationStatusTest` | refused and stale status changes; approval blocked when the slots are full |
 | integration | `AnalyticsTest` | projected scholars, committed, projected need, surplus, extra fundable, attendance, no-show, scores, on-time rate, against numbers worked out by hand from the seed |

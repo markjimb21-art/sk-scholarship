@@ -102,7 +102,6 @@ switch ($route) {
             require __DIR__ . '/../app/controllers/AdminController.php';
             (new AdminController())->handle(substr($route, 6));
         } else {
-            http_response_code(404);
-            require VIEW_PATH . '/errors/404.php';
+            not_found();
         }
 }

@@ -25,10 +25,10 @@ final class SettingsController
     {
         require_post('admin/settings');
         $values = [
-            'email_notifications'      => !empty($_POST['email_notifications']) ? '1' : '0',
+            'email_notifications'      => post_bool('email_notifications') ? '1' : '0',
             'interview_reminder_hours' => (string)max(0, min(168, (int)($_POST['interview_reminder_hours'] ?? 24))),
-            'daily_digest_enabled'     => !empty($_POST['daily_digest_enabled']) ? '1' : '0',
-            'admin_event_emails'       => !empty($_POST['admin_event_emails']) ? '1' : '0',
+            'daily_digest_enabled'     => post_bool('daily_digest_enabled') ? '1' : '0',
+            'admin_event_emails'       => post_bool('admin_event_emails') ? '1' : '0',
             'interview_suggestion_window_days' => (string)max(7, min(180, (int)($_POST['interview_suggestion_window_days'] ?? 60))),
         ];
         Setting::saveMany($values);
@@ -41,7 +41,7 @@ final class SettingsController
     public function settingsTestEmail(): void
     {
         require_post('admin/settings');
-        $to = strtolower(trim((string)($_POST['test_email'] ?? '')));
+        $to = strtolower(trim(post_str('test_email')));
         if (!filter_var($to, FILTER_VALIDATE_EMAIL)) { flash('danger', 'Enter a valid e-mail address to send the test to.'); redirect('admin/settings'); }
         $result = Notification::sendTestEmail($to);
         AuditLog::write($result['ok'] ? 'test_email_sent' : 'test_email_failed', 'system_settings', null,
@@ -56,8 +56,8 @@ final class SettingsController
     public function holidaySave(): void
     {
         require_post('admin/settings');
-        $date = trim((string)($_POST['holiday_date'] ?? ''));
-        $name = trim((string)($_POST['name'] ?? ''));
+        $date = trim(post_str('holiday_date'));
+        $name = trim(post_str('name'));
         $d = DateTime::createFromFormat('!Y-m-d', $date);
         if (!$d || $d->format('Y-m-d') !== $date) { flash('danger', 'Choose a valid date.'); redirect('admin/settings'); }
         if ($name === '') { flash('danger', 'Give the holiday a name.'); redirect('admin/settings'); }
@@ -72,7 +72,7 @@ final class SettingsController
     public function holidayDelete(): void
     {
         require_post('admin/settings');
-        $id = (int)($_POST['id'] ?? 0);
+        $id = post_int('id');
         $h = Holiday::find($id);
         if ($h) {
             Holiday::delete($id);

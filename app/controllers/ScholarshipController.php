@@ -24,17 +24,16 @@ final class ScholarshipController
     /** The current semester of the logged-in scholar, only if $_POST['term_id'] is theirs. */
     private function ownTerm(): ?array
     {
-        $term = Term::find((int)($_POST['term_id'] ?? 0));
+        $term = Term::find(post_int('term_id'));
         return ($term && (int)$term['applicant_id'] === (int)Applicant::current()['id']) ? $term : null;
     }
 
     public function uploadTermDocument(string $purpose): void
     {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('applicant/scholarship');
-        verify_csrf();
+        require_post('applicant/scholarship');
         $term = $this->ownTerm();
         if (!$term) { flash('danger', 'Semester not found.'); redirect('applicant/scholarship'); }
-        $type = (string)($_POST['type'] ?? '');
+        $type = post_str('type');
         $result = TermDocument::upload($term, $purpose, $type, $_FILES['file'] ?? []);
         if ($result['ok']) flash('success', "$type uploaded.");
         else               flash('danger', $result['error']);
@@ -43,8 +42,7 @@ final class ScholarshipController
 
     public function submitClaim(): void
     {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('applicant/scholarship');
-        verify_csrf();
+        require_post('applicant/scholarship');
         $term = $this->ownTerm();
         if (!$term) { flash('danger', 'Semester not found.'); redirect('applicant/scholarship'); }
         try {
@@ -59,8 +57,7 @@ final class ScholarshipController
 
     public function submitRenewal(): void
     {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('applicant/scholarship');
-        verify_csrf();
+        require_post('applicant/scholarship');
         $term = $this->ownTerm();
         if (!$term) { flash('danger', 'Semester not found.'); redirect('applicant/scholarship'); }
         $result = Renewal::submit($term, (int)Auth::user()['id']);
@@ -71,8 +68,8 @@ final class ScholarshipController
 
     public function viewTermDocument(): void
     {
-        $doc = TermDocument::find((int)($_GET['id'] ?? 0));
-        if (!$doc || (int)$doc['applicant_id'] !== (int)Applicant::current()['id']) { http_response_code(404); die('Document not found.'); }
+        $doc = TermDocument::find(get_int('id'));
+        if (!$doc || (int)$doc['applicant_id'] !== (int)Applicant::current()['id']) not_found('Document not found.');
         DocumentStorage::send($doc['file_path'], $doc['original_filename'], $doc['type'], 'term_documents', (int)$doc['id'], isset($_GET['download']));
     }
 }

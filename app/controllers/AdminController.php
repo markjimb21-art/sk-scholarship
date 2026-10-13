@@ -136,9 +136,7 @@ final class AdminController
         Auth::requireRole(...self::STAFF);
         $route = self::ROUTES[trim($action, '/')] ?? null;
         if ($route === null || !in_array(Auth::role(), $route[2], true)) {
-            http_response_code(404);   // same answer for "no such page" and "not for your role"
-            require VIEW_PATH . '/errors/404.php';
-            return;
+            not_found();   // same answer for "no such page" and "not for your role"
         }
         [$class, $method] = $route;
         if ($class !== self::class) require_once BASE_PATH . "/app/controllers/$class.php";
@@ -167,7 +165,7 @@ final class AdminController
         // Only the queues this staff role may open.
         $counters = array_values(array_filter($counters, static fn($c) => self::canAccess(substr($c[2], 6))));
 
-        $program = Program::selected(!empty($_GET['program_id']) ? (int)$_GET['program_id'] : null);
+        $program = Program::fromRequest();
         $programs = Program::options();
         $slotsUsed = $program ? Program::slotsUsed((int)$program['id']) : 0;
         $budget = $program ? Budget::forProgramYear((int)$program['id'], $program['academic_year']) : null;
@@ -197,15 +195,14 @@ final class AdminController
     public function applications(): void
     {
         $filters = [
-            'q'          => trim((string)($_GET['q'] ?? '')),
-            'status'     => (string)($_GET['status'] ?? ''),
-            'program_id' => (string)($_GET['program_id'] ?? ''),
+            'q'          => trim(get_str('q')),
+            'status'     => get_str('status'),
+            'program_id' => get_str('program_id'),
         ];
-        $page = max(1, (int)($_GET['page'] ?? 1));
         $limit = 25;
-        $rows = ApplicationSearch::search($filters, $limit, ($page - 1) * $limit);
         $total = ApplicationSearch::count($filters);
-        $pages = max(1, (int)ceil($total / $limit));
+        ['page' => $page, 'offset' => $offset, 'pages' => $pages] = paginate($total, $limit);
+        $rows = ApplicationSearch::search($filters, $limit, $offset);
         $programs = Program::options();
         render('admin/applications', compact('filters', 'page', 'rows', 'total', 'pages', 'programs'), 'Applications');
     }
@@ -224,7 +221,7 @@ final class AdminController
     public function programSave(): void
     {
         require_post('admin/programs');
-        $id = !empty($_POST['id']) ? (int)$_POST['id'] : null;
+        $id = post_id('id');
         $result = Program::save($_POST, $id, admin_id());
         flash($result['ok'] ? 'success' : 'danger', $result['ok'] ? ($id ? 'Program updated.' : 'Program created.') : $result['error']);
         redirect('admin/programs');
@@ -233,7 +230,7 @@ final class AdminController
     public function programToggle(): void
     {
         require_post('admin/programs');
-        $state = Program::toggle((int)($_POST['id'] ?? 0));
+        $state = Program::toggle(post_int('id'));
         if ($state === null) flash('danger', 'Program not found.');
         else flash('success', $state ? 'Program opened. Applicants can apply while today is inside its dates.' : 'Program closed.');
         redirect('admin/programs');

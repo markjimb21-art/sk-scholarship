@@ -53,6 +53,12 @@ final class Program
     }
 
     /** Program chosen on an admin page (?program_id=), defaulting to the newest program. */
+    public static function fromRequest(): ?array
+    {
+        return self::selected(get_id('program_id'));
+    }
+
+    /** The newest program unless $programId names one that exists. */
     public static function selected(?int $programId): ?array
     {
         if ($programId) {

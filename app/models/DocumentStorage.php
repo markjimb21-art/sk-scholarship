@@ -110,7 +110,7 @@ final class DocumentStorage
     public static function send(string $filePath, ?string $originalName, string $label, string $entityType, int $entityId, bool $download = false): void
     {
         $path = self::absolutePath($filePath);
-        if ($path === null) { http_response_code(404); die('Document not found.'); }
+        if ($path === null) { not_found('Document not found.'); }
 
         // Trust the bytes on disk, not the DB value or the client-supplied name.
         $finfo = finfo_open(FILEINFO_MIME_TYPE);

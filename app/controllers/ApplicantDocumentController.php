@@ -51,9 +51,9 @@ final class ApplicantDocumentController
     public function viewDocument(): void
     {
         $applicant = Applicant::current();
-        $doc = Document::find((int)($_GET['id'] ?? 0));
+        $doc = Document::find(get_int('id'));
         $owned = $doc && $doc['file_path'] !== '' && Application::isOwnedBy((int)$doc['application_id'], (int)$applicant['id']);
-        if (!$owned) { http_response_code(404); die('Document not found.'); }
+        if (!$owned) not_found('Document not found.');
         Document::sendApplicationDocument($doc, isset($_GET['download']));
     }
 
@@ -63,17 +63,16 @@ final class ApplicantDocumentController
      */
     public function invalidateDocument(): void
     {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('applicant/application');
-        verify_csrf();
+        require_post('applicant/application');
         $applicant = Applicant::current();
-        $doc = Document::find((int)($_POST['id'] ?? 0));
+        $doc = Document::find(post_int('id'));
         $app = $doc ? Application::find((int)$doc['application_id']) : null;
         if (!$doc || !$app || (int)$app['applicant_id'] !== (int)$applicant['id']) { flash('danger', 'Document not found.'); redirect('applicant/application'); }
         if (!Application::fieldEditable($app, 'documents.' . $doc['document_type'])) {
             flash('danger', 'This document can’t be changed now.');
             redirect('applicant/application');
         }
-        $reason = trim((string)($_POST['reason'] ?? '')) ?: 'Wrong file uploaded';
+        $reason = trim(post_str('reason')) ?: 'Wrong file uploaded';
         $r = Document::markInvalid('documents', (int)$doc['id'], 'Removed by the applicant: ' . $reason, (int)Auth::user()['id']);
         flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? "{$doc['document_type']} removed. Upload the correct file." : $r['error']);
         redirect('applicant/application');

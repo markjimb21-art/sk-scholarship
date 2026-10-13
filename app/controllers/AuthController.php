@@ -8,8 +8,8 @@ final class AuthController
     public function login(): void {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             verify_csrf();
-            $email = trim((string)($_POST['email'] ?? ''));
-            $password = (string)($_POST['password'] ?? '');
+            $email = trim(post_str('email'));
+            $password = post_str('password');
 
             // Empty fields: a friendly message (same words as the sign-in pop-up) instead of "Invalid credentials".
             // Only emptiness is checked here — the new-password rule never applies at login, so old passwords still work.
@@ -159,7 +159,7 @@ final class AuthController
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             verify_csrf();
-            $code = trim((string)($_POST['otp'] ?? ''));
+            $code = trim(post_str('otp'));
             $result = Otp::verify($userId, 'registration', $code);
 
             if ($result['ok']) {
@@ -208,7 +208,7 @@ final class AuthController
     public function forgotPassword(): void {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             verify_csrf();
-            $email = strtolower(trim((string)($_POST['email'] ?? '')));
+            $email = strtolower(trim(post_str('email')));
             $userId = User::activeIdByEmail($email);
 
             // Always the same response and the same redirect, whether or not the e-mail exists —
@@ -237,7 +237,7 @@ final class AuthController
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             verify_csrf();
-            $code = trim((string)($_POST['otp'] ?? ''));
+            $code = trim(post_str('otp'));
             // No user id in session (unknown e-mail case) -> always report generic invalid/expired.
             $result = $userId > 0 ? Otp::verify($userId, 'password_reset', $code) : ['ok' => false, 'error' => 'none'];
 
@@ -268,8 +268,8 @@ final class AuthController
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             verify_csrf();
-            $pw = (string)($_POST['password'] ?? '');
-            $cpw = (string)($_POST['confirm_password'] ?? '');
+            $pw = post_str('password');
+            $cpw = post_str('confirm_password');
 
             if ($problems = password_problems($pw)) {
                 $_SESSION['_field_errors'] = ['password' => password_rule_message($problems)];

@@ -27,8 +27,8 @@ final class InterviewController
     /** One schedule: assigned applicants with attendance/score actions, and bulk-assign within capacity. */
     public function schedule(): void
     {
-        $schedule = Interview::schedule((int)($_GET['id'] ?? 0));
-        if (!$schedule) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
+        $schedule = Interview::schedule(get_int('id'));
+        if (!$schedule) not_found();
         $assignments = Interview::assignmentsBySchedule((int)$schedule['id']);
         $waiting = Interview::qualifiedWithoutSchedule((int)$schedule['program_id']);
         $free = max(0, (int)$schedule['max_slots'] - (int)$schedule['assigned_count']);
@@ -38,7 +38,7 @@ final class InterviewController
 
     public function scheduleSave(): void
     {
-        $programId = (int)($_POST['program_id'] ?? 0);
+        $programId = post_int('program_id');
         require_post('admin/interviews&program_id=' . $programId);
         $r = Interview::createSchedule($programId, $_POST, admin_id());
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/interviews&program_id=' . $programId); }
@@ -48,7 +48,7 @@ final class InterviewController
 
     public function scheduleUpdate(): void
     {
-        $id = (int)($_POST['id'] ?? 0);
+        $id = post_int('id');
         require_post('admin/interview-schedule&id=' . $id);
         $r = Interview::updateSchedule($id, $_POST, admin_id());
         flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? 'Schedule updated. Affected applicants were notified of any date, time or venue change.' : $r['error']);
@@ -57,7 +57,7 @@ final class InterviewController
 
     public function scheduleCancel(): void
     {
-        $id = (int)($_POST['id'] ?? 0);
+        $id = post_int('id');
         require_post('admin/interview-schedule&id=' . $id);
         $r = Interview::cancelSchedule($id, admin_id());
         flash($r['ok'] ? 'warning' : 'danger', $r['ok'] ? "Schedule cancelled. {$r['count']} applicant(s) are back in the waiting list and were notified." : $r['error']);
@@ -66,7 +66,7 @@ final class InterviewController
 
     public function scheduleDelete(): void
     {
-        $id = (int)($_POST['id'] ?? 0);
+        $id = post_int('id');
         $sched = Interview::schedule($id);
         require_post('admin/interviews');
         $r = Interview::deleteSchedule($id);
@@ -77,7 +77,7 @@ final class InterviewController
     /** Bulk-assign selected Qualified applicants (respects capacity). */
     public function assign(): void
     {
-        $scheduleId = (int)($_POST['schedule_id'] ?? 0);
+        $scheduleId = post_int('schedule_id');
         require_post('admin/interview-schedule&id=' . $scheduleId);
         $ids = array_filter(array_map('intval', (array)($_POST['application_ids'] ?? [])));
         if (!$ids) { flash('warning', 'Select at least one applicant.'); redirect('admin/interview-schedule&id=' . $scheduleId); }
@@ -91,9 +91,9 @@ final class InterviewController
 
     public function unassign(): void
     {
-        $scheduleId = (int)($_POST['schedule_id'] ?? 0);
+        $scheduleId = post_int('schedule_id');
         require_post('admin/interview-schedule&id=' . $scheduleId);
-        $r = InterviewAssignment::unassign((int)($_POST['assignment_id'] ?? 0), admin_id());
+        $r = InterviewAssignment::unassign(post_int('assignment_id'), admin_id());
         flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? 'Applicant removed from this schedule and notified.' : $r['error']);
         redirect('admin/interview-schedule&id=' . $scheduleId);
     }
@@ -103,10 +103,10 @@ final class InterviewController
     /** GET application_id (or id = an interview assignment): suggestions, a free date/time picker, and any slot request. */
     public function reschedule(): void
     {
-        $appId = (int)($_GET['application_id'] ?? 0);
+        $appId = get_int('application_id');
         if (!$appId && !empty($_GET['id'])) $appId = (int)(InterviewAssignment::assignment((int)$_GET['id'])['application_id'] ?? 0);
         $app = $appId ? Application::withDetails($appId) : null;
-        if (!$app) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
+        if (!$app) not_found();
         $currentAssignment = InterviewAssignment::assignmentByApplication($appId);
         $missed = InterviewAssignment::missedCount($appId);
         $why = null;
@@ -125,11 +125,11 @@ final class InterviewController
     /** POST application_id + mode: 'schedule' (schedule_id) or 'new' (interview_date, start_time, end_time, venue, max_slots). */
     public function rescheduleSave(): void
     {
-        $appId = (int)($_POST['application_id'] ?? 0);
+        $appId = post_int('application_id');
         $back = 'admin/interview-reschedule&application_id=' . $appId;
         require_post($back);
         $r = ($_POST['mode'] ?? '') === 'schedule'
-            ? InterviewAssignment::scheduleApplication($appId, (int)($_POST['schedule_id'] ?? 0), admin_id())
+            ? InterviewAssignment::scheduleApplication($appId, post_int('schedule_id'), admin_id())
             : InterviewAssignment::scheduleApplicationAt($appId, $_POST, admin_id());
         if (!$r['ok']) { flash('danger', $r['error']); redirect($back); }
         flash('success', 'Interview scheduled. The applicant was notified.');
@@ -140,13 +140,13 @@ final class InterviewController
     /** POST request_id + decision confirm (venue, max_slots for a new block) | decline (note). */
     public function slotDecide(): void
     {
-        $req = SlotRequest::find((int)($_POST['request_id'] ?? 0));
+        $req = SlotRequest::find(post_int('request_id'));
         $back = 'admin/interview-reschedule&application_id=' . (int)($req['application_id'] ?? 0);
         require_post($back);
         if (!$req) { flash('danger', 'Request not found.'); redirect('admin/interviews'); }
         $r = ($_POST['decision'] ?? '') === 'confirm'
-            ? SlotRequest::confirm((int)$req['id'], trim((string)($_POST['venue'] ?? '')), max(1, (int)($_POST['max_slots'] ?? 10)), admin_id())
-            : SlotRequest::decline((int)$req['id'], (string)($_POST['note'] ?? ''), admin_id());
+            ? SlotRequest::confirm((int)$req['id'], trim(post_str('venue')), max(1, (int)($_POST['max_slots'] ?? 10)), admin_id())
+            : SlotRequest::decline((int)$req['id'], post_str('note'), admin_id());
         flash($r['ok'] ? 'success' : 'danger', $r['ok']
             ? (($_POST['decision'] ?? '') === 'confirm' ? 'Slot confirmed — the applicant is scheduled and was notified.' : 'Request declined. The applicant was notified.')
             : $r['error']);
@@ -156,9 +156,9 @@ final class InterviewController
     /** B4 No-show (1st: back to waiting list with one reschedule; 2nd: rejected). */
     public function noShow(): void
     {
-        $scheduleId = (int)($_POST['schedule_id'] ?? 0);
+        $scheduleId = post_int('schedule_id');
         require_post('admin/interview-schedule&id=' . $scheduleId);
-        $r = InterviewAssignment::markNoShow((int)($_POST['assignment_id'] ?? 0), admin_id());
+        $r = InterviewAssignment::markNoShow(post_int('assignment_id'), admin_id());
         if (!$r['ok']) flash('danger', $r['error']);
         else flash('warning', $r['final'] ? 'Second no-show: the application was rejected and the applicant notified.'
                                           : 'No-show recorded. The applicant is back in the waiting list for their one reschedule.');
@@ -168,8 +168,8 @@ final class InterviewController
     /** B4 Rubric form for an attendee. */
     public function score(): void
     {
-        $assignment = InterviewAssignment::assignment((int)($_GET['id'] ?? 0));
-        if (!$assignment) { http_response_code(404); require VIEW_PATH . '/errors/404.php'; return; }
+        $assignment = InterviewAssignment::assignment(get_int('id'));
+        if (!$assignment) not_found();
         $evaluation = InterviewScore::evaluation((int)$assignment['id']);
         $editable = $assignment['attendance'] === 'Scheduled'
             || ($assignment['attendance'] === 'Attended' && $assignment['app_status'] === 'Interviewed');
@@ -178,9 +178,9 @@ final class InterviewController
 
     public function scoreSave(): void
     {
-        $id = (int)($_POST['assignment_id'] ?? 0);
+        $id = post_int('assignment_id');
         require_post('admin/interview-score&id=' . $id);
-        $r = InterviewScore::saveScore($id, $_POST, (string)($_POST['remarks'] ?? ''), admin_id());
+        $r = InterviewScore::saveScore($id, $_POST, post_str('remarks'), admin_id());
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/interview-score&id=' . $id); }
         $a = InterviewAssignment::assignment($id);
         flash('success', "Score saved: {$r['total']} / 100. The applicant is now waiting for the final decision.");
@@ -205,14 +205,14 @@ final class InterviewController
     /** Approve | Waitlist | Reject (reason). */
     public function decide(): void
     {
-        $id = (int)($_POST['id'] ?? 0);
+        $id = post_int('id');
         $app = Application::find($id);
         $back = 'admin/decisions&program_id=' . (int)($app['program_id'] ?? 0);
         require_post($back);
         $result = match ($_POST['decision'] ?? '') {
             'approve'  => Application::approve($id, admin_id()),
             'waitlist' => Application::waitlist($id, admin_id()),
-            'reject'   => Application::reject($id, admin_id(), (string)($_POST['reason'] ?? '')),
+            'reject'   => Application::reject($id, admin_id(), post_str('reason')),
             default    => ['ok' => false, 'error' => 'Unknown decision.'],
         };
         $done = ['approve' => 'Approved — scholar created and Semester 1 opened.', 'waitlist' => 'Waitlisted.', 'reject' => 'Rejected.'];

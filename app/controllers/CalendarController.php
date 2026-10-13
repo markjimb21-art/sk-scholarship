@@ -23,7 +23,7 @@ final class CalendarController
 
     private function programId(): ?int
     {
-        $id = (int)($_GET['program_id'] ?? 0);
+        $id = get_int('program_id');
         return $id > 0 && Program::find($id) ? $id : null;
     }
 
@@ -42,8 +42,8 @@ final class CalendarController
     /** GET start/end (from FullCalendar) + optional program_id → JSON events. */
     public function feed(): void
     {
-        $from = substr((string)($_GET['start'] ?? ''), 0, 10);
-        $to = substr((string)($_GET['end'] ?? ''), 0, 10);
+        $from = substr(get_str('start'), 0, 10);
+        $to = substr(get_str('end'), 0, 10);
         foreach ([$from, $to] as $d) {
             $dt = DateTime::createFromFormat('!Y-m-d', $d);
             if (!$dt || $dt->format('Y-m-d') !== $d) json_response(['error' => 'Invalid range.'], 400);

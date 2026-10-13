@@ -7,18 +7,17 @@ final class AuditController
     public function auditLogs(): void
     {
         $filters = [
-            'q'           => trim((string)($_GET['q'] ?? '')),
-            'action'      => (string)($_GET['action'] ?? ''),
-            'entity_type' => (string)($_GET['entity_type'] ?? ''),
-            'user_id'     => (string)($_GET['user_id'] ?? ''),
-            'date_from'   => (string)($_GET['date_from'] ?? ''),
-            'date_to'     => (string)($_GET['date_to'] ?? ''),
+            'q'           => trim(get_str('q')),
+            'action'      => get_str('action'),
+            'entity_type' => get_str('entity_type'),
+            'user_id'     => get_str('user_id'),
+            'date_from'   => get_str('date_from'),
+            'date_to'     => get_str('date_to'),
         ];
-        $page = max(1, (int)($_GET['page'] ?? 1));
         $limit = 50;
-        $logs = AuditLog::search($filters, $limit, ($page - 1) * $limit);
         $total = AuditLog::count($filters);
-        $pages = max(1, (int)ceil($total / $limit));
+        ['page' => $page, 'offset' => $offset, 'pages' => $pages] = paginate($total, $limit);
+        $logs = AuditLog::search($filters, $limit, $offset);
 
         [$actions, $entityTypes] = AuditLog::filterOptions();
         $users = User::options();

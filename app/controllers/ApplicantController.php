@@ -52,9 +52,7 @@ final class ApplicantController
     {
         $route = self::ROUTES[trim($action, '/')] ?? null;
         if ($route === null) {
-            http_response_code(404);
-            require VIEW_PATH . '/errors/404.php';
-            return;
+            not_found();
         }
         [$class, $method] = $route;
         if ($class !== self::class) require_once BASE_PATH . "/app/controllers/$class.php";

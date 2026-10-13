@@ -68,8 +68,7 @@ final class ApplicationFormController
     /** A2 submit / A3 resubmit. */
     public function submit(): void
     {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('applicant/application');
-        verify_csrf();
+        require_post('applicant/application');
         $applicant = Applicant::current();
         $app = Application::currentForApplicant((int)$applicant['id']);
         if (!$app) { flash('danger', 'Please start your application first.'); redirect('applicant/application'); }

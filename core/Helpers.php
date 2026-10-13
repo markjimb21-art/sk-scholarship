@@ -105,6 +105,37 @@ function render(string $view, array $vars = [], string $pageTitle = 'Dashboard')
     require VIEW_PATH . '/layouts/footer.php';
 }
 
+/**
+ * 404 and stop. Without $text: the "Page not found" page (also the answer for "not for your role", so a page's
+ * existence isn't revealed). With $text: that plain text (file downloads).
+ */
+function not_found(?string $text = null): never {
+    http_response_code(404);
+    if ($text !== null) exit($text);
+    require VIEW_PATH . '/errors/404.php';
+    exit;
+}
+
+/*
+ * Request input, read the same way everywhere. GET and POST are named separately on purpose: a value that changes
+ * data must come from the (CSRF-checked) form, never from a link.
+ */
+function get_int(string $key): int { return (int)($_GET[$key] ?? 0); }
+function post_int(string $key): int { return (int)($_POST[$key] ?? 0); }
+function get_str(string $key): string { return (string)($_GET[$key] ?? ''); }
+function post_str(string $key): string { return (string)($_POST[$key] ?? ''); }
+/** An optional id: null when missing, empty or "0". */
+function get_id(string $key): ?int { return !empty($_GET[$key]) ? (int)$_GET[$key] : null; }
+function post_id(string $key): ?int { return !empty($_POST[$key]) ? (int)$_POST[$key] : null; }
+/** A ticked checkbox (or any non-empty value). */
+function post_bool(string $key): bool { return !empty($_POST[$key]); }
+
+/** Page number from ?page= (at least 1), the row offset for it, and the number of pages for $total rows. */
+function paginate(int $total, int $perPage): array {
+    $page = max(1, (int)($_GET['page'] ?? 1));
+    return ['page' => $page, 'offset' => ($page - 1) * $perPage, 'pages' => max(1, (int)ceil($total / $perPage))];
+}
+
 /** Every state-changing action: POST only (anything else goes back to $back) + CSRF check. */
 function require_post(string $back): void {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect($back);

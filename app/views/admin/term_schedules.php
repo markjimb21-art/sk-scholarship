@@ -4,7 +4,7 @@ $isRelease = $purpose === 'release';
 $stateColor = ['open' => 'success', 'not_open_yet' => 'info', 'deadline_passed' => 'warning', 'closed' => 'secondary', 'cancelled' => 'danger', 'not_created' => 'secondary'];
 $dt = static fn(?string $v): string => $v ? fmt_datetime($v) : '—';
 $local = static fn(?string $v): string => $v ? date('Y-m-d\TH:i', strtotime($v)) : '';
-$editId = (int)($_GET['edit'] ?? 0);   // opened straight away by pages/term-schedules.js
+$editId = get_int('edit');   // opened straight away by pages/term-schedules.js
 ?>
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
