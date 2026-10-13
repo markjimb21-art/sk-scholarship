@@ -31,8 +31,9 @@ require_once BASE_PATH . '/app/models/Setting.php';
 require_once BASE_PATH . '/app/models/Holiday.php';
 
 /**
- * Admin area router + the shared admin pages. Only the admin role reaches this (public/index.php).
- * Each process step has its own controller; see docs/PROCESS.md for the step ↔ route map.
+ * Admin area router + the shared admin pages. Every staff role (STAFF_ROLES) reaches this from public/index.php;
+ * ROUTES then decides which pages each role may open. Each process step has its own controller; see docs/PROCESS.md
+ * for the step ↔ route map.
  */
 final class AdminController
 {
