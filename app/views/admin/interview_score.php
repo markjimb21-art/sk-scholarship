@@ -35,7 +35,7 @@
     <?php if ($editable): ?><button class="btn btn-primary"><i class="bi bi-save"></i> Save score</button><?php endif; ?>
     </fieldset>
     <?php if ($evaluation): ?>
-      <p class="small text-muted mt-2 mb-0">Last saved <?= e(date('M d, Y g:i A', strtotime($evaluation['evaluated_at']))) ?> by <?= e($evaluation['interviewer_name'] ?? '—') ?>.</p>
+      <p class="small text-muted mt-2 mb-0">Last saved <?= e(fmt_datetime($evaluation['evaluated_at'])) ?> by <?= e($evaluation['interviewer_name'] ?? '—') ?>.</p>
     <?php endif; ?>
   </form>
 </div>

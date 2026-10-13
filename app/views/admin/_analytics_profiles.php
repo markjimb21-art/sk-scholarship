@@ -1,6 +1,6 @@
 <?php
 // Analytics sections 5–7 (docs/PROCESS.md §6): profiles, academic performance, fund utilization.
-// Expects $data (ReportController::analytics), $program, $pct, $peso. Every number shows its formula.
+// Expects $data (ReportController::analytics), $program, $pct. Every number shows its formula.
 $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
 ?>
 <!-- (5) PROFILES -->
@@ -106,17 +106,17 @@ $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
 <h5 class="fw-semibold mb-2 mt-4">7. Fund utilization — A.Y. <?= e($data['ay']) ?></h5>
 <div class="row g-3">
   <div class="col-sm-6 col-lg-3"><div class="card border-0 shadow-sm h-100"><div class="card-body">
-    <div class="small text-muted">Released</div><div class="fs-4 fw-bold"><?= e($peso($aps['total'])) ?></div>
+    <div class="small text-muted">Released</div><div class="fs-4 fw-bold"><?= e(peso($aps['total'], '—')) ?></div>
     <div class="small text-muted">= sum of releases for this program’s semesters of this A.Y.</div></div></div></div>
   <div class="col-sm-6 col-lg-3"><div class="card border-0 shadow-sm h-100"><div class="card-body">
-    <div class="small text-muted">Committed</div><div class="fs-4 fw-bold"><?= e($peso($data['committed'])) ?></div>
+    <div class="small text-muted">Committed</div><div class="fs-4 fw-bold"><?= e(peso($data['committed'], '—')) ?></div>
     <div class="small text-muted">= Σ Active scholars (amount per semester × semesters of this A.Y. not yet released)</div></div></div></div>
   <div class="col-sm-6 col-lg-3"><div class="card border-0 shadow-sm h-100"><div class="card-body">
     <div class="small text-muted">Release rate</div><div class="fs-4 fw-bold"><?= e($pct($data['releaseRate'])) ?></div>
-    <div class="small text-muted">= released ÷ total budget<?= $data['budget'] ? ' (' . e($peso($data['budget']['total_budget'])) . ')' : ' — no budget for this A.Y.' ?></div></div></div></div>
+    <div class="small text-muted">= released ÷ total budget<?= $data['budget'] ? ' (' . e(peso($data['budget']['total_budget'], '—')) . ')' : ' — no budget for this A.Y.' ?></div></div></div></div>
   <div class="col-sm-6 col-lg-3"><div class="card border-0 shadow-sm h-100"><div class="card-body">
-    <div class="small text-muted">Average released per scholar</div><div class="fs-4 fw-bold"><?= e($peso($aps['avg'])) ?></div>
-    <div class="small text-muted">= released <?= e($peso($aps['total'])) ?> ÷ <?= (int)$aps['scholars'] ?> scholar(s) who received a release</div></div></div></div>
+    <div class="small text-muted">Average released per scholar</div><div class="fs-4 fw-bold"><?= e(peso($aps['avg'], '—')) ?></div>
+    <div class="small text-muted">= released <?= e(peso($aps['total'], '—')) ?> ÷ <?= (int)$aps['scholars'] ?> scholar(s) who received a release</div></div></div></div>
 
   <div class="col-lg-6"><div class="card border-0 shadow-sm h-100"><div class="card-body">
     <h6 class="fw-semibold mb-1">Released per month (₱)</h6>
@@ -124,7 +124,7 @@ $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
     <?php if (!$data['releasedByMonth']): ?><p class="text-muted small mb-0">Nothing released yet.</p><?php else: ?>
       <div style="height:220px"><canvas id="releasedMonthChart" role="img" aria-label="Released per month"></canvas></div>
       <table class="table table-sm small mb-0 mt-2"><thead><tr><th>Month</th><th class="text-end">Released</th></tr></thead><tbody>
-        <?php foreach ($data['releasedByMonth'] as $m => $v): ?><tr><td><?= e(date('F Y', strtotime($m . '-01'))) ?></td><td class="text-end"><?= e($peso($v)) ?></td></tr><?php endforeach; ?>
+        <?php foreach ($data['releasedByMonth'] as $m => $v): ?><tr><td><?= e(date('F Y', strtotime($m . '-01'))) ?></td><td class="text-end"><?= e(peso($v, '—')) ?></td></tr><?php endforeach; ?>
       </tbody></table>
     <?php endif; ?>
   </div></div></div>
@@ -134,7 +134,7 @@ $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
     <?php if (!$data['releasedBySemester']): ?><p class="text-muted small mb-0">Nothing released yet.</p><?php else: ?>
       <div style="height:220px"><canvas id="releasedSemChart" role="img" aria-label="Released per semester"></canvas></div>
       <table class="table table-sm small mb-0 mt-2"><thead><tr><th>Semester</th><th class="text-end">Released</th></tr></thead><tbody>
-        <?php foreach ($data['releasedBySemester'] as $sem => $v): ?><tr><td><?= e($sem) ?></td><td class="text-end"><?= e($peso($v)) ?></td></tr><?php endforeach; ?>
+        <?php foreach ($data['releasedBySemester'] as $sem => $v): ?><tr><td><?= e($sem) ?></td><td class="text-end"><?= e(peso($v, '—')) ?></td></tr><?php endforeach; ?>
       </tbody></table>
     <?php endif; ?>
   </div></div></div>

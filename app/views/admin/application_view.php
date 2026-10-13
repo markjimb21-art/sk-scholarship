@@ -5,7 +5,6 @@ $edu = $app['education'] ?? [];
 $f = $app['family'] ?? [];
 $screening = Application::can('qualify', $app['status']);
 $resultColor = ['Pass' => 'success', 'Fail' => 'danger', 'Not provided' => 'warning', 'No limit' => 'secondary'];
-$money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_format((float)$v, 2);
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
   <div>
@@ -17,7 +16,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
     </h4>
     <div class="text-muted small">
       <code><?= e($app['application_code']) ?></code> · <?= e($app['program_name']) ?> (<?= e($app['academic_year']) ?>)
-      · submitted <?= $app['submitted_at'] ? e(date('M d, Y g:i A', strtotime($app['submitted_at']))) : '—' ?>
+      · submitted <?= $app['submitted_at'] ? e(fmt_datetime($app['submitted_at'])) : '—' ?>
       <?php if ($scholar): ?> · Scholar <a href="<?= url('admin/scholar&id=' . (int)$scholar['id']) ?>"><?= e($scholar['scholar_code']) ?></a><?php endif; ?>
     </div>
   </div>
@@ -25,7 +24,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
 </div>
 
 <?php if ($app['status'] === 'Returned'): ?>
-  <div class="alert alert-warning"><strong>Returned for correction</strong> on <?= e(date('M d, Y', strtotime($app['review_remarks_at']))) ?>: <?= nl2br(e($app['review_remarks'])) ?>
+  <div class="alert alert-warning"><strong>Returned for correction</strong> on <?= e(fmt_date($app['review_remarks_at'])) ?>: <?= nl2br(e($app['review_remarks'])) ?>
     <?php if ($flags): $labels = Application::flagOptions(); ?>
       <div class="mt-1 small"><strong>Flagged (only these can change):</strong> <?= e(implode(', ', array_map(static fn($k) => $labels[$k], $flags))) ?></div>
     <?php endif; ?>
@@ -33,7 +32,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
 <?php elseif ($flags && $app['status'] === 'Submitted'): $labels = Application::flagOptions(); ?>
   <div class="alert alert-info small">Resubmitted after correction. Flagged last time: <?= e(implode(', ', array_map(static fn($k) => $labels[$k], $flags))) ?>.</div>
 <?php elseif ($app['status'] === 'Rejected'): ?>
-  <div class="alert alert-danger"><strong>Rejected</strong><?= $app['decided_at'] ? ' on ' . e(date('M d, Y', strtotime($app['decided_at']))) : '' ?>: <?= e($app['decision_remarks'] ?? '') ?></div>
+  <div class="alert alert-danger"><strong>Rejected</strong><?= $app['decided_at'] ? ' on ' . e(fmt_date($app['decided_at'])) : '' ?>: <?= e($app['decision_remarks'] ?? '') ?></div>
 <?php elseif (in_array($app['status'], ['Interviewed', 'Waitlisted'], true)): ?>
   <div class="alert alert-info">This application is waiting for the final decision — decide it on the <a href="<?= url('admin/decisions&program_id=' . (int)$app['program_id']) ?>">ranking page</a>.</div>
 <?php elseif ($app['status'] === 'Qualified'): ?>
@@ -120,7 +119,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
                 updated during <?= e($cur['uploaded_during']) ?> · <?= e($cur['context']) ?>. The one from this application is in the document history.</div>
             <?php endif; ?>
             <?php if (!$isNewer && $d['status'] === 'Invalid'): $has = false; ?>
-              <div class="alert alert-danger py-2 small mb-0">Marked invalid<?= $d['invalidated_at'] ? ' ' . e(date('M d, Y', strtotime($d['invalidated_at']))) : '' ?>: <?= e($d['invalid_reason']) ?>
+              <div class="alert alert-danger py-2 small mb-0">Marked invalid<?= $d['invalidated_at'] ? ' ' . e(fmt_date($d['invalidated_at'])) : '' ?>: <?= e($d['invalid_reason']) ?>
                 <div class="text-muted">The file was removed; the record is kept (see the document history).</div></div>
             <?php endif; ?>
             <?php if ($has): ?>
@@ -132,7 +131,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
               <div class="small">
                 <a href="<?= e($src) ?>" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Open</a> ·
                 <a href="<?= e($src . '&download=1') ?>"><i class="bi bi-download"></i> Download</a>
-                <div class="text-muted"><?= e($shown['original_filename']) ?> · <?= e(date('M d, Y', strtotime($shown['uploaded_at']))) ?></div>
+                <div class="text-muted"><?= e($shown['original_filename']) ?> · <?= e(fmt_date($shown['uploaded_at'])) ?></div>
               </div>
               <?php $invTable = $isNewer ? $cur['source_table'] : 'documents'; $invId = $isNewer ? (int)$cur['id'] : (int)$d['id']; ?>
               <details class="small mt-2">
@@ -187,11 +186,11 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
         <div class="col-md-6">
           <h6 class="text-primary"><?= $label ?></h6>
           <div><strong>Name:</strong> <?= e($f[$k . '_name'] ?? '—') ?> (<?= e((string)($f[$k . '_age'] ?? '—')) ?>) · <?= e($f[$k . '_status'] ?? '—') ?></div>
-          <div><strong>Occupation:</strong> <?= e($f[$k . '_occupation'] ?? '—') ?> · <strong>Income:</strong> <?= e($money($f[$k . '_income'] ?? null)) ?></div>
+          <div><strong>Occupation:</strong> <?= e($f[$k . '_occupation'] ?? '—') ?> · <strong>Income:</strong> <?= e(peso($f[$k . '_income'] ?? null, '—')) ?></div>
           <div><strong>Contact:</strong> <?= e($f[$k . '_contact'] ?? '—') ?> · <strong>Address:</strong> <?= e($f[$k . '_address'] ?? '—') ?></div>
         </div>
       <?php endforeach; ?>
-      <div class="col-md-6"><label class="small text-muted">Total family income (monthly)</label><div class="fw-bold text-success"><?= e($money($f['total_family_income'] ?? null)) ?></div></div>
+      <div class="col-md-6"><label class="small text-muted">Total family income (monthly)</label><div class="fw-bold text-success"><?= e(peso($f['total_family_income'] ?? null, '—')) ?></div></div>
       <div class="col-md-6"><label class="small text-muted">Family size</label><div class="fw-semibold"><?= e((string)($f['family_size'] ?? '—')) ?></div></div>
     </div></div>
   </div>
@@ -220,7 +219,7 @@ $money = static fn($v) => $v === null || $v === '' ? '—' : '₱' . number_form
         <tbody>
           <?php if (!$auditTrail): ?><tr><td colspan="3" class="text-center text-muted py-3">No history yet.</td></tr><?php endif; ?>
           <?php foreach ($auditTrail as $a): ?>
-            <tr><td class="text-nowrap"><?= e(date('M d, Y g:i A', strtotime($a['created_at']))) ?></td><td><?= e($a['actor'] ?? 'system') ?></td><td><?= e($a['description'] ?? $a['action']) ?></td></tr>
+            <tr><td class="text-nowrap"><?= e(fmt_datetime($a['created_at'])) ?></td><td><?= e($a['actor'] ?? 'system') ?></td><td><?= e($a['description'] ?? $a['action']) ?></td></tr>
           <?php endforeach; ?>
         </tbody>
       </table>

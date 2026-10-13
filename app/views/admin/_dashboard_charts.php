@@ -1,7 +1,6 @@
 <?php
 // Dashboard charts for the selected program. Expects $program, $budget, $charts (AdminController::dashboard).
 // Each chart has its numbers in a small table next to it, and an empty state when there is nothing to show.
-$peso = static fn($v) => '₱' . number_format((float)$v, 2);
 $status = array_filter($charts['status']);
 $budgetRows = $budget ? ['Total budget' => (float)$budget['total_budget'], 'Released' => (float)$budget['released'], 'Remaining' => (float)$budget['remaining']] : [];
 $gwaRows = array_filter($charts['gwa']);
@@ -28,7 +27,7 @@ $gwaRows = array_filter($charts['gwa']);
     <?php if (!$budgetRows): ?><p class="text-muted small mb-0">No budget for this academic year yet. <a href="<?= url('admin/budget') ?>">Create it</a>.</p><?php else: ?>
       <div style="height:180px"><canvas id="dashBudget" role="img" aria-label="Budget total, released and remaining"></canvas></div>
       <table class="table table-sm small mb-0 mt-2"><tbody>
-        <?php foreach ($budgetRows as $k => $v): ?><tr><td><?= e($k) ?></td><td class="text-end"><?= e($peso($v)) ?></td></tr><?php endforeach; ?>
+        <?php foreach ($budgetRows as $k => $v): ?><tr><td><?= e($k) ?></td><td class="text-end"><?= e(peso($v)) ?></td></tr><?php endforeach; ?>
       </tbody></table>
     <?php endif; ?>
   </div></div></div>
@@ -41,7 +40,7 @@ $gwaRows = array_filter($charts['gwa']);
     <?php if (!$charts['months']): ?><p class="text-muted small mb-0">Nothing released yet.</p><?php else: ?>
       <div style="height:220px"><canvas id="dashMonths" role="img" aria-label="Releases per month"></canvas></div>
       <table class="table table-sm small mb-0 mt-2"><tbody>
-        <?php foreach ($charts['months'] as $m => $v): ?><tr><td><?= e(date('F Y', strtotime($m . '-01'))) ?></td><td class="text-end"><?= e($peso($v)) ?></td></tr><?php endforeach; ?>
+        <?php foreach ($charts['months'] as $m => $v): ?><tr><td><?= e(date('F Y', strtotime($m . '-01'))) ?></td><td class="text-end"><?= e(peso($v)) ?></td></tr><?php endforeach; ?>
       </tbody></table>
     <?php endif; ?>
   </div></div></div>

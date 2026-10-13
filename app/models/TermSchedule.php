@@ -346,7 +346,7 @@ final class TermSchedule
         if ($row['opens_at'] > date('Y-m-d H:i:s')) $extra .= "\nSubmission opens on " . date('F j, Y g:i A', strtotime($row['opens_at'])) . '.';
         if ($row['planned_date']) {
             $extra .= "\n" . ($purpose === 'release' ? 'Planned release date: ' : 'Semester starts: ')
-                . date('F j, Y', strtotime($row['planned_date'])) . '.';
+                . fmt_long_date($row['planned_date']) . '.';
         }
         [$title, $message, $type] = match ($kind) {
             'created'   => [self::TITLES[$purpose] . ' open: submit by ' . date('M j', strtotime($row['submission_deadline'])),

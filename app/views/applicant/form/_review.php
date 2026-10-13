@@ -26,7 +26,6 @@
         // Review of everything entered in steps I–IV. Rendered from the saved data here; application/review.js refreshes
         // it from the form itself each time this step is opened, so it always matches what is on screen.
         $show = static fn($v): string => ($v === null || trim((string)$v) === '') ? '—' : (string)$v;
-        $money = static fn($v): string => ($v === null || $v === '') ? '—' : '₱' . number_format((float)$v, 2);
         $unit = static fn($v, string $u): string => ($v === null || $v === '') ? '—' : rtrim(rtrim(number_format((float)$v, 1), '0'), '.') . " $u";
         $yesNo = static fn($flag, $details): string => !empty($flag) ? 'Yes' . (trim((string)$details) !== '' ? ' — ' . $details : '') : 'No';
         $purokName = '';
@@ -36,7 +35,7 @@
         $reviewSections = [
           ['I. Personal Information', 0, [
             'Full name'        => ['@full_name', implode(' ', array_filter([$personal['first_name'] ?? '', $personal['middle_name'] ?? '', $personal['last_name'] ?? '', $personal['suffix'] ?? ''], static fn($x) => trim((string)$x) !== ''))],
-            'Date of birth'    => ['date_of_birth|date', !empty($personal['date_of_birth']) ? date('M d, Y', strtotime($personal['date_of_birth'])) : ''],
+            'Date of birth'    => ['date_of_birth|date', !empty($personal['date_of_birth']) ? fmt_date($personal['date_of_birth']) : ''],
             'Age'              => ['@age', !empty($personal['date_of_birth']) ? (string)(int)calculate_age($personal['date_of_birth']) : ''],
             'Sex'              => ['sex', $personal['sex'] ?? ''],
             'Complete address' => ['@address', implode(' / ', array_filter([$personal['address_unit'] ?? '', $purokName], static fn($x) => trim((string)$x) !== '')) . ($purokName !== '' ? ' / ' . ADDRESS_BARANGAY . ' / ' . ADDRESS_CITY : '')],
@@ -58,7 +57,7 @@
             'Current scholarship'  => ['current_scholarship|yesno', $yesNo($education['current_scholarship'] ?? 0, $education['current_scholarship_details'] ?? '')],
           ]],
         ];
-        $parentRows = static function (string $who) use ($family, $money): array {
+        $parentRows = static function (string $who) use ($family): array {
           return [
             'Name'           => ["{$who}_name", $family["{$who}_name"] ?? ''],
             'Age'            => ["{$who}_age", (string)($family["{$who}_age"] ?? '')],
@@ -66,7 +65,7 @@
             'Status'         => ["{$who}_status", $family["{$who}_status"] ?? ''],
             'Address'        => ["{$who}_address", $family["{$who}_address"] ?? ''],
             'Contact number' => ["{$who}_contact", $family["{$who}_contact"] ?? ''],
-            'Monthly income' => ["{$who}_income|money", $money($family["{$who}_income"] ?? null)],
+            'Monthly income' => ["{$who}_income|money", peso($family["{$who}_income"] ?? null, '—')],
           ];
         };
         $reviewTable = static function (array $rows) use ($show): void {
@@ -103,7 +102,7 @@
                 <div class="col-lg-6"><div class="small text-muted mb-1">Mother</div><?php $reviewTable($parentRows('mother')); ?></div>
                 <div class="col-lg-6">
                   <?php $reviewTable([
-                    'Total family income' => ['@total_income', $money($family['total_family_income'] ?? 0)],
+                    'Total family income' => ['@total_income', peso($family['total_family_income'] ?? 0, '—')],
                     'Family size'         => ['family_size', (string)($family['family_size'] ?? '')],
                   ]); ?>
                 </div>

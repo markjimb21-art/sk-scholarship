@@ -33,7 +33,7 @@ final class InterviewController
         $waiting = Interview::qualifiedWithoutSchedule((int)$schedule['program_id']);
         $free = max(0, (int)$schedule['max_slots'] - (int)$schedule['assigned_count']);
         render('admin/interview_schedule', compact('schedule', 'assignments', 'waiting', 'free') + ['pageScripts' => [asset('js/pages/interview-schedule.js')]],
-            'Interview · ' . date('M d, Y', strtotime($schedule['interview_date'])));
+            'Interview · ' . fmt_date($schedule['interview_date']));
     }
 
     public function scheduleSave(): void

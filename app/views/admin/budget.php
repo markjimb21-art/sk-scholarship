@@ -1,4 +1,3 @@
-<?php $peso = static fn($v) => '₱' . number_format((float)$v, 2); ?>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h4 class="fw-bold mb-0">Budget</h4>
@@ -19,11 +18,11 @@
           <tr>
             <td class="fw-semibold"><?= e($b['program_name']) ?></td>
             <td><?= e($b['academic_year']) ?></td>
-            <td><?= e($peso($b['total_budget'])) ?></td>
-            <td class="text-success"><?= e($peso($b['released'])) ?></td>
-            <td class="fw-semibold"><?= e($peso($b['remaining'])) ?></td>
-            <td><?= e($peso($b['committed'])) ?></td>
-            <td class="<?= $after < 0 ? 'text-danger fw-bold' : 'text-success' ?>"><?= e(($after < 0 ? 'Shortfall ' : 'Surplus ') . $peso(abs($after))) ?></td>
+            <td><?= e(peso($b['total_budget'])) ?></td>
+            <td class="text-success"><?= e(peso($b['released'])) ?></td>
+            <td class="fw-semibold"><?= e(peso($b['remaining'])) ?></td>
+            <td><?= e(peso($b['committed'])) ?></td>
+            <td class="<?= $after < 0 ? 'text-danger fw-bold' : 'text-success' ?>"><?= e(($after < 0 ? 'Shortfall ' : 'Surplus ') . peso(abs($after))) ?></td>
             <td class="text-end text-nowrap">
               <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#budgetModal" data-budget-modal="<?= e(js_json($b)) ?>" aria-label="Edit budget"><i class="bi bi-pencil" aria-hidden="true"></i></button>
               <?php if ((float)$b['released'] == 0.0): ?>
@@ -63,7 +62,7 @@
             <?php foreach ($programs as $p): $s = $suggestions[(int)$p['id']] ?? null; ?>
               <option value="<?= (int)$p['id'] ?>" data-year="<?= e($p['academic_year']) ?>"
                 <?php if ($s): ?>data-suggested="<?= e(number_format($s['total'], 2, '.', '')) ?>"
-                data-suggested-text="<?= e('Suggested total budget: ' . $peso($s['total']) . ' (based on ' . $s['slots'] . ' slots × ' . $peso($s['amount']) . '/semester × 2 semesters)') ?>"<?php endif; ?>><?= e($p['program_name']) ?></option>
+                data-suggested-text="<?= e('Suggested total budget: ' . peso($s['total']) . ' (based on ' . $s['slots'] . ' slots × ' . peso($s['amount']) . '/semester × 2 semesters)') ?>"<?php endif; ?>><?= e($p['program_name']) ?></option>
             <?php endforeach; ?>
           </select>
         </div>

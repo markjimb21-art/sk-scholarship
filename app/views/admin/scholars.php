@@ -34,7 +34,7 @@
             <td><div class="fw-semibold"><?= e($r['full_name']) ?></div><code class="small"><?= e($r['scholar_code']) ?></code></td>
             <td><small><?= e($r['program_name']) ?></small></td>
             <td><?= e($sem ?: '—') ?><?php if ($claim): ?><br><span class="badge bg-<?= e(CLAIM_STATUS_COLORS[$claim] ?? 'secondary') ?>"><?= e($claim) ?></span><?php endif; ?></td>
-            <td>₱<?= e(number_format((float)$r['total_released'], 2)) ?></td>
+            <td><?= e(peso($r['total_released'])) ?></td>
             <td><?= $r['status'] === 'Active' ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">Ended — ' . e($r['end_reason']) . '</span>' ?></td>
             <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?= url('admin/scholar&id=' . (int)$r['id']) ?>">Open</a></td>
           </tr>

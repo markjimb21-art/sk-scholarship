@@ -283,8 +283,8 @@ final class Application
         $resubmission = $app['status'] === 'Returned';
         if (!$resubmission && (!$app['program_open'] || !Program::windowOpen($app))) {
             return ['ok' => false, 'error' => "Applications for {$app['program_name']} are accepted from "
-                . date('F j, Y', strtotime($app['application_start'])) . ' to '
-                . date('F j, Y', strtotime($app['application_end'])) . ' while the program is open.'];
+                . fmt_long_date($app['application_start']) . ' to '
+                . fmt_long_date($app['application_end']) . ' while the program is open.'];
         }
 
         $check = self::completeness($applicationId);

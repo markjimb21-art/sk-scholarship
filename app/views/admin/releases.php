@@ -1,4 +1,3 @@
-<?php $peso = static fn($v) => '₱' . number_format((float)$v, 2); ?>
 <div class="mb-3">
   <h4 class="fw-bold mb-0">Releases</h4>
   <p class="text-muted small mb-0">Release cash for verified claims. Each semester can be released once, only against a budget for its program and academic year, and never above the remaining balance.</p>
@@ -15,7 +14,7 @@
           <tr>
             <td><div class="fw-semibold"><?= e($t['full_name']) ?></div><code class="small"><?= e($t['scholar_code']) ?></code> · <small><?= e($t['program_name']) ?></small></td>
             <td><?= e($t['academic_year'] . ' ' . $t['semester']) ?><br><small class="text-muted">GWA <?= $t['gwa'] !== null ? e(number_format((float)$t['gwa'], 2)) : '—' ?></small></td>
-            <td><?= $t['budget_remaining'] !== null ? e($peso($t['budget_remaining'])) : '<span class="text-danger">No budget for ' . e($t['academic_year']) . '</span>' ?></td>
+            <td><?= $t['budget_remaining'] !== null ? e(peso($t['budget_remaining'])) : '<span class="text-danger">No budget for ' . e($t['academic_year']) . '</span>' ?></td>
             <td>
               <form method="POST" action="<?= url('admin/release-save') ?>" class="row g-1 align-items-end"
                     data-confirm="Record this release? The scholar will be notified.">
@@ -59,16 +58,16 @@
         <?php if (!$history): ?><tr><td colspan="7" class="text-center text-muted py-3">No releases.</td></tr><?php endif; ?>
         <?php foreach ($history as $r): ?>
           <tr>
-            <td><?= e(date('M d, Y', strtotime($r['release_date']))) ?></td><td><code><?= e($r['release_code']) ?></code></td>
+            <td><?= e(fmt_date($r['release_date'])) ?></td><td><code><?= e($r['release_code']) ?></code></td>
             <td><?= e($r['full_name']) ?> <small class="text-muted"><?= e($r['program_name']) ?></small></td>
             <td><?= e($r['academic_year'] . ' ' . $r['semester']) ?></td>
-            <td><?= e($peso($r['amount'])) ?></td>
+            <td><?= e(peso($r['amount'])) ?></td>
             <td><?= e($r['payment_method']) ?><?= $r['reference_number'] ? ' · ' . e($r['reference_number']) : '' ?></td>
             <td><small><?= e($r['released_by'] ?? '—') ?></small></td>
           </tr>
         <?php endforeach; ?>
       </tbody>
-      <tfoot><tr class="table-light"><th colspan="4">Total shown (sum of the rows above)</th><th><?= e($peso($historyTotal)) ?></th><th colspan="2"></th></tr></tfoot>
+      <tfoot><tr class="table-light"><th colspan="4">Total shown (sum of the rows above)</th><th><?= e(peso($historyTotal)) ?></th><th colspan="2"></th></tr></tfoot>
     </table>
   </div>
 </div>

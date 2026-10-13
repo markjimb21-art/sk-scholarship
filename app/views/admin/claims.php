@@ -10,7 +10,7 @@
         <?php if (!$rows): ?><tr><td colspan="5" class="text-center text-muted py-4">No claims waiting.</td></tr><?php endif; ?>
         <?php foreach ($rows as $r): ?>
           <tr>
-            <td><small><?= $r['submitted_at'] ? e(date('M d, Y g:i A', strtotime($r['submitted_at']))) : '—' ?></small></td>
+            <td><small><?= $r['submitted_at'] ? e(fmt_datetime($r['submitted_at'])) : '—' ?></small></td>
             <td><div class="fw-semibold"><?= e($r['full_name']) ?></div><code class="small"><?= e($r['scholar_code']) ?></code></td>
             <td><small><?= e($r['program_name']) ?></small></td>
             <td><?= e($r['academic_year'] . ' ' . $r['semester']) ?></td>

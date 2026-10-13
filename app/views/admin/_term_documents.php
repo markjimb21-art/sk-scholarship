@@ -12,7 +12,7 @@
           <?php else: ?><span class="badge bg-secondary">Missing</span><?php endif; ?>
         </div>
         <?php if ($d && $d['status'] === 'Invalid'): ?>
-          <div class="alert alert-danger py-2 small mb-0">Marked invalid <?= $d['invalidated_at'] ? e(date('M d, Y', strtotime($d['invalidated_at']))) : '' ?>: <?= e($d['invalid_reason']) ?>
+          <div class="alert alert-danger py-2 small mb-0">Marked invalid <?= $d['invalidated_at'] ? e(fmt_date($d['invalidated_at'])) : '' ?>: <?= e($d['invalid_reason']) ?>
             <div class="text-muted">The file was removed; the record is kept. Waiting for the scholar to upload a new one.</div></div>
         <?php elseif ($d): $src = url('admin/term-documents/view&id=' . (int)$d['id']); ?>
           <?php if (in_array($d['mime_type'], ['image/jpeg', 'image/png'], true)): ?>
@@ -21,7 +21,7 @@
           <div class="small">
             <a href="<?= $src ?>" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Open</a> ·
             <a href="<?= $src ?>&download=1"><i class="bi bi-download"></i> Download</a>
-            <div class="text-muted"><?= e($d['original_filename']) ?> · uploaded <?= e(date('M d, Y g:i A', strtotime($d['uploaded_at']))) ?></div>
+            <div class="text-muted"><?= e($d['original_filename']) ?> · uploaded <?= e(fmt_datetime($d['uploaded_at'])) ?></div>
             <?php if (in_array($type, VERSIONED_DOCUMENT_TYPES, true)): ?>
               <?= (int)$d['is_current']
                 ? '<span class="badge bg-success-subtle text-success border mt-1">Current on file</span>'

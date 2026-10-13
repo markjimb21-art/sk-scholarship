@@ -87,10 +87,10 @@
     <div class="card border-0 shadow-sm h-100"><div class="card-body">
       <div class="text-muted small">Budget remaining — <?= e($program['academic_year']) ?></div>
       <?php if ($budget): ?>
-        <div class="fs-3 fw-bold <?= (float)$budget['remaining'] < (float)$budget['committed'] ? 'text-danger' : '' ?>">₱<?= e(number_format((float)$budget['remaining'], 2)) ?></div>
+        <div class="fs-3 fw-bold <?= (float)$budget['remaining'] < (float)$budget['committed'] ? 'text-danger' : '' ?>"><?= e(peso($budget['remaining'])) ?></div>
         <div class="small text-muted">
-          Remaining = total ₱<?= e(number_format((float)$budget['total_budget'], 2)) ?> − released ₱<?= e(number_format((float)$budget['released'], 2)) ?>.
-          Still committed to current scholars this A.Y.: ₱<?= e(number_format((float)$budget['committed'], 2)) ?>.
+          Remaining = total <?= e(peso($budget['total_budget'])) ?> − released <?= e(peso($budget['released'])) ?>.
+          Still committed to current scholars this A.Y.: <?= e(peso($budget['committed'])) ?>.
         </div>
       <?php else: ?>
         <div class="fs-5 text-warning">No budget yet</div>

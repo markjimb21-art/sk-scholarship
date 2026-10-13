@@ -18,7 +18,7 @@ $scheduleRoute = $purpose === 'release' ? 'admin/release-schedule' : 'admin/rene
             <td><div class="fw-semibold"><?= e($m['full_name']) ?></div><code><?= e($m['scholar_code']) ?></code></td>
             <td><?= e($s['program_name']) ?></td>
             <td><?= e($s['academic_year'] . ' ' . $s['semester']) ?></td>
-            <td class="text-danger"><?= e(date('M d, Y g:i A', strtotime($s['submission_deadline']))) ?></td>
+            <td class="text-danger"><?= e(fmt_datetime($s['submission_deadline'])) ?></td>
             <td><?= e($m['progress'] ?? 'Not submitted') ?></td>
             <td class="text-end text-nowrap">
               <a class="btn btn-sm btn-outline-secondary" href="<?= url('admin/scholar&id=' . (int)$m['scholar_id']) ?>">Scholar</a>

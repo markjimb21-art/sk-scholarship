@@ -23,7 +23,7 @@
         <?php if (!$rows): ?><tr><td colspan="7" class="text-center text-muted py-4">Nothing to screen. 🎉</td></tr><?php endif; ?>
         <?php foreach ($rows as $r): ?>
           <tr>
-            <td><small><?= e(date('M d, Y g:i A', strtotime($r['submitted_at']))) ?></small></td>
+            <td><small><?= e(fmt_datetime($r['submitted_at'])) ?></small></td>
             <td><div class="fw-semibold"><?= e($r['full_name']) ?></div><code class="small"><?= e($r['application_code']) ?></code></td>
             <td><small><?= e($r['program_name']) ?></small></td>
             <td><small><?= e($r['school_name'] ?? '—') ?><br><span class="text-muted"><?= e($r['course_name'] ?? '') ?></span></small></td>

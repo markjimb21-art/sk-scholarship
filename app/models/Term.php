@@ -253,7 +253,7 @@ final class Term
             $pdo->beginTransaction();
             $blocker = Budget::releaseBlocker((int)$term['program_id'], $term['program_name'], $term['academic_year'], (float)$amount);
             if ($blocker) throw new DomainException($blocker);
-            self::changeClaimStatus($term, 'release', $adminId, [], '₱' . number_format((float)$amount, 2) . " via $method");
+            self::changeClaimStatus($term, 'release', $adminId, [], peso($amount) . " via $method");
             $pdo->prepare(
                 "INSERT INTO scholarship_releases (release_code, scholar_id, term_id, amount, release_date, payment_method, reference_number, staff_id)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
@@ -272,8 +272,8 @@ final class Term
             throw $e;
         }
         self::notifyScholar($term, 'Cash released',
-            '₱' . number_format((float)$amount, 2) . " for {$term['academic_year']} {$term['semester']} was released on "
-            . date('F j, Y', strtotime($date)) . " via $method" . ($reference ? " (reference no. $reference)" : '') . '.'
+            peso($amount) . " for {$term['academic_year']} {$term['semester']} was released on "
+            . fmt_long_date($date) . " via $method" . ($reference ? " (reference no. $reference)" : '') . '.'
             . "\nYou can now renew for the next semester on My Scholarship.", 'success');
         return ['ok' => true];
     }

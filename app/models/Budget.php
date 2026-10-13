@@ -130,7 +130,7 @@ final class Budget
         if ($total === false) return "Create a budget for $programName $academicYear first.";
         $remaining = (float)$total - self::actualReleased($programId, $academicYear);
         if ($amount > $remaining + 0.001) {
-            return 'This release (₱' . number_format($amount, 2) . ') is more than the remaining budget for '
+            return 'This release (' . peso($amount) . ') is more than the remaining budget for '
                 . "$programName $academicYear (₱" . number_format($remaining, 2) . ').';
         }
         return null;
@@ -149,7 +149,7 @@ final class Budget
         if (!is_numeric($total) || (float)$total <= 0) return ['ok' => false, 'error' => 'Total budget must be a number greater than 0.'];
         $released = self::actualReleased($programId, $year);
         if ((float)$total < $released) {
-            return ['ok' => false, 'error' => 'Total budget can’t be less than the ₱' . number_format($released, 2) . " already released for {$program['program_name']} $year."];
+            return ['ok' => false, 'error' => 'Total budget can’t be less than the ' . peso($released) . " already released for {$program['program_name']} $year."];
         }
 
         $pdo = Database::conn();

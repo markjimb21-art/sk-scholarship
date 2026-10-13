@@ -37,7 +37,7 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
             <td><?= e($u['email']) ?><?= !$u['email_verified'] ? ' <span class="badge bg-warning">not verified</span>' : '' ?></td>
             <td><span class="badge bg-<?= e($roleColors[$u['role_name']] ?? 'secondary') ?>"><?= e($roleLabels[$u['role_name']] ?? $u['role_name']) ?></span></td>
             <td><span class="badge bg-<?= $u['is_active'] ? 'success' : 'secondary' ?>"><?= $u['is_active'] ? 'Active' : 'Deactivated' ?></span></td>
-            <td><small class="text-muted"><?= $u['last_login'] ? e(date('M d, Y g:i A', strtotime($u['last_login']))) : 'Never' ?></small></td>
+            <td><small class="text-muted"><?= $u['last_login'] ? e(fmt_datetime($u['last_login'])) : 'Never' ?></small></td>
             <td class="text-end text-nowrap">
               <?php if ($u['role_name'] !== 'applicant'): ?>
                 <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#userModal" data-user-modal="<?= e(js_json($u)) ?>" aria-label="Edit account"><i class="bi bi-pencil" aria-hidden="true"></i></button>

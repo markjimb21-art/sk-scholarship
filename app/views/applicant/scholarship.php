@@ -14,7 +14,7 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
           </span>
           <div class="small text-muted">
             <a href="<?= url('applicant/term-documents/view&id=' . (int)$doc['id']) ?>" target="_blank" rel="noopener"><?= e($doc['original_filename']) ?></a>
-            · <?= e(date('M d, Y g:i A', strtotime($doc['uploaded_at']))) ?>
+            · <?= e(fmt_datetime($doc['uploaded_at'])) ?>
           </div>
         <?php else: ?>
           <span class="badge bg-secondary ms-1">Missing</span>
@@ -66,8 +66,8 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
 
     <?php if ($term['claim_status'] === 'Released'): ?>
       <div class="alert alert-success mb-0">
-        <strong>₱<?= e(number_format((float)$term['released_amount'], 2)) ?></strong> released on
-        <?= e(date('F j, Y', strtotime($term['release_date']))) ?> via <?= e($term['payment_method']) ?>
+        <strong><?= e(peso($term['released_amount'])) ?></strong> released on
+        <?= e(fmt_long_date($term['release_date'])) ?> via <?= e($term['payment_method']) ?>
         <?= $term['reference_number'] ? '· Reference no. <strong>' . e($term['reference_number']) . '</strong>' : '' ?>
       </div>
     <?php else: ?>
@@ -75,7 +75,7 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
         <div class="alert alert-<?= $claimWindow['can_upload'] ? 'info' : ($claimWindow['state'] === 'not_created' || $claimWindow['state'] === 'not_open_yet' ? 'secondary' : 'danger') ?> py-2">
           <i class="bi bi-calendar-event"></i> <?= e($claimWindow['message']) ?>
           <?php if (!empty($claimWindow['schedule']['planned_date'])): ?>
-            <div class="small">Planned release date: <?= e(date('F j, Y', strtotime($claimWindow['schedule']['planned_date']))) ?></div>
+            <div class="small">Planned release date: <?= e(fmt_long_date($claimWindow['schedule']['planned_date'])) ?></div>
           <?php endif; ?>
         </div>
       <?php endif; ?>
@@ -115,7 +115,7 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
       <div class="alert alert-<?= $renewalWindow['can_upload'] ? 'info' : ($renewalWindow['state'] === 'not_created' || $renewalWindow['state'] === 'not_open_yet' ? 'secondary' : 'danger') ?> py-2">
         <i class="bi bi-calendar-event"></i> <?= e($renewalWindow['message']) ?>
         <?php if (!empty($renewalWindow['schedule']['planned_date'])): ?>
-          <div class="small">Semester starts: <?= e(date('F j, Y', strtotime($renewalWindow['schedule']['planned_date']))) ?></div>
+          <div class="small">Semester starts: <?= e(fmt_long_date($renewalWindow['schedule']['planned_date'])) ?></div>
         <?php endif; ?>
       </div>
     <?php endif; ?>
@@ -151,7 +151,7 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
             <td><span class="badge bg-<?= e(CLAIM_STATUS_COLORS[$t['claim_status']]) ?>"><?= e($t['claim_status']) ?></span></td>
             <td><?= $t['gwa'] !== null ? e(number_format((float)$t['gwa'], 2)) : '—' ?></td>
             <td><?= $t['released_amount'] !== null
-                    ? '₱' . e(number_format((float)$t['released_amount'], 2)) . ' · ' . e(date('M d, Y', strtotime($t['release_date'])))
+                    ? '₱' . e(number_format((float)$t['released_amount'], 2)) . ' · ' . e(fmt_date($t['release_date']))
                       . ($t['reference_number'] ? ' · ref. ' . e($t['reference_number']) : '')
                     : '—' ?></td>
           </tr>

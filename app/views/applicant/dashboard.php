@@ -93,7 +93,7 @@ $steps = ['Apply', 'Screening', 'Interview', 'Final result', 'Claim cash', 'Rene
           <tr>
             <td><?= e($pa['program_name']) ?><br><span class="text-muted"><?= e($pa['academic_year']) ?></span></td>
             <td><code><?= e($pa['application_code']) ?></code></td>
-            <td><?= $pa['submitted_at'] ? e(date('M d, Y', strtotime($pa['submitted_at']))) : '—' ?></td>
+            <td><?= $pa['submitted_at'] ? e(fmt_date($pa['submitted_at'])) : '—' ?></td>
             <td>
               <span class="badge bg-<?= e(APP_STATUS_COLORS[$pa['status']] ?? 'secondary') ?>"><?= e(Application::label($pa['status'])) ?></span>
               <?php if ($pa['status'] === 'Rejected' && $pa['decision_remarks']): ?>

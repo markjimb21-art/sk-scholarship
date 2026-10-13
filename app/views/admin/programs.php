@@ -3,7 +3,7 @@
     <h4 class="fw-bold mb-0">Scholarship Programs</h4>
     <p class="text-muted small mb-0">
       <?php if ($openProgram): ?>
-        Applicants can apply to <strong><?= e($openProgram['program_name']) ?></strong> until <?= e(date('M d, Y', strtotime($openProgram['application_end']))) ?>.
+        Applicants can apply to <strong><?= e($openProgram['program_name']) ?></strong> until <?= e(fmt_date($openProgram['application_end'])) ?>.
       <?php else: ?>
         <span class="text-warning">No program is accepting applications right now (a program must be open AND today inside its dates).</span>
       <?php endif; ?>
@@ -29,8 +29,8 @@
           $acceptingNow = $openProgram && (int)$openProgram['id'] === (int)$p['id']; ?>
           <tr>
             <td><div class="fw-semibold"><?= e($p['program_name']) ?></div><small class="text-muted">A.Y. <?= e($p['academic_year']) ?></small></td>
-            <td><small><?= e(date('M d, Y', strtotime($p['application_start']))) ?> – <?= e(date('M d, Y', strtotime($p['application_end']))) ?></small></td>
-            <td>₱<?= e(number_format((float)$p['amount_per_semester'], 2)) ?></td>
+            <td><small><?= e(fmt_date($p['application_start'])) ?> – <?= e(fmt_date($p['application_end'])) ?></small></td>
+            <td><?= e(peso($p['amount_per_semester'])) ?></td>
             <td><small class="text-muted">
               Age ≤ <?= $p['max_age'] ? (int)$p['max_age'] : 'no limit' ?><br>
               Income ≤ <?= (float)$p['max_family_income'] > 0 ? '₱' . e(number_format((float)$p['max_family_income'], 2)) : 'no limit' ?><br>

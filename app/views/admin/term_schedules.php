@@ -2,7 +2,7 @@
 // Claim (release) or renewal submission windows. Expects $purpose, $schedules, $needed, $missed, $programs, $years.
 $isRelease = $purpose === 'release';
 $stateColor = ['open' => 'success', 'not_open_yet' => 'info', 'deadline_passed' => 'warning', 'closed' => 'secondary', 'cancelled' => 'danger', 'not_created' => 'secondary'];
-$dt = static fn(?string $v): string => $v ? date('M d, Y g:i A', strtotime($v)) : '—';
+$dt = static fn(?string $v): string => $v ? fmt_datetime($v) : '—';
 $local = static fn(?string $v): string => $v ? date('Y-m-d\TH:i', strtotime($v)) : '';
 $editId = (int)($_GET['edit'] ?? 0);   // opened straight away by pages/term-schedules.js
 ?>
@@ -47,7 +47,7 @@ $editId = (int)($_GET['edit'] ?? 0);   // opened straight away by pages/term-sch
             <td><?= e($s['academic_year'] . ' ' . $s['semester']) ?></td>
             <td><small><?= e($dt($s['opens_at'])) ?></small></td>
             <td><small><?= e($dt($s['submission_deadline'])) ?></small></td>
-            <td><small><?= $s['planned_date'] ? e(date('M d, Y', strtotime($s['planned_date']))) : '—' ?></small></td>
+            <td><small><?= $s['planned_date'] ? e(fmt_date($s['planned_date'])) : '—' ?></small></td>
             <td><small><?= (int)$s['affected_count'] - (int)$s['pending_count'] ?> submitted · <?= (int)$s['pending_count'] ?> not yet</small></td>
             <td><span class="badge bg-<?= e($stateColor[$s['state']]) ?>"><?= e(TermSchedule::STATE_LABELS[$s['state']]) ?></span></td>
             <td class="text-end">

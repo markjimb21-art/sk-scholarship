@@ -28,7 +28,7 @@ $moving = $app['status'] === 'Interview Scheduled';
   <div class="card-body">
     <h6 class="fw-semibold">The applicant asked for a slot</h6>
     <p class="mb-2"><strong><?= e(SlotRequest::describe($pending)) ?></strong>
-      <span class="text-muted small">· requested <?= e(date('M d, Y g:i A', strtotime($pending['created_at']))) ?></span></p>
+      <span class="text-muted small">· requested <?= e(fmt_datetime($pending['created_at'])) ?></span></p>
     <div class="d-flex flex-wrap gap-2 align-items-start">
       <form method="POST" action="<?= url('admin/slot-request-decide') ?>" class="d-flex gap-2 flex-wrap align-items-end">
         <?= csrf_field() ?><input type="hidden" name="request_id" value="<?= (int)$pending['id'] ?>"><input type="hidden" name="decision" value="confirm">

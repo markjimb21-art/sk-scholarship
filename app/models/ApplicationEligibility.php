@@ -34,8 +34,8 @@ final class ApplicationEligibility
         $maxIncome = (float)($app['max_family_income'] ?? 0);
         $income = $family ? (float)$family['total_family_income'] : null;
         $rows[] = [
-            'label' => 'Total family income (monthly)', 'rule' => $maxIncome > 0 ? 'at most ₱' . number_format($maxIncome, 2) : 'no limit',
-            'value' => $income === null ? '—' : '₱' . number_format($income, 2),
+            'label' => 'Total family income (monthly)', 'rule' => $maxIncome > 0 ? 'at most ' . peso($maxIncome) : 'no limit',
+            'value' => peso($income, '—'),
             'result' => $maxIncome <= 0 ? 'No limit' : ($income === null ? 'Not provided' : ($income <= $maxIncome ? 'Pass' : 'Fail')),
         ];
 

@@ -17,7 +17,7 @@ $program = $app ?: $openProgram;
     <h4 class="fw-bold mb-1">Scholarship Application</h4>
     <?php if ($program): ?>
       <p class="small mb-1"><strong><?= e($program['program_name']) ?></strong> · applications accepted
-        <?= e(date('M d, Y', strtotime($program['application_start']))) ?> – <?= e(date('M d, Y', strtotime($program['application_end']))) ?></p>
+        <?= e(fmt_date($program['application_start'])) ?> – <?= e(fmt_date($program['application_end'])) ?></p>
     <?php endif; ?>
     <?php if ($editable): ?>
       <p class="text-muted small mb-1">Your information is saved automatically as you fill in the form.</p>

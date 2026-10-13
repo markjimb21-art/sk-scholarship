@@ -24,7 +24,7 @@
           <label class="form-check-label" for="digestOn">Daily interview digest</label>
           <div class="form-text">On the first run of <code>bin/send_reminders.php</code> each day: "Your interview is today" to each applicant
             interviewed today, and one list of today's interviews to the admins.
-            Last sent: <?= $settings['daily_digest_sent_on'] !== '' ? e(date('M d, Y', strtotime($settings['daily_digest_sent_on']))) : 'never' ?>.</div>
+            Last sent: <?= $settings['daily_digest_sent_on'] !== '' ? e(fmt_date($settings['daily_digest_sent_on'])) : 'never' ?>.</div>
         </div>
         <div class="form-check form-switch mt-3">
           <input class="form-check-input" type="checkbox" name="admin_event_emails" value="1" id="adminEvents" <?= $settings['admin_event_emails'] === '1' ? 'checked' : '' ?>>

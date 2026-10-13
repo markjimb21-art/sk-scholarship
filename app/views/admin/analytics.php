@@ -1,5 +1,4 @@
 <?php
-$peso = static fn($v) => $v === null ? '—' : '₱' . number_format((float)$v, 2);
 $pct = static fn($r) => $r === null ? 'no data' : number_format($r * 100, 1) . '%';
 ?>
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
@@ -100,17 +99,17 @@ $pct = static fn($r) => $r === null ? 'no data' : number_format($r * 100, 1) . '
     <div class="card border-0 shadow-sm h-100"><div class="card-body">
       <table class="table table-sm small align-middle mb-0">
         <tbody>
-          <tr><th>Total budget</th><td class="text-end"><?= e($peso($data['budget']['total_budget'] ?? null)) ?></td><td class="text-muted">from the Budget page</td></tr>
-          <tr><th>Released</th><td class="text-end"><?= e($peso($data['budget']['released'] ?? null)) ?></td><td class="text-muted">sum of releases for this program’s semesters of this A.Y.</td></tr>
-          <tr><th>Remaining</th><td class="text-end"><?= e($peso($data['remaining'])) ?></td><td class="text-muted">= total − released</td></tr>
-          <tr><th>Committed</th><td class="text-end"><?= e($peso($data['committed'])) ?></td><td class="text-muted">= Σ Active scholars (<?= e($peso($amount)) ?> × semesters of this A.Y. not yet released)</td></tr>
-          <tr><th>Projected need</th><td class="text-end"><?= e($peso($data['projectedNeed'])) ?></td>
-              <td class="text-muted">= committed + (projected scholars − slots used = <?= number_format($proj['expected_new'], 2) ?>) × <?= e($peso($amount)) ?> × 2 semesters</td></tr>
+          <tr><th>Total budget</th><td class="text-end"><?= e(peso($data['budget']['total_budget'] ?? null, '—')) ?></td><td class="text-muted">from the Budget page</td></tr>
+          <tr><th>Released</th><td class="text-end"><?= e(peso($data['budget']['released'] ?? null, '—')) ?></td><td class="text-muted">sum of releases for this program’s semesters of this A.Y.</td></tr>
+          <tr><th>Remaining</th><td class="text-end"><?= e(peso($data['remaining'], '—')) ?></td><td class="text-muted">= total − released</td></tr>
+          <tr><th>Committed</th><td class="text-end"><?= e(peso($data['committed'], '—')) ?></td><td class="text-muted">= Σ Active scholars (<?= e(peso($amount, '—')) ?> × semesters of this A.Y. not yet released)</td></tr>
+          <tr><th>Projected need</th><td class="text-end"><?= e(peso($data['projectedNeed'], '—')) ?></td>
+              <td class="text-muted">= committed + (projected scholars − slots used = <?= number_format($proj['expected_new'], 2) ?>) × <?= e(peso($amount, '—')) ?> × 2 semesters</td></tr>
           <tr class="<?= $data['surplus'] !== null && $data['surplus'] < 0 ? 'table-danger' : 'table-success' ?>">
             <th><?= $data['surplus'] !== null && $data['surplus'] < 0 ? 'Shortfall' : 'Surplus' ?></th>
-            <td class="text-end fw-bold"><?= e($data['surplus'] === null ? '—' : $peso(abs($data['surplus']))) ?></td><td class="text-muted">= remaining − projected need</td></tr>
+            <td class="text-end fw-bold"><?= e($data['surplus'] === null ? '—' : peso(abs($data['surplus']), '—')) ?></td><td class="text-muted">= remaining − projected need</td></tr>
           <tr><th>Extra scholars fundable</th><td class="text-end fw-bold"><?= (int)$data['extraFundable'] ?></td>
-              <td class="text-muted">= floor(surplus ÷ (<?= e($peso($amount)) ?> × 2)); 0 when there is a shortfall</td></tr>
+              <td class="text-muted">= floor(surplus ÷ (<?= e(peso($amount, '—')) ?> × 2)); 0 when there is a shortfall</td></tr>
         </tbody>
       </table>
     </div></div>

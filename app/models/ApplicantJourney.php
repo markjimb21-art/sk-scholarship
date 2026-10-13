@@ -20,7 +20,7 @@ final class ApplicantJourney
         if (!$app) {
             if ($open) {
                 $j['status'] = 'Not started';
-                $j['next'] = "Apply to {$open['program_name']} before " . date('F j, Y', strtotime($open['application_end']))
+                $j['next'] = "Apply to {$open['program_name']} before " . fmt_long_date($open['application_end'])
                     . ': fill in the form and upload the 5 required documents.';
                 $j['action'] = ['label' => 'Start my application', 'route' => 'applicant/application'];
             } else {
@@ -36,10 +36,10 @@ final class ApplicantJourney
                 $j['status'] = Application::label('Draft');
                 if ($app['program_open'] && Program::windowOpen($app)) {
                     $j['next'] = 'Complete every section and upload the 5 documents, then submit before '
-                        . date('F j, Y', strtotime($app['application_end'])) . '.';
+                        . fmt_long_date($app['application_end']) . '.';
                     $j['action'] = ['label' => 'Continue my application', 'route' => 'applicant/application'];
                 } else {
-                    $j['next'] = 'The application period ended on ' . date('F j, Y', strtotime($app['application_end'])) . '.';
+                    $j['next'] = 'The application period ended on ' . fmt_long_date($app['application_end']) . '.';
                     $j['tone'] = 'secondary';
                 }
                 return $j;
@@ -120,8 +120,8 @@ final class ApplicantJourney
         // Released: renewal for the next semester.
         $next = Term::nextSemester($term['academic_year'], $term['semester']);
         $nextSem = "{$next['academic_year']} {$next['semester']}";
-        $released = '₱' . number_format((float)$term['released_amount'], 2) . ' on '
-            . date('F j, Y', strtotime((string)$term['release_date'])) . ' (' . $term['payment_method']
+        $released = peso($term['released_amount']) . ' on '
+            . fmt_long_date((string)$term['release_date']) . ' (' . $term['payment_method']
             . ($term['reference_number'] ? ', ref. ' . $term['reference_number'] : '') . ')';
         $details = ["Released for $sem" => $released];
         if (!$renewal || $renewal['status'] === 'Resubmit') {

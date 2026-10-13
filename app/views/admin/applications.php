@@ -40,8 +40,8 @@
             <td><div class="fw-semibold"><?= e($r['full_name']) ?></div><code class="small"><?= e($r['application_code']) ?></code></td>
             <td><small><?= e($r['program_name']) ?></small></td>
             <td><span class="badge bg-<?= e(APP_STATUS_COLORS[$r['status']]) ?>"><?= e(Application::label($r['status'])) ?></span></td>
-            <td><small><?= $r['submitted_at'] ? e(date('M d, Y', strtotime($r['submitted_at']))) : '—' ?></small></td>
-            <td><small><?= e(date('M d, Y', strtotime($r['updated_at']))) ?></small></td>
+            <td><small><?= $r['submitted_at'] ? e(fmt_date($r['submitted_at'])) : '—' ?></small></td>
+            <td><small><?= e(fmt_date($r['updated_at'])) ?></small></td>
             <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?= url('admin/application&id=' . (int)$r['id']) ?>">Open</a></td>
           </tr>
         <?php endforeach; ?>

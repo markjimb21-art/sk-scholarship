@@ -55,7 +55,7 @@
           $hasDiff = !empty($log['old_values']) || !empty($log['new_values']);
         ?>
           <tr>
-            <td><?= e(date('M d, Y g:i A', strtotime($log['created_at']))) ?></td>
+            <td><?= e(fmt_datetime($log['created_at'])) ?></td>
             <td>
               <?php if ($log['actor_name']): ?>
                 <div><?= e($log['actor_name']) ?></div>

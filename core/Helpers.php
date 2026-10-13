@@ -65,6 +65,20 @@ function js_json($value): string {
     return $json === false ? 'null' : $json;
 }
 
+/**
+ * Money as every page and report shows it: "₱1,234.50". A missing amount (null or '') shows $ifMissing when the
+ * caller gives one (e.g. "—"); without it, it shows ₱0.00.
+ */
+function peso(float|int|string|null $amount, ?string $ifMissing = null): string {
+    if ($ifMissing !== null && ($amount === null || $amount === '')) return $ifMissing;
+    return '₱' . number_format((float)$amount, 2);
+}
+
+/** Dates as the pages show them, from a DB date/datetime string. */
+function fmt_date(?string $value): string { return date('M d, Y', (int)strtotime((string)$value)); }               // Oct 05, 2026
+function fmt_datetime(?string $value): string { return date('M d, Y g:i A', (int)strtotime((string)$value)); }    // Oct 05, 2026 3:30 PM
+function fmt_long_date(?string $value): string { return date('F j, Y', (int)strtotime((string)$value)); }         // October 5, 2026
+
 function calculate_age(string $dob): int {
     try {
         $d = new DateTime($dob);
