@@ -23,14 +23,6 @@ final class Validator
         return $this;
     }
 
-    public function min(string $field, int $len, ?string $label = null): self {
-        $label ??= ucfirst(str_replace('_', ' ', $field));
-        if (!empty($this->data[$field]) && mb_strlen((string)$this->data[$field]) < $len) {
-            $this->errors[$field] = "$label must be at least $len characters.";
-        }
-        return $this;
-    }
-
     /** The shared new-password rule (password_problems()); the message names exactly what is missing. */
     public function strongPassword(string $field): self {
         if (isset($this->data[$field]) && (string)$this->data[$field] !== '' && ($p = password_problems((string)$this->data[$field]))) {
@@ -50,37 +42,10 @@ final class Validator
         return $this;
     }
 
-    public function numeric(string $field, ?string $label = null): self {
-        $label ??= ucfirst(str_replace('_', ' ', $field));
-        if (!empty($this->data[$field]) && !is_numeric($this->data[$field])) {
-            $this->errors[$field] = "$label must be numeric.";
-        }
-        return $this;
-    }
-
-    public function date(string $field, ?string $label = null): self {
-        $label ??= ucfirst(str_replace('_', ' ', $field));
-        if (!empty($this->data[$field])) {
-            $d = DateTime::createFromFormat('Y-m-d', $this->data[$field]);
-            if (!$d || $d->format('Y-m-d') !== $this->data[$field]) {
-                $this->errors[$field] = "$label is not a valid date.";
-            }
-        }
-        return $this;
-    }
-
     public function matches(string $field, string $otherField, ?string $label = null): self {
         $label ??= ucfirst(str_replace('_', ' ', $field));
         if (($this->data[$field] ?? null) !== ($this->data[$otherField] ?? null)) {
             $this->errors[$field] = "$label does not match.";
-        }
-        return $this;
-    }
-
-    public function in(string $field, array $allowed, ?string $label = null): self {
-        $label ??= ucfirst(str_replace('_', ' ', $field));
-        if (!empty($this->data[$field]) && !in_array($this->data[$field], $allowed, true)) {
-            $this->errors[$field] = "$label has an invalid value.";
         }
         return $this;
     }

@@ -261,7 +261,7 @@ Types: 3 untyped parameters remain: `ApplicantController::measurement($value)`, 
 (reset password, admin create user, admin reset password, My Profile) through one rule, `newPassword()`, with each
 form's own wording. The remaining hand-written checks stay as they are, because moving them would change behaviour:
 - they sit between database checks (e.g. "e-mail already used") whose order decides which message is shown;
-- `Validator::email()`/`in()` skip "empty" values with `!empty()`, so the input `"0"` would pass where the hand check refuses it (see B8).
+- `Validator::email()` skips "empty" values with `!empty()`, so the input `"0"` would pass where the hand check refuses it (see B8).
 
 **Stage 8 — delete proven dead code (§5)**
 - The 3 CSS classes;
