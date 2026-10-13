@@ -10,10 +10,20 @@ final class InterviewSlots
     /** Interview blocks offered as suggestions (Mon–Sat, lunch hour skipped). */
     public const SUGGESTION_BLOCKS = [['08:00', '10:00'], ['10:00', '12:00'], ['13:00', '15:00'], ['15:00', '17:00']];
 
-    /** Days the suggestions may reach (Settings → interview_suggestion_window_days, 7–180, default 60). */
+    /** How far ahead suggestions may reach, in days (Settings → interview_suggestion_window_days). */
+    public const WINDOW_MIN_DAYS = 7;
+    public const WINDOW_MAX_DAYS = 180;
+    public const WINDOW_DEFAULT_DAYS = 60;
+
     public static function suggestionWindowDays(): int
     {
-        return max(7, min(180, (int)setting('interview_suggestion_window_days', '60')));
+        return self::clampWindowDays((int)setting('interview_suggestion_window_days', (string)self::WINDOW_DEFAULT_DAYS));
+    }
+
+    /** $days kept within WINDOW_MIN_DAYS..WINDOW_MAX_DAYS. */
+    public static function clampWindowDays(int $days): int
+    {
+        return max(self::WINDOW_MIN_DAYS, min(self::WINDOW_MAX_DAYS, $days));
     }
 
     /** Holidays in [$from, $to] as [Y-m-d => name]. */

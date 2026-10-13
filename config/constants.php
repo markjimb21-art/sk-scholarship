@@ -12,6 +12,9 @@ const PASSWORD_SPECIAL_CHARS = '!@#$%^&*()_+-=[]{};:\'",.<>/?\\|`~';
 
 // Every status, list and rule value used by the process in docs/PROCESS.md lives here.
 
+// Staff roles: these reach the admin area at all (AdminController::ROUTES then decides page by page).
+const STAFF_ROLES = ['admin', 'reviewer', 'treasurer'];
+
 // Application statuses (applications.status) => plain-language label shown to users.
 const APP_STATUS_LABELS = [
     'Draft'               => 'Draft — not submitted',
@@ -34,6 +37,12 @@ const APP_STATUS_COLORS = [
     'Interview Scheduled' => 'primary', 'Interviewed' => 'primary', 'Approved' => 'success',
     'Waitlisted' => 'warning', 'Rejected' => 'danger',
 ];
+
+// Bootstrap colour per interview attendance (interview_assignments.attendance).
+const ATTENDANCE_COLORS = ['Scheduled' => 'primary', 'Attended' => 'success', 'No-show' => 'danger'];
+
+// Bootstrap colour per eligibility check result (ApplicationEligibility::evaluate).
+const ELIGIBILITY_COLORS = ['Pass' => 'success', 'Fail' => 'danger', 'Not provided' => 'warning', 'No limit' => 'secondary'];
 
 // Application documents (A2), all required.
 const DOCUMENT_TYPES = [
@@ -58,6 +67,9 @@ const CLAIM_STATUS_COLORS = [
     'Waiting for Requirements' => 'secondary', 'Submitted' => 'info', 'Resubmit' => 'warning',
     'Verified' => 'primary', 'Released' => 'success',
 ];
+
+// Bootstrap colour per claim/renewal document status (term_documents.status).
+const TERM_DOC_STATUS_COLORS = ['Submitted' => 'info', 'Resubmit' => 'warning', 'Verified' => 'success', 'Invalid' => 'danger'];
 
 // Renewal request (renewal_requests.status) => label.
 const RENEWAL_STATUS_LABELS = [

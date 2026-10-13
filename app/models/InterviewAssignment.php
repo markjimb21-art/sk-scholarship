@@ -90,9 +90,7 @@ final class InterviewAssignment
                 $cnt->execute([$scheduleId]);
                 if ((int)$cnt->fetchColumn() >= $cap) throw new DomainException('schedule is full');
 
-                $missed = $pdo->prepare("SELECT COUNT(*) FROM interview_assignments WHERE application_id = ? AND attendance = 'No-show'");
-                $missed->execute([$appId]);
-                $rescheduleCount = (int)$missed->fetchColumn();
+                $rescheduleCount = self::missedCount($appId);
 
                 Application::changeStatus($app, 'assign', $adminId, [], 'schedule #' . $scheduleId);
                 $pdo->prepare("INSERT INTO interview_assignments (schedule_id, application_id, attendance, reschedule_count) VALUES (?, ?, 'Scheduled', ?)")

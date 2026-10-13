@@ -18,7 +18,7 @@ final class DocumentStorage
         $fail = static fn(string $m): array => ['ok' => false, 'error' => $m];
         $size = filesize($path);
         if ($size === false || $size <= 0) return $fail('The uploaded file is empty.');
-        if ($size > MAX_FILE_SIZE) return $fail('File too large (max 5MB).');
+        if ($size > MAX_FILE_SIZE) return $fail('File too large (max ' . MAX_FILE_SIZE_TEXT . ').');
 
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mime = finfo_file($finfo, $path);

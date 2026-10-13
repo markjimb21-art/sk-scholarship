@@ -16,8 +16,8 @@
         <div class="form-text">Used by <code>bin/send_reminders.php</code> (see README). 0 turns interview reminders off.</div>
 
         <label class="form-label mt-3">Interview suggestions — days ahead</label>
-        <input type="number" min="7" max="180" name="interview_suggestion_window_days" class="form-control" value="<?= e($settings['interview_suggestion_window_days']) ?>">
-        <div class="form-text">Suggested interview slots reach this many days past the later of the application end date and today (7–180).</div>
+        <input type="number" min="<?= InterviewSlots::WINDOW_MIN_DAYS ?>" max="<?= InterviewSlots::WINDOW_MAX_DAYS ?>" name="interview_suggestion_window_days" class="form-control" value="<?= e($settings['interview_suggestion_window_days']) ?>">
+        <div class="form-text">Suggested interview slots reach this many days past the later of the application end date and today (<?= InterviewSlots::WINDOW_MIN_DAYS ?>–<?= InterviewSlots::WINDOW_MAX_DAYS ?>).</div>
 
         <div class="form-check form-switch mt-3">
           <input class="form-check-input" type="checkbox" name="daily_digest_enabled" value="1" id="digestOn" <?= $settings['daily_digest_enabled'] === '1' ? 'checked' : '' ?>>

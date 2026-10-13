@@ -43,7 +43,7 @@ $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] 
               <?= (int)$a['reschedule_count'] ? '<span class="badge bg-warning ms-1">reschedule — last chance</span>' : '' ?>
               <div class="small text-muted"><?= e($a['contact_number'] ?? '') ?> · <?= e($a['email']) ?></div>
             </td>
-            <td><span class="badge bg-<?= $a['attendance'] === 'Attended' ? 'success' : ($a['attendance'] === 'No-show' ? 'danger' : 'primary') ?>"><?= e($a['attendance']) ?></span></td>
+            <td><span class="badge bg-<?= e(ATTENDANCE_COLORS[$a['attendance']]) ?>"><?= e($a['attendance']) ?></span></td>
             <td><?= $a['total_score'] !== null ? '<strong>' . e(number_format((float)$a['total_score'], 2)) . '</strong> / 100' : '—' ?></td>
             <td class="text-end text-nowrap">
               <?php if ($a['attendance'] === 'Scheduled' && !$cancelled): ?>

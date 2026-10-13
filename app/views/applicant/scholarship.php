@@ -9,7 +9,7 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
           <span class="badge bg-danger ms-1">Invalid — please upload again</span>
           <div class="small text-danger"><?= e($doc['invalid_reason']) ?></div>
         <?php elseif ($doc): ?>
-          <span class="badge bg-<?= $doc['status'] === 'Resubmit' ? 'warning' : ($doc['status'] === 'Verified' ? 'success' : 'info') ?> ms-1">
+          <span class="badge bg-<?= e(TERM_DOC_STATUS_COLORS[$doc['status']]) ?> ms-1">
             <?= e($doc['status'] === 'Resubmit' ? 'Please re-upload' : ($doc['status'] === 'Verified' ? 'Verified' : 'Uploaded')) ?>
           </span>
           <div class="small text-muted">
@@ -79,7 +79,7 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
           <?php endif; ?>
         </div>
       <?php endif; ?>
-      <p class="text-muted small">Upload your School ID and your Grades for <?= e($sem) ?> (PDF, JPG or PNG, max 5MB each), then submit.</p>
+      <p class="text-muted small">Upload your School ID and your Grades for <?= e($sem) ?> (PDF, JPG or PNG, max <?= e(MAX_FILE_SIZE_TEXT) ?> each), then submit.</p>
       <?php foreach (TERM_DOCUMENT_TYPES['claim'] as $type) $docRow('claim', $type, $claimDocs[$type] ?? null, $claimEditable, (int)$term['id']); ?>
 
       <?php if ($claimEditable): ?>

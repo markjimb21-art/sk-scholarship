@@ -37,7 +37,7 @@ require_once BASE_PATH . '/app/models/Holiday.php';
 final class AdminController
 {
     /** Who may open what (docs/PROCESS.md "Roles"). The admin role can open everything. */
-    private const STAFF  = ['admin', 'reviewer', 'treasurer'];   // every staff role
+    private const STAFF  = STAFF_ROLES;                         // every staff role
     private const REVIEW = ['admin', 'reviewer'];                // applications: screening, interviews, decisions
     private const FUNDS  = ['admin', 'treasurer'];               // budget, claims, releases, renewals, scholars
     private const ADMIN  = ['admin'];                            // programs, users, settings, reports, analytics, audit
@@ -119,9 +119,6 @@ final class AdminController
         'settings/holiday-delete'   => ['SettingsController', 'holidayDelete', self::ADMIN],
         'audit-logs'                => ['AuditController', 'auditLogs', self::ADMIN],
     ];
-
-    /** Staff roles that reach the admin area at all (each route then checks its own list). */
-    public const STAFF_ROLES = self::STAFF;
 
     /** May the logged-in user (or $role) open this admin route (without the "admin/" prefix)? Used by handle(), the sidebar and pages. */
     public static function canAccess(string $route, ?string $role = null): bool

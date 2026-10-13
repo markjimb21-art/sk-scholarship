@@ -8,7 +8,7 @@
         <div class="d-flex justify-content-between mb-2">
           <strong><?= e($type) ?></strong>
           <?php if ($d): ?>
-            <span class="badge bg-<?= ['Resubmit' => 'warning', 'Verified' => 'success', 'Invalid' => 'danger'][$d['status']] ?? 'info' ?>"><?= e($d['status'] === 'Submitted' ? 'Uploaded' : $d['status']) ?></span>
+            <span class="badge bg-<?= e(TERM_DOC_STATUS_COLORS[$d['status']]) ?>"><?= e($d['status'] === 'Submitted' ? 'Uploaded' : $d['status']) ?></span>
           <?php else: ?><span class="badge bg-secondary">Missing</span><?php endif; ?>
         </div>
         <?php if ($d && $d['status'] === 'Invalid'): ?>

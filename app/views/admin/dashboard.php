@@ -40,7 +40,7 @@
                 <?php if (!$s['attempts']): ?><span class="text-muted">Nobody assigned</span><?php endif; ?>
                 <?php foreach ($s['attempts'] as $at): ?>
                   <div><a href="<?= url('admin/application&id=' . (int)$at['application_id']) ?>"><?= e($at['full_name']) ?></a>
-                    <?php if ($at['attendance'] !== 'Scheduled'): ?><span class="badge bg-<?= $at['attendance'] === 'Attended' ? 'success' : 'danger' ?>"><?= e($at['attendance']) ?></span><?php endif; ?>
+                    <?php if ($at['attendance'] !== 'Scheduled'): ?><span class="badge bg-<?= e(ATTENDANCE_COLORS[$at['attendance']]) ?>"><?= e($at['attendance']) ?></span><?php endif; ?>
                     <?= (int)$at['reschedule_count'] ? '<span class="badge bg-warning text-dark">reschedule</span>' : '' ?></div>
                 <?php endforeach; ?>
               </td>

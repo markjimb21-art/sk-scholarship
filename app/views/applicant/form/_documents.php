@@ -6,7 +6,7 @@
           <i class="bi bi-info-circle me-1"></i>
           Drag a file into each box below (or click to choose one). Each file is <strong>saved automatically</strong> as soon as you
           choose it, so a power interruption or an accidental refresh will not lose it; <strong>Next</strong> finishes any file still
-          saving. Accepted: <strong>PDF, JPG, PNG</strong> (max 5MB each). All 5 documents are required.
+          saving. Accepted: <strong>PDF, JPG, PNG</strong> (max <?= e(MAX_FILE_SIZE_TEXT) ?> each). All 5 documents are required.
         </div>
         <div class="row g-3 mb-3" id="wizardDocuments">
           <?php foreach (DOCUMENT_TYPES as $dt):

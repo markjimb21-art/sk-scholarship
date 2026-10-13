@@ -29,7 +29,7 @@ final class SettingsController
             'interview_reminder_hours' => (string)max(0, min(168, (int)($_POST['interview_reminder_hours'] ?? 24))),
             'daily_digest_enabled'     => post_bool('daily_digest_enabled') ? '1' : '0',
             'admin_event_emails'       => post_bool('admin_event_emails') ? '1' : '0',
-            'interview_suggestion_window_days' => (string)max(7, min(180, (int)($_POST['interview_suggestion_window_days'] ?? 60))),
+            'interview_suggestion_window_days' => (string)InterviewSlots::clampWindowDays((int)($_POST['interview_suggestion_window_days'] ?? InterviewSlots::WINDOW_DEFAULT_DAYS)),
         ];
         Setting::saveMany($values);
         AuditLog::write('settings_updated', 'system_settings', null, 'Settings saved', null, $values);

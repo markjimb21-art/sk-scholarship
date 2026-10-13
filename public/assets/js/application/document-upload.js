@@ -10,7 +10,7 @@
   const { wizard, userId, uploadUrl, csrfToken, setIndicator } = A;
 
   /* ---------------- Step 4: documents auto-save — each file uploads as soon as it is chosen ---------------- */
-  const MAX_SIZE = 5 * 1024 * 1024;
+  const MAX_SIZE = Number(wizard.dataset.maxBytes);   // MAX_FILE_SIZE (config.php); the server checks it again
   const ALLOWED_EXT = ['pdf', 'jpg', 'jpeg', 'png'];
   const pendingFiles = {}; // { [docType]: File } — chosen but not saved yet (uploading, or failed and waiting for a retry)
   let uploadQueue = Promise.resolve(); // uploads run one at a time, in the order the files were chosen
@@ -138,7 +138,7 @@
       return;
     }
     if (file.size > MAX_SIZE) {
-      showDocError(card, 'File is too large (max 5MB).');
+      showDocError(card, 'File is too large (max ' + wizard.dataset.maxText + ').');
       return;
     }
     const docType = card.dataset.docType;

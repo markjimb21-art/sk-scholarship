@@ -78,6 +78,7 @@ $program = $app ?: $openProgram;
          data-updated-at="<?= e($updatedAt ?? '') ?>"
          data-autosave-url="<?= url('applicant/application/autosave') ?>"
          data-upload-url="<?= url('applicant/documents/upload') ?>"
+         data-max-bytes="<?= MAX_FILE_SIZE ?>" data-max-text="<?= e(MAX_FILE_SIZE_TEXT) ?>"
          data-csrf="<?= e(csrf_token()) ?>">
 
 <?php require __DIR__ . '/form/_personal.php'; ?>

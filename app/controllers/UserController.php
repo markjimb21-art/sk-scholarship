@@ -7,7 +7,7 @@ final class UserController
     public function users(): void
     {
         $q = trim(get_str('q'));
-        $role = in_array($_GET['role'] ?? '', [...AdminController::STAFF_ROLES, 'applicant'], true) ? $_GET['role'] : '';
+        $role = in_array($_GET['role'] ?? '', [...STAFF_ROLES, 'applicant'], true) ? $_GET['role'] : '';
         $users = User::search($q, $role);
         render('admin/users', compact('users', 'q', 'role') + ['pageScripts' => [asset('js/pages/users.js')]], 'Users');
     }
@@ -18,7 +18,7 @@ final class UserController
         require_post('admin/users');
         $id = post_int('id');
         $roleName = post_str('role');
-        if (!in_array($roleName, AdminController::STAFF_ROLES, true)) { flash('danger', 'Choose a role: admin, reviewer or treasurer.'); redirect('admin/users'); }
+        if (!in_array($roleName, STAFF_ROLES, true)) { flash('danger', 'Choose a role: admin, reviewer or treasurer.'); redirect('admin/users'); }
         $name = trim(post_str('full_name'));
         $email = strtolower(trim(post_str('email')));
         $contact = digits_only($_POST['contact_number'] ?? '');
@@ -29,7 +29,7 @@ final class UserController
 
         if ($id > 0) {
             $oldRole = User::roleName($id);
-            if (!in_array($oldRole, AdminController::STAFF_ROLES, true)) { flash('danger', 'Only staff accounts are managed here.'); redirect('admin/users'); }
+            if (!in_array($oldRole, STAFF_ROLES, true)) { flash('danger', 'Only staff accounts are managed here.'); redirect('admin/users'); }
             if ($oldRole !== $roleName) {
                 if ($id === admin_id()) { flash('danger', 'You cannot change your own role.'); redirect('admin/users'); }
                 if ($oldRole === 'admin' && User::otherActiveAdmins($id) === 0) { flash('danger', 'This is the last active admin — make someone else admin first.'); redirect('admin/users'); }

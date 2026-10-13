@@ -45,6 +45,7 @@ define('PASSWORD_MIN_LENGTH', 8);
 
 // File uploads
 define('MAX_FILE_SIZE', 5 * 1024 * 1024);
+define('MAX_FILE_SIZE_TEXT', (MAX_FILE_SIZE / (1024 * 1024)) . 'MB');   // "5MB", in messages and help text
 define('ALLOWED_MIME', ['application/pdf','image/jpeg','image/png']);
 
 // Error reporting: always report + log everything; only DISPLAY it in development.

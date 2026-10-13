@@ -4,7 +4,6 @@ $p = $app['personal'] ?? [];
 $edu = $app['education'] ?? [];
 $f = $app['family'] ?? [];
 $screening = Application::can('qualify', $app['status']);
-$resultColor = ['Pass' => 'success', 'Fail' => 'danger', 'Not provided' => 'warning', 'No limit' => 'secondary'];
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
   <div>
@@ -53,7 +52,7 @@ $resultColor = ['Pass' => 'success', 'Fail' => 'danger', 'Not provided' => 'warn
                 <td><?= e($row['label']) ?></td>
                 <td class="small text-muted"><?= e($row['rule']) ?></td>
                 <td><?= e($row['value']) ?></td>
-                <td><span class="badge bg-<?= e($resultColor[$row['result']]) ?>"><?= e($row['result']) ?></span></td>
+                <td><span class="badge bg-<?= e(ELIGIBILITY_COLORS[$row['result']]) ?>"><?= e($row['result']) ?></span></td>
               </tr>
             <?php endforeach; ?>
           </tbody>
@@ -202,7 +201,7 @@ $resultColor = ['Pass' => 'success', 'Fail' => 'danger', 'Not provided' => 'warn
         <div class="border rounded p-2 mb-2">
           <strong><?= e(Interview::describe($at)) ?></strong>
           <?= (int)$at['reschedule_count'] ? '<span class="badge bg-warning ms-1">reschedule</span>' : '' ?>
-          <span class="badge bg-<?= $at['attendance'] === 'Attended' ? 'success' : ($at['attendance'] === 'No-show' ? 'danger' : 'primary') ?> ms-1"><?= e($at['attendance']) ?></span>
+          <span class="badge bg-<?= e(ATTENDANCE_COLORS[$at['attendance']]) ?> ms-1"><?= e($at['attendance']) ?></span>
           <?php if ($at['total_score'] !== null): ?> · Score <strong><?= e(number_format((float)$at['total_score'], 2)) ?></strong> / 100
             (<a href="<?= url('admin/interview-score&id=' . (int)$at['id']) ?>">details</a>)<?php endif; ?>
           · <a href="<?= url('admin/interview-schedule&id=' . (int)$at['schedule_id']) ?>">schedule</a>
