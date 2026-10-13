@@ -17,7 +17,7 @@ final class CalendarController
     public const LEGEND = [
         ['Interview — open', 'Open', false], ['Interview — full', 'Full', false], ['Interview — done', 'Done', false],
         ['Interview — cancelled', 'Cancelled', false], ['Claim deadline', 'release', false], ['Renewal deadline', 'renewal', false],
-        ['Deadline within 48 hours', 'due_soon', false], ['Overdue (someone missed it)', 'overdue', false],
+        ['Deadline within ' . TERM_SCHEDULE_REMINDER_HOURS . ' hours', 'due_soon', false], ['Overdue (someone missed it)', 'overdue', false],
         ['Planned release / semester start', 'release', true],
     ];
 

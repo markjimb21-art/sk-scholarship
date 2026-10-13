@@ -36,6 +36,8 @@ require_once BASE_PATH . '/app/models/Holiday.php';
  */
 final class AdminController
 {
+    private const APPLICATIONS_PER_PAGE = 25;
+
     /** Who may open what (docs/PROCESS.md "Roles"). The admin role can open everything. */
     private const STAFF  = STAFF_ROLES;                         // every staff role
     private const REVIEW = ['admin', 'reviewer'];                // applications: screening, interviews, decisions
@@ -196,10 +198,9 @@ final class AdminController
             'status'     => get_str('status'),
             'program_id' => get_str('program_id'),
         ];
-        $limit = 25;
         $total = ApplicationSearch::count($filters);
-        ['page' => $page, 'offset' => $offset, 'pages' => $pages] = paginate($total, $limit);
-        $rows = ApplicationSearch::search($filters, $limit, $offset);
+        ['page' => $page, 'offset' => $offset, 'pages' => $pages] = paginate($total, self::APPLICATIONS_PER_PAGE);
+        $rows = ApplicationSearch::search($filters, self::APPLICATIONS_PER_PAGE, $offset);
         $programs = Program::options();
         render('admin/applications', compact('filters', 'page', 'rows', 'total', 'pages', 'programs'), 'Applications');
     }

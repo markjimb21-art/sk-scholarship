@@ -7,6 +7,8 @@ declare(strict_types=1);
  */
 final class Term
 {
+    private const RELEASE_HISTORY_LIMIT = 300;   // newest releases on the releases page
+
     /** Claim status map (docs/PROCESS.md §1). */
     public const CLAIM_TRANSITIONS = [
         'submit'   => ['from' => ['Waiting for Requirements', 'Resubmit'], 'to' => 'Submitted'],
@@ -148,7 +150,7 @@ final class Term
         $params = [];
         if ($filters['program_id'] !== '')    { $sql .= " AND s.program_id = :pid"; $params['pid'] = (int)$filters['program_id']; }
         if ($filters['academic_year'] !== '') { $sql .= " AND t.academic_year = :ay"; $params['ay'] = $filters['academic_year']; }
-        $stmt = Database::conn()->prepare($sql . " ORDER BY r.release_date DESC, r.id DESC LIMIT 300");
+        $stmt = Database::conn()->prepare($sql . " ORDER BY r.release_date DESC, r.id DESC LIMIT " . self::RELEASE_HISTORY_LIMIT);
         $stmt->execute($params);
         return $stmt->fetchAll();
     }

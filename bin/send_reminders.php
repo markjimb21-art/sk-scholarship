@@ -51,7 +51,7 @@ try {
     $now = date('Y-m-d H:i:s');
 
     $setting = Setting::raw('interview_reminder_hours');
-    $hours = ($setting === null || $setting === '') ? 24 : max(0, (int)$setting);
+    $hours = ($setting === null || $setting === '') ? INTERVIEW_REMINDER_DEFAULT_HOURS : max(0, (int)$setting);
     // Window bounds come from PHP (Asia/Manila) rather than MySQL NOW(), whose timezone may differ.
     $until = date('Y-m-d H:i:s', strtotime($now) + $hours * 3600);
     // interview_reminder_hours = 0 turns interview reminders off (deadline reminders below still run).

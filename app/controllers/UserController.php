@@ -41,8 +41,8 @@ final class UserController
             }
             flash('success', $oldRole !== $roleName ? "Account updated; role changed to $roleName." : 'Account updated.');
         } else {
-            if ($problems = password_problems($password)) { flash('danger', password_rule_message($problems)); redirect('admin/users'); }
-            if ($password !== post_str('password_confirm')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
+            $v = (new Validator($_POST))->newPassword('password', 'password_confirm');
+            if ($v->fails()) { flash('danger', $v->firstError()); redirect('admin/users'); }
             $newId = User::createStaff($roleName, $name, $email, $password, $contact);
             AuditLog::write('user_created', 'users', $newId, "Created $roleName account $email", null, ['role' => $roleName, 'by' => admin_id()]);
             flash('success', ucfirst($roleName) . ' account created.');
@@ -72,8 +72,8 @@ final class UserController
         require_post('admin/users');
         $id = post_int('id');
         $password = post_str('new_password');
-        if ($problems = password_problems($password)) { flash('danger', password_rule_message($problems)); redirect('admin/users'); }
-        if ($password !== post_str('new_password_confirm')) { flash('danger', 'The two passwords do not match.'); redirect('admin/users'); }
+        $v = (new Validator($_POST))->newPassword('new_password', 'new_password_confirm');
+        if ($v->fails()) { flash('danger', $v->firstError()); redirect('admin/users'); }
         User::resetPassword($id, $password);
         AuditLog::write('user_password_reset', 'users', $id, 'Admin reset the password');
         flash('success', 'Password reset.');

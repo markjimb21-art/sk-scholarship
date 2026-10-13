@@ -242,7 +242,7 @@ final class TermSchedule
 
     /**
      * Create (program, A.Y., semester and purpose fixed from then on) or edit a window.
-     * Creating notifies every affected scholar who hasn't submitted; a changed deadline resets the 48 h reminder and
+     * Creating notifies every affected scholar who hasn't submitted; a changed deadline resets the TERM_SCHEDULE_REMINDER_HOURS reminder and
      * notifies them again; cancelling notifies them too. Returns ['ok'=>true,'id','notified'] or ['ok'=>false,'error'].
      */
     public static function save(array $data, ?int $id, int $adminId): array

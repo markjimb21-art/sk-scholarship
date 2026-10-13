@@ -4,6 +4,8 @@ declare(strict_types=1);
 /** User accounts (the users table): staff accounts managed by the admin, and every account's own details. */
 final class User
 {
+    private const SEARCH_LIMIT = 200;   // accounts page
+
     /** Name and e-mail of one account, or null. */
     public static function contact(int $id): ?array
     {
@@ -28,7 +30,7 @@ final class User
         return $id ? (int)$id : null;
     }
 
-    /** Accounts page: search by name/e-mail and filter by role; at most 200 rows. */
+    /** Accounts page: search by name/e-mail and filter by role; at most SEARCH_LIMIT rows. */
     public static function search(string $q, string $role): array
     {
         $sql = "SELECT u.id, u.full_name, u.email, u.contact_number, u.is_active, u.email_verified, u.last_login, u.created_at, r.role_name
@@ -36,7 +38,7 @@ final class User
         $params = [];
         if ($q !== '')  { $sql .= " AND (u.full_name LIKE :q1 OR u.email LIKE :q2)"; $params['q1'] = $params['q2'] = "%$q%"; }
         if ($role !== '') { $sql .= " AND r.role_name = :role"; $params['role'] = $role; }
-        $stmt = Database::conn()->prepare($sql . " ORDER BY r.role_name, u.full_name LIMIT 200");
+        $stmt = Database::conn()->prepare($sql . " ORDER BY r.role_name, u.full_name LIMIT " . self::SEARCH_LIMIT);
         $stmt->execute($params);
         return $stmt->fetchAll();
     }

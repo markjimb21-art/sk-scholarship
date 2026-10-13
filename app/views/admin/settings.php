@@ -12,7 +12,7 @@
           <div class="form-text">When off, applicants still get in-app notifications. OTP codes are always e-mailed.</div>
         </div>
         <label class="form-label">Interview reminder — hours before the interview</label>
-        <input type="number" min="0" max="168" name="interview_reminder_hours" class="form-control" value="<?= e($settings['interview_reminder_hours']) ?>">
+        <input type="number" min="0" max="<?= INTERVIEW_REMINDER_MAX_HOURS ?>" name="interview_reminder_hours" class="form-control" value="<?= e($settings['interview_reminder_hours']) ?>">
         <div class="form-text">Used by <code>bin/send_reminders.php</code> (see README). 0 turns interview reminders off.</div>
 
         <label class="form-label mt-3">Interview suggestions — days ahead</label>

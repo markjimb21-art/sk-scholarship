@@ -11,7 +11,7 @@ declare(strict_types=1);
  */
 final class Otp
 {
-    private const TTL_MINUTES     = 10;
+    public const TTL_MINUTES      = 10;
     private const MAX_ATTEMPTS    = 5;
     private const RESEND_COOLDOWN = 60; // seconds
 

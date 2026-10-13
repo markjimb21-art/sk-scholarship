@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 final class Notification
 {
+    private const LIST_LIMIT = 100;   // newest notifications on the Notifications page
+
     public static function send(
         int $userId,
         string $title,
@@ -102,7 +104,7 @@ final class Notification
         return $authenticatedUser !== '' ? $authenticatedUser : 'noreply@estefania.sk';
     }
 
-    /** Admin-only "Send Test Email" (see AdminController::settingsTestEmail). */
+    /** Admin-only "Send Test Email" (see SettingsController::settingsTestEmail). */
     public static function sendTestEmail(string $toEmail): array {
         $subject = APP_NAME_SHORT . ' — Test Email';
         $plain = 'This is a test email from ' . APP_NAME . '.';
@@ -271,9 +273,9 @@ HTML;
         return (int)$stmt->fetchColumn();
     }
 
-    /** The newest 100 notifications of one user (the Notifications page). */
+    /** The newest LIST_LIMIT notifications of one user (the Notifications page). */
     public static function forUser(int $userId): array {
-        $stmt = Database::conn()->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 100");
+        $stmt = Database::conn()->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT " . self::LIST_LIMIT);
         $stmt->execute([$userId]);
         return $stmt->fetchAll();
     }

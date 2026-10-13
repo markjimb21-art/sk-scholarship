@@ -196,11 +196,12 @@ Types: 3 untyped parameters remain: `ApplicantController::measurement($value)`, 
 |---|---|---|---|
 | **B1** | **Notifications are never marked as read.** The bell's unread count only grows. | `app.js:117–119` waits for `[data-notifications]`, which no view has; its URL is hard-coded to `/sk-scholarship/public/…` (wrong on any other install path); the only "mark read" is a GET (`?mark_read=1`) that changes data without a CSRF check. | Every user's badge shows all notifications ever received |
 | **B2** | **"Forgot password → Resend code" reveals whether an e-mail is registered.** | `AuthController::forgotPassword` unsets `otp_user_id` for unknown e-mails; `resendOtp` then redirects to Sign In, while a real account stays on the code page. | Account enumeration (low severity) |
-| **B3** | **The OTP countdown restarts at 10:00 on every page load**, including the reload after a wrong code. | `verify_otp.php:32` / `verify_reset_otp.php:32` start from `10 * 60`, not from the code's real expiry | The page can say "9:58 left" for a code that is already expired |
-| **B4** | **Admin "Reset password" reports success for a user that doesn't exist.** | `AdminController::userReset` runs the UPDATE and audit-logs without checking the id (0 rows changed → still "Password reset.") | Misleading message and a bogus audit row (crafted request only) |
+| **B3** | **The OTP countdown restarts at 10:00 on every page load**, including the reload after a wrong code. | `pages/otp-countdown.js` always starts from the full lifetime (`data-ttl` = `Otp::TTL_MINUTES`), not from the code's real expiry | The page can say "9:58 left" for a code that is already expired |
+| **B4** | **Admin "Reset password" reports success for a user that doesn't exist.** | `UserController::userReset` runs the UPDATE and audit-logs without checking the id (0 rows changed → still "Password reset.") | Misleading message and a bogus audit row (crafted request only) |
 | **B5** | **The OTP e-mail still prints the code in the old navy** `#0d3b66`. | `AuthController.php:134` inline style | Off-brand (the rest of the e-mail uses the new tokens) |
 | **B6** | **Sign out is a GET link** (`?r=logout`). | `public/index.php` `case 'logout'` | Another site could sign a user out (low severity) |
 | **B7** | **An error after a page has started returns HTTP 200**, not 500. *(Found in Stage 1, while proving the smoke test catches errors.)* | `public/index.php` exception handler: `http_response_code(500)` only when `!headers_sent()`; by the time a view throws, the layout has already been sent | In production the user sees half a page with the error page appended; monitoring sees a "successful" request |
+| **B8** | **Registration accepts the e-mail `0`.** *(Found in Stage 7.)* | `Validator::email()` only checks a value that is `!empty()`, and `"0"` is "empty" in PHP; `required()` passes it (not blank), so a crafted POST with `email=0` creates an account. The browser's `type="email"` field blocks it in normal use. | An account with an unusable e-mail (crafted request only) |
 
 ---
 
@@ -255,6 +256,12 @@ Types: 3 untyped parameters remain: `ApplicantController::measurement($value)`, 
 - named constants;
 - the 3 parameter types;
 - comments only where the reason isn't obvious.
+
+*Outcome (R6):* the Validator now checks registration (as before) and all four "new password + confirm" forms
+(reset password, admin create user, admin reset password, My Profile) through one rule, `newPassword()`, with each
+form's own wording. The remaining hand-written checks stay as they are, because moving them would change behaviour:
+- they sit between database checks (e.g. "e-mail already used") whose order decides which message is shown;
+- `Validator::email()`/`in()` skip "empty" values with `!empty()`, so the input `"0"` would pass where the hand check refuses it (see B8).
 
 **Stage 8 — delete proven dead code (§5)**
 - The 3 CSS classes;

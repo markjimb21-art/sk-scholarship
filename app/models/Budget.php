@@ -68,7 +68,7 @@ final class Budget
         $slots = (int)$program['slots_available'];
         $amount = (float)$program['amount_per_semester'];
         if ($slots <= 0 || $amount <= 0) return null;
-        return ['total' => round($slots * $amount * 2, 2), 'slots' => $slots, 'amount' => $amount];
+        return ['total' => round($slots * $amount * SEMESTERS_PER_YEAR, 2), 'slots' => $slots, 'amount' => $amount];
     }
 
     /** Sum of the actual releases for scholars of a program in an academic year. */
@@ -87,13 +87,13 @@ final class Budget
 
     /**
      * Committed = Σ over Active scholars of the program of
-     *             (amount per semester × semesters of this A.Y. not yet released to them), 2 semesters per A.Y.
+     *             (amount per semester × semesters of this A.Y. not yet released to them), SEMESTERS_PER_YEAR per A.Y.
      */
     public static function committed(int $programId, string $academicYear): float
     {
         $stmt = Database::conn()->prepare(
             "SELECT sp.amount_per_semester,
-                    COALESCE(SUM(GREATEST(0, 2 - (SELECT COUNT(*) FROM scholar_terms t
+                    COALESCE(SUM(GREATEST(0, " . SEMESTERS_PER_YEAR . " - (SELECT COUNT(*) FROM scholar_terms t
                                                    JOIN scholarship_releases r ON r.term_id = t.id
                                                    WHERE t.scholar_id = s.id AND t.academic_year = ?))), 0) AS unreleased
              FROM scholarship_programs sp

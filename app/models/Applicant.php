@@ -88,7 +88,7 @@ final class Applicant
     }
 
     /** A body measurement from the form: a number within [$min, $max] rounded to 1 decimal, else null. */
-    private static function measurement($value, float $min, float $max): ?float
+    private static function measurement(mixed $value, float $min, float $max): ?float
     {
         $v = trim((string)$value);
         if (!is_numeric($v) || (float)$v < $min || (float)$v > $max) return null;

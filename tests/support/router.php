@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 // Router for PHP's built-in server (tests only): serves files from public/ as they are, and turns every other path into
 // public/index.php?r=<path> — the same thing public/.htaccess does under Apache.
 $path = rawurldecode((string)parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));

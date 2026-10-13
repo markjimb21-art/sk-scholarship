@@ -4,11 +4,13 @@ declare(strict_types=1);
 /** B2 Screening: the Submitted queue and the one page per application (also used read-only for any status). */
 final class ScreeningController
 {
+    private const QUEUE_LIMIT = 200;   // the screening queue lists at most this many applications
+
     /** Queue: Submitted applications, oldest first. */
     public function queue(): void
     {
         $programId = get_id('program_id');
-        $rows = ApplicationSearch::search(['status' => 'Submitted', 'program_id' => $programId], 200);
+        $rows = ApplicationSearch::search(['status' => 'Submitted', 'program_id' => $programId], self::QUEUE_LIMIT);
         $programs = Program::options();
         render('admin/screening', compact('rows', 'programs', 'programId'), 'Screening');
     }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 /** Scholars: Active or Ended (with a reason). Semesters, claims and renewals live in Term / Renewal. */
 final class Scholar
 {
+    private const LIST_LIMIT = 500;   // scholars page
+
     public static function find(int $id): ?array
     {
         $stmt = Database::conn()->prepare(
@@ -68,7 +70,7 @@ final class Scholar
             $sql .= " AND (u.full_name LIKE :q1 OR s.scholar_code LIKE :q2 OR u.email LIKE :q3)";
             $params['q1'] = $params['q2'] = $params['q3'] = '%' . $filters['q'] . '%';
         }
-        $stmt = Database::conn()->prepare($sql . " ORDER BY s.status, u.full_name LIMIT 500");
+        $stmt = Database::conn()->prepare($sql . " ORDER BY s.status, u.full_name LIMIT " . self::LIST_LIMIT);
         $stmt->execute($params);
         return $stmt->fetchAll();
     }

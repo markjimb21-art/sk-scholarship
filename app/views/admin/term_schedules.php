@@ -13,7 +13,7 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
       <?= $isRelease
         ? 'Scholars can upload their Grades and School ID for a semester only while its claim window is open.'
         : 'Scholars can upload their Enrollment Form and School ID for the next semester only while its renewal window is open.' ?>
-      Creating a window e-mails every scholar it applies to; a reminder goes out 48 hours before the deadline.
+      Creating a window e-mails every scholar it applies to; a reminder goes out <?= TERM_SCHEDULE_REMINDER_HOURS ?> hours before the deadline.
     </p>
   </div>
   <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#scheduleModal" data-schedule-modal><i class="bi bi-plus-lg"></i> New window</button>
@@ -113,7 +113,7 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
           <div class="form-text">Closed stops new submissions; Cancelled also stops re-uploads and notifies the scholars.</div>
         </div>
         <div class="mb-1"><label class="form-label">Notes <span class="text-muted small">(admin only)</span></label><textarea name="notes" id="schNotes" class="form-control" rows="2"></textarea></div>
-        <div class="form-text">Changing the deadline notifies the scholars who haven't submitted and resets the 48-hour reminder.</div>
+        <div class="form-text">Changing the deadline notifies the scholars who haven't submitted and resets the <?= TERM_SCHEDULE_REMINDER_HOURS ?>-hour reminder.</div>
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
     </form>

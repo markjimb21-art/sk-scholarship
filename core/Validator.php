@@ -39,6 +39,17 @@ final class Validator
         return $this;
     }
 
+    /**
+     * A password being created or changed: the shared rule (password_problems(), also when empty), then the confirmation
+     * must match. One message at a time, the rule first, as every password form shows it.
+     */
+    public function newPassword(string $field, string $confirmField, string $mismatch = 'The two passwords do not match.'): self {
+        $password = (string)($this->data[$field] ?? '');
+        if ($problems = password_problems($password)) $this->errors[$field] = password_rule_message($problems);
+        elseif ($password !== (string)($this->data[$confirmField] ?? '')) $this->errors[$confirmField] = $mismatch;
+        return $this;
+    }
+
     public function numeric(string $field, ?string $label = null): self {
         $label ??= ucfirst(str_replace('_', ' ', $field));
         if (!empty($this->data[$field]) && !is_numeric($this->data[$field])) {

@@ -1,5 +1,5 @@
 <?php
-// One progress tracker, the status in plain words, and ONE "What you need to do next" box (see ApplicantController::journey()).
+// One progress tracker, the status in plain words, and ONE "What you need to do next" box (see ApplicantJourney::build()).
 $steps = ['Apply', 'Screening', 'Interview', 'Final result', 'Claim cash', 'Renewal'];
 ?>
 <div class="mb-4">

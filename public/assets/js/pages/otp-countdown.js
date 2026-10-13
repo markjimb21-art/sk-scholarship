@@ -1,8 +1,8 @@
-/** E-mail code pages (sign-up and password reset): counts down the code's 10 minutes, then says it expired. */
+/** E-mail code pages (sign-up and password reset): counts down the code's lifetime (data-ttl), then says it expired. */
 (function () {
   'use strict';
 
-  var total = 10 * 60, time = document.getElementById('otpTime');
+  var time = document.getElementById('otpTime'), total = Number(time.dataset.ttl);   // seconds (Otp::TTL_MINUTES)
   var timer = setInterval(function () {
     total--;
     if (total <= 0) {

@@ -15,7 +15,7 @@ final class AnalyticsBudget
     {
         $program = Program::find($programId);
         $newScholars = AnalyticsFunnel::projectedScholars($programId)['expected_new'];
-        return self::committed($programId, $academicYear) + $newScholars * (float)$program['amount_per_semester'] * 2;
+        return self::committed($programId, $academicYear) + $newScholars * (float)$program['amount_per_semester'] * SEMESTERS_PER_YEAR;
     }
 
     /** Remaining = total budget − released (null when there is no budget for the program + A.Y.). */
@@ -37,7 +37,7 @@ final class AnalyticsBudget
     {
         $program = Program::find($programId);
         $surplus = self::surplus($programId, $academicYear);
-        $perScholar = (float)$program['amount_per_semester'] * 2;
+        $perScholar = (float)$program['amount_per_semester'] * SEMESTERS_PER_YEAR;
         if ($surplus === null || $surplus <= 0 || $perScholar <= 0) return 0;
         return (int)floor($surplus / $perScholar);
     }

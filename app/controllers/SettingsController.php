@@ -10,7 +10,7 @@ final class SettingsController
         $rows = Setting::all();
         $settings = [
             'email_notifications'      => (string)($rows['email_notifications'] ?? '1'),
-            'interview_reminder_hours' => (string)($rows['interview_reminder_hours'] ?? '24'),
+            'interview_reminder_hours' => (string)($rows['interview_reminder_hours'] ?? INTERVIEW_REMINDER_DEFAULT_HOURS),
             'daily_digest_enabled'     => (string)($rows['daily_digest_enabled'] ?? '1'),
             'daily_digest_sent_on'     => (string)($rows['daily_digest_sent_on'] ?? ''),
             'admin_event_emails'       => (string)($rows['admin_event_emails'] ?? '0'),
@@ -26,7 +26,7 @@ final class SettingsController
         require_post('admin/settings');
         $values = [
             'email_notifications'      => post_bool('email_notifications') ? '1' : '0',
-            'interview_reminder_hours' => (string)max(0, min(168, (int)($_POST['interview_reminder_hours'] ?? 24))),
+            'interview_reminder_hours' => (string)max(0, min(INTERVIEW_REMINDER_MAX_HOURS, (int)($_POST['interview_reminder_hours'] ?? INTERVIEW_REMINDER_DEFAULT_HOURS))),
             'daily_digest_enabled'     => post_bool('daily_digest_enabled') ? '1' : '0',
             'admin_event_emails'       => post_bool('admin_event_emails') ? '1' : '0',
             'interview_suggestion_window_days' => (string)InterviewSlots::clampWindowDays((int)($_POST['interview_suggestion_window_days'] ?? InterviewSlots::WINDOW_DEFAULT_DAYS)),

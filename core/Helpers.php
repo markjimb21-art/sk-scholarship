@@ -23,7 +23,7 @@ function asset(string $path): string {
     return BASE_URL . '/assets/' . $path . (is_file($file) ? '?v=' . filemtime($file) : '');
 }
 
-function old(string $key, $default = '') { return $_SESSION['_old'][$key] ?? $default; }
+function old(string $key, mixed $default = ''): mixed { return $_SESSION['_old'][$key] ?? $default; }
 
 function flash(string $type, string $message): void {
     $_SESSION['_flash'][] = ['type' => $type, 'message' => $message];
@@ -60,7 +60,7 @@ function verify_csrf(): void {
  * JSON for embedding in <script> blocks AND in HTML attributes (onclick='f(<?= js_json($x) ?>)').
  * <, >, &, ' and " are all \u-escaped, so HTML entities such as &quot; can never be re-assembled by the browser.
  */
-function js_json($value): string {
+function js_json(mixed $value): string {
     $json = json_encode($value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE);
     return $json === false ? 'null' : $json;
 }

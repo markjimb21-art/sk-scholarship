@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 final class AuditLog
 {
+    private const APPLICATION_HISTORY_LIMIT = 50;   // newest entries on an application page
+
     public static function write(
         string $action,
         ?string $entityType = null,
@@ -70,7 +72,7 @@ final class AuditLog
             "SELECT al.*, u.full_name AS actor FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id
              WHERE (al.entity_type = 'applications' AND al.entity_id = ?)
                 OR (al.entity_type = 'documents' AND al.entity_id IN (SELECT id FROM documents WHERE application_id = ?))
-             ORDER BY al.created_at DESC, al.id DESC LIMIT 50"
+             ORDER BY al.created_at DESC, al.id DESC LIMIT " . self::APPLICATION_HISTORY_LIMIT
         );
         $audit->execute([$applicationId, $applicationId]);
         return $audit->fetchAll();

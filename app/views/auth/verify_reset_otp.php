@@ -14,7 +14,7 @@ require VIEW_PATH . '/layouts/auth_head.php';
     <label class="form-label" for="otp">6-digit code</label>
     <input type="text" name="otp" id="otp" class="form-control form-control-lg text-center mb-2" style="letter-spacing:.5em;font-weight:700;"
            maxlength="6" pattern="\d{6}" inputmode="numeric" autocomplete="one-time-code" required autofocus aria-describedby="otpCountdown">
-    <p id="otpCountdown" class="text-muted mb-3">The code expires in <span id="otpTime">10:00</span>.</p>
+    <p id="otpCountdown" class="text-muted mb-3">The code expires in <span id="otpTime" data-ttl="<?= Otp::TTL_MINUTES * 60 ?>"><?= Otp::TTL_MINUTES ?>:00</span>.</p>
     <div id="otpExpired" role="alert"></div>
     <button type="submit" class="btn btn-primary btn-lg w-100 mb-2">Verify Code</button>
   </form>

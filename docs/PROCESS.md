@@ -125,7 +125,7 @@ Interviews page's waiting list, "Reschedule" on a schedule's applicant row, a sl
 first-no-show notification. It shows the applicant's pending slot request (Confirm / Decline), a ranked list of
 suggestions, and a free date/time picker (`admin/interview-reschedule-save`, `admin/slot-request-decide`).
 
-**Suggestions — `Interview::suggestSlots()`, one function for the New-schedule form, this page and the applicant:**
+**Suggestions — `InterviewSlots::suggestSlots()`, one function for the New-schedule form, this page and the applicant:**
 1. Existing **Open** schedules of the program, from tomorrow, that still have free capacity (soonest first) — not on the
    New-schedule form, and not the schedule the applicant is already on.
 2. New free **2-hour blocks** (8–10, 10–12, 1–3, 3–5), Monday–Saturday, from the day after the application end date (or
@@ -187,7 +187,7 @@ before any second semester was opened (their slot is free again — that's when 
 
 A School ID or Enrollment Form uploaded during a claim or renewal becomes the applicant's **current** version (`is_current`). Older versions — in `documents` or `term_documents` — are marked superseded (`superseded_at`), never deleted, and audit-logged (`Document::supersede`). The application view and scholar view show the current version (`Document::current`) and a **Document history** list (`Document::history`). A claim or renewal review always shows what was submitted for it.
 
-**Suggestions (never filled in without a click):** B3 "New schedule" offers up to 5 free 2-hour slots, and the scheduling page and applicant dashboard rank existing schedules first — rules in §3a (`Interview::suggestSlots`). B6 offers a total budget = slots × amount per semester × 2 — `Budget::suggestedTotal`.
+**Suggestions (never filled in without a click):** B3 "New schedule" offers up to 5 free 2-hour slots, and the scheduling page and applicant dashboard rank existing schedules first — rules in §3a (`InterviewSlots::suggestSlots`). B6 offers a total budget = slots × amount per semester × 2 — `Budget::suggestedTotal`.
 
 ---
 
@@ -233,12 +233,12 @@ All functions live in `app/models/Analytics.php`, one small function per number.
 Base: interview attempts on the program's schedules that aren't cancelled and that happened (Attended or No-show).
 - **Attendance rate** = Attended ÷ (Attended + No-show).
 - **No-show rate** on the first attempt (`reschedule_count` = 0) vs after the one reschedule (`reschedule_count` = 1), each = No-show ÷ attempts.
-- **Average score** = average `total_score` of scored interviews; count per band < 50 · 50–69.99 · 70–100 (`Analytics::SCORE_BANDS`).
+- **Average score** = average `total_score` of scored interviews; count per band < 50 · 50–69.99 · 70–100 (`AnalyticsInterviews::SCORE_BANDS`).
 
 ### (4) On-time claim submissions — per program + academic year
 Base: the program's semesters of that A.Y. whose claim was submitted, joined to their release window (`term_schedules`).
 - **On-time rate** = submitted (last submission) on or before the window's deadline ÷ submitted claims with a window. Claims from before windows existed are not counted.
-- **Currently overdue** = scholars in `Analytics::overdue(program, A.Y., 'release')` — the same list as Claims → Missed deadline and the red deadlines on the calendar.
+- **Currently overdue** = scholars in `AnalyticsClaims::overdue(program, A.Y., 'release')` — the same list as Claims → Missed deadline and the red deadlines on the calendar.
 - **Average time to submit** = average (submitted_at − window opens_at), in days.
 
 ### (5) Applicant and scholar profiles — per program
@@ -339,7 +339,7 @@ Correct data is kept; only data explicitly flagged as invalid is removed — and
 application documents and claim/renewal documents, record history, audit logs.
 
 - **Re-uploads are versions.** A new application, claim or renewal upload adds a row; the older one is superseded
-  (`is_current = 0`, `superseded_at`) and its file kept (`Document::storeApplicationDocument`, `Term::uploadDocument`,
+  (`is_current = 0`, `superseded_at`) and its file kept (`Document::storeApplicationDocument`, `TermDocument::upload`,
   `Document::supersede`), with an audit entry. Every version is listed under **Document history** on the application and
   scholar pages.
 - **Invalid documents.** The only way a document file is deleted: an admin (any document, or ticking "invalid — remove
@@ -371,7 +371,7 @@ recorded are kept.
 
 `admin/calendar` + `admin/calendar-feed` (read-only calendar of interview schedules, claim/renewal deadlines and
 planned dates; interview colours from `Interview::displayStatus()` like the Interviews list, red deadlines from
-`Analytics::overdue()` like Missed deadline, amber within 48 h like the deadline reminder; a list below the calendar is
+`AnalyticsClaims::overdue()` like Missed deadline, amber within 48 h like the deadline reminder; a list below the calendar is
 linked both ways),
 `admin/applications` (read-only search of all applications — the "database of applications"),
 `admin/users` (admin accounts), `admin/settings` (e-mail on/off, reminder hours, Send Test Email),

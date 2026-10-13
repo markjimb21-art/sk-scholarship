@@ -269,16 +269,10 @@ final class AuthController
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             verify_csrf();
             $pw = post_str('password');
-            $cpw = post_str('confirm_password');
-
-            if ($problems = password_problems($pw)) {
-                $_SESSION['_field_errors'] = ['password' => password_rule_message($problems)];
-                flash('danger', password_rule_message($problems));
-                redirect('reset-password');
-            }
-            if ($pw !== $cpw) {
-                $_SESSION['_field_errors'] = ['confirm_password' => 'The two passwords do not match.'];
-                flash('danger', 'The two passwords do not match.');
+            $v = (new Validator($_POST))->newPassword('password', 'confirm_password');
+            if ($v->fails()) {
+                $_SESSION['_field_errors'] = $v->errors();
+                flash('danger', $v->firstError());
                 redirect('reset-password');
             }
 

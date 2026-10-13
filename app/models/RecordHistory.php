@@ -7,6 +7,8 @@ declare(strict_types=1);
  */
 final class RecordHistory
 {
+    private const LIST_LIMIT = 200;   // newest changes listed per applicant
+
     /**
      * Compare a row before/after a save and record each changed HISTORY_FIELDS column. A first fill-in (old row missing,
      * or old value empty) is not a change and isn't recorded. Returns the number of rows written.
@@ -40,7 +42,7 @@ final class RecordHistory
     {
         $stmt = Database::conn()->prepare(
             "SELECT h.*, u.full_name AS changed_by_name FROM record_history h LEFT JOIN users u ON u.id = h.changed_by
-             WHERE h.applicant_id = ? ORDER BY h.changed_at DESC, h.id DESC LIMIT 200"
+             WHERE h.applicant_id = ? ORDER BY h.changed_at DESC, h.id DESC LIMIT " . self::LIST_LIMIT
         );
         $stmt->execute([$applicantId]);
         $rows = $stmt->fetchAll();

@@ -54,6 +54,7 @@ const VERSIONED_DOCUMENT_TYPES = ['School ID', 'Enrollment Form'];
 
 // Semesters: 1st -> 2nd (same A.Y.) -> 1st of the next A.Y.
 const SEMESTERS = ['1st Semester', '2nd Semester'];
+define('SEMESTERS_PER_YEAR', count(SEMESTERS));   // budgets and projections count a scholar's year as this many releases
 
 // Semester claim (scholar_terms.claim_status) => label shown to the scholar.
 const CLAIM_STATUS_LABELS = [
@@ -106,6 +107,10 @@ const ADDRESS_CITY = 'BACOLOD CITY';
 
 // Claim / renewal windows (term_schedules): the deadline reminder goes out this many hours before the deadline.
 const TERM_SCHEDULE_REMINDER_HOURS = 48;
+
+// Interview reminder (Settings → interview_reminder_hours): hours before the interview; 0 = off, at most one week.
+const INTERVIEW_REMINDER_DEFAULT_HOURS = 24;
+const INTERVIEW_REMINDER_MAX_HOURS = 168;
 
 // Fields an admin can flag as wrong when returning an application (B2), per form step: POST name => label.
 // When an application is Returned with flags, ONLY the flagged fields/documents may change (server-side).
