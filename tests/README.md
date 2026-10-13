@@ -9,10 +9,14 @@ The test tools refuse to run if `DB_NAME` is anything else.
 From the project root (XAMPP's MySQL must be running):
 
 ```
-composer -d tests install                          # once: installs PHPUnit into tests/vendor (not committed)
+composer --working-dir=tests install               # once: installs PHPUnit into tests/vendor (not committed)
 tests/vendor/bin/phpunit -c tests/phpunit.xml      # unit + database + HTTP tests
 php bin/smoke_test.php                             # every route, signed in as each kind of user
 ```
+
+`sk_scholarship_test` is created automatically on the first run, if the MySQL user in `.env` may create databases
+(XAMPP's `root` may). Otherwise create it once:
+`mysql -u root -e "CREATE DATABASE sk_scholarship_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"`.
 
 ## What is covered
 
@@ -35,6 +39,8 @@ php bin/smoke_test.php                             # every route, signed in as e
 | http | `ApplicantWritePathsTest` | autosave of the 3 steps (cleaning and history), first save creates the Draft, Returned-with-flags lock, profile and password change, own documents only, notifications |
 | http | `ScholarClaimTest` | a scholar uploads School ID + Grades in an open claim window and submits; another applicant cannot touch that semester |
 | http | `InterviewWritePathsTest` | schedules (create, edit, cancel with applicants, delete), assign/unassign, no-show → one reschedule → second no-show rejects, scoring (only on/after the date, within the rubric), waitlist/reject decisions, declining a slot request |
+| http | `NotificationsReadTest` | (bug B1) opening Notifications marks them read through a POST with the CSRF token to a url()-built address; a GET changes nothing; only the user's own; the bell count goes away |
+| http | `ErrorAfterOutputTest` | (bug B7) an exception or fatal error after the page was printed ends as HTTP 500 with only the error page (production: no details). Its server is started with `SK_TEST_FAULTS=1`, so the test router runs `support/fault_after_output.php` after each page |
 | http | `AuthFlowsTest` | register → e-mail code → verified → sign in; forgot password → code → new password (and unlock); unknown e-mail looks the same |
 | smoke | `bin/smoke_test.php` | every route as admin, reviewer, treasurer and three applicants: no HTTP 500, no PHP warning, and each staff role sees exactly the pages the access map allows (404 for the rest) |
 

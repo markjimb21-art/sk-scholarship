@@ -1,9 +1,15 @@
 # Refactor plan — clean up the code without changing what the system does
 
-Stage 0 only: **no code has been changed.** Measured on branch `restructure-process` at `16f58b6`.
-The rule for every later stage: same pages, URLs, schema, e-mails, reports and look. Anything that would change what a
-user sees or what the database stores is listed in **§7 Bugs found** instead of being fixed here.
-Decisions that need your answer are in **§0**.
+**Status: completed.**
+- Stages 1–8 are done: commits `d188740` … `088964e`, each listed under its stage in §8, plus `15e9fa0` for `docs/CODE_ORGANISATION.md`.
+- Bugs B1 and B7 were then fixed in their own commits, `bb794a9` and `e00b7ff` (§7).
+- Latest results (2026-10-13): PHPUnit **232 tests, 873 assertions, OK**; smoke test **252 requests, OK** (no HTTP 500, no PHP warnings, access map as expected).
+- Before/after line counts of the split files: §9.
+
+The Stage 0 measurements in §1–§6 were taken on branch `restructure-process` at `16f58b6`; their line numbers refer to that commit.
+The rule for every stage: same pages, URLs, schema, e-mails, reports and look. Anything that would change what a
+user sees or what the database stores went into **§7 Bugs found** instead of being fixed here.
+The decisions in **§0** were approved with their defaults.
 
 ---
 
@@ -160,11 +166,11 @@ Most are in application_form 4, interview_schedule 4, decisions 4, users 3, term
 
 | Item | Proof | Plan |
 |---|---|---|
-| `AdminController::STAFF_ROLES` (line 109) | `grep -rn "STAFF_ROLES" app core public bin` → only its definition | **Use it** (§4, staff role list) rather than delete |
-| `Validator::min()`, `numeric()`, `date()`, `in()` | no `->min(`, `->numeric(`, `->date(`, `->in(` call anywhere (the last `->min` went when the password rule moved to `strongPassword()`) | **unsure**: Stage 7 (R6) may use them; whatever is still unused after Stage 7 is deleted in Stage 8 |
-| CSS `.auth-hero` (in the focus rule), `.brand-logos-lg`, `.brand-rule` | `grep -rlw` over `app core public/assets/js` → 0 files each | delete (Stage 8). Leftovers from the UI change, no visual effect. |
-| `public/assets/js/app.js` 116–120 (notifications "mark read" fetch) | its selector `[data-notifications]` appears in no view (`grep -rn "data-notifications" app` → 0) | **leave**: it's the broken half of bug **B1**; deleting it would hide the bug |
-| `?mark_read=1` branch in both notifications actions | only caller is the dead fetch above | **leave** (B1) |
+| `AdminController::STAFF_ROLES` (line 109) | `grep -rn "STAFF_ROLES" app core public bin` → only its definition | **Used** (Stage 6c, `cb104d4`): moved to `config/constants.php` as `STAFF_ROLES`, used by `AdminController`, `UserController` and `public/index.php` |
+| `Validator::min()`, `numeric()`, `date()`, `in()` | no `->min(`, `->numeric(`, `->date(`, `->in(` call anywhere (the last `->min` went when the password rule moved to `strongPassword()`) | **Done: deleted in Stage 8** (`088964e`). Stage 7 didn't need them (its new rule is `newPassword()`). |
+| CSS `.auth-hero` (in the focus rule), `.brand-logos-lg`, `.brand-rule` | `grep -rlw` over `app core public/assets/js` → 0 files each | **Done: deleted in Stage 8** (`088964e`); none of 585 rendered pages used them |
+| `public/assets/js/app.js` 116–120 (notifications "mark read" fetch) | its selector `[data-notifications]` appears in no view (`grep -rn "data-notifications" app` → 0) | left in the refactor (the broken half of bug **B1**); **removed by the B1 fix** (`bb794a9`), replaced by `pages/notifications.js` |
+| `?mark_read=1` branch in both notifications actions | only caller is the dead fetch above | left in the refactor; **removed by the B1 fix** (`bb794a9`), replaced by POST routes |
 | Bootstrap override classes never used in our markup (`text-bg-*`, `btn-info`, `btn-outline-info/success`, `alert-primary`, `alert-link`, `valid-feedback`, `was-validated`, `text-secondary`, `text-info`, `link-danger`, `list-group-item-action`, `input-group-text`, `bg-dark`) | 0 hits in views/JS | **keep**: they make standard Bootstrap classes meet the contrast rules if a page ever uses one |
 | Routes, views, model methods, helper functions | Script over every class: a method counts as used if `Class::name(`, `self::/static::/$this->name(` or `$obj->name(` appears anywhere (route strings for controllers). **0 unused** in models/controllers/core. Every one of the 54 views is required somewhere. Every admin and applicant route is linked (`claim/upload`, `renewal/upload` through `applicant/$purpose/upload`). | nothing to delete. Earlier change plans already removed the rest. |
 | JS functions | `checkForNewerLocalCopy` looked unused but is a named IIFE that runs on load | not dead |
@@ -190,18 +196,20 @@ Types: 3 untyped parameters remain: `ApplicantController::measurement($value)`, 
 
 ---
 
-## 7. Bugs found (NOT fixed in the refactor; fix separately, one commit each)
+## 7. Bugs found (NOT fixed in the refactor; each fixed separately, one commit each)
 
-| # | Bug | Evidence | Effect |
-|---|---|---|---|
-| **B1** | **Notifications are never marked as read.** The bell's unread count only grows. | `app.js:117–119` waits for `[data-notifications]`, which no view has; its URL is hard-coded to `/sk-scholarship/public/…` (wrong on any other install path); the only "mark read" is a GET (`?mark_read=1`) that changes data without a CSRF check. | Every user's badge shows all notifications ever received |
-| **B2** | **"Forgot password → Resend code" reveals whether an e-mail is registered.** | `AuthController::forgotPassword` unsets `otp_user_id` for unknown e-mails; `resendOtp` then redirects to Sign In, while a real account stays on the code page. | Account enumeration (low severity) |
-| **B3** | **The OTP countdown restarts at 10:00 on every page load**, including the reload after a wrong code. | `pages/otp-countdown.js` always starts from the full lifetime (`data-ttl` = `Otp::TTL_MINUTES`), not from the code's real expiry | The page can say "9:58 left" for a code that is already expired |
-| **B4** | **Admin "Reset password" reports success for a user that doesn't exist.** | `UserController::userReset` runs the UPDATE and audit-logs without checking the id (0 rows changed → still "Password reset.") | Misleading message and a bogus audit row (crafted request only) |
-| **B5** | **The OTP e-mail still prints the code in the old navy** `#0d3b66`. | `AuthController.php:134` inline style | Off-brand (the rest of the e-mail uses the new tokens) |
-| **B6** | **Sign out is a GET link** (`?r=logout`). | `public/index.php` `case 'logout'` | Another site could sign a user out (low severity) |
-| **B7** | **An error after a page has started returns HTTP 200**, not 500. *(Found in Stage 1, while proving the smoke test catches errors.)* | `public/index.php` exception handler: `http_response_code(500)` only when `!headers_sent()`; by the time a view throws, the layout has already been sent | In production the user sees half a page with the error page appended; monitoring sees a "successful" request |
-| **B8** | **Registration accepts the e-mail `0`.** *(Found in Stage 7.)* | `Validator::email()` only checks a value that is `!empty()`, and `"0"` is "empty" in PHP; `required()` passes it (not blank), so a crafted POST with `email=0` creates an account. The browser's `type="email"` field blocks it in normal use. | An account with an unusable e-mail (crafted request only) |
+Still open: **B2, B3, B4, B5, B6, B8**. Fixed: B1 and B7 (high priority).
+
+| # | Bug | Evidence | Effect | Priority | Status / fix plan |
+|---|---|---|---|---|---|
+| **B1** | **Notifications are never marked as read.** The bell's unread count only grows. | `app.js:117–119` waits for `[data-notifications]`, which no view has; its URL is hard-coded to `/sk-scholarship/public/…` (wrong on any other install path); the only "mark read" is a GET (`?mark_read=1`) that changes data without a CSRF check. | Every user's badge shows all notifications ever received | **High** | **Fixed** in `bb794a9`: POST routes `admin/` and `applicant/notifications/mark-read` (CSRF), the page hook built with `url()`, `pages/notifications.js` posts it and clears the bell. Test: `NotificationsReadTest`. |
+| **B2** | **"Forgot password → Resend code" reveals whether an e-mail is registered.** | `AuthController::forgotPassword` unsets `otp_user_id` for unknown e-mails; `resendOtp` then redirects to Sign In, while a real account stays on the code page. | Account enumeration (low severity) | Low | Open. Fix: for an unknown e-mail, keep the same session state and page as for a real account, so Resend looks identical (and sends nothing). |
+| **B3** | **The OTP countdown restarts at 10:00 on every page load**, including the reload after a wrong code. | `pages/otp-countdown.js` always starts from the full lifetime (`data-ttl` = `Otp::TTL_MINUTES`), not from the code's real expiry | The page can say "9:58 left" for a code that is already expired | Low | Open. Fix: write the code's real expiry (`expires_at` of the newest `email_otp_codes` row) into the page and count down from that. |
+| **B4** | **Admin "Reset password" reports success for a user that doesn't exist.** | `UserController::userReset` runs the UPDATE and audit-logs without checking the id (0 rows changed → still "Password reset.") | Misleading message and a bogus audit row (crafted request only) | Low | Open. Fix: look the account up first and answer "Account not found." with no UPDATE and no audit row when it doesn't exist. |
+| **B5** | **The OTP e-mail still prints the code in the old navy** `#0d3b66`. | `AuthController.php:134` inline style | Off-brand (the rest of the e-mail uses the new tokens) | Low | Open. Fix: use the brand colour of the rest of the e-mail for the code instead of `#0d3b66`. |
+| **B6** | **Sign out is a GET link** (`?r=logout`). | `public/index.php` `case 'logout'` | Another site could sign a user out (low severity) | Low | Open. Fix: make Sign out a small POST form with the CSRF token in the account menu; a GET to `logout` only redirects. |
+| **B7** | **An error after a page has started returns HTTP 200**, not 500. *(Found in Stage 1, while proving the smoke test catches errors.)* | `public/index.php` exception handler: `http_response_code(500)` only when `!headers_sent()`; by the time a view throws, the layout has already been sent | In production the user sees half a page with the error page appended; monitoring sees a "successful" request | **High** | **Fixed** in `e00b7ff`: every page is built in an output buffer; the exception handler and a shutdown check for fatal errors discard it and answer 500 with the error page. Test: `ErrorAfterOutputTest`. |
+| **B8** | **Registration accepts the e-mail `0`.** *(Found in Stage 7.)* | `Validator::email()` only checks a value that is `!empty()`, and `"0"` is "empty" in PHP; `required()` passes it (not blank), so a crafted POST with `email=0` creates an account. The browser's `type="email"` field blocks it in normal use. | An account with an unusable e-mail (crafted request only) | Low | Open. Fix: in the Validator, treat only a missing or blank value as empty (not `"0"`), so `email()` checks `"0"`; add a test. |
 
 ---
 
@@ -233,29 +241,55 @@ Types: 3 untyped parameters remain: `ApplicantController::measurement($value)`, 
   4. requests every route: public routes, every key of `AdminController::ROUTES` (read by reflection), and every applicant route, with seed ids where a page needs `&id=`;
   5. fails on HTTP 500 or on "Warning", "Notice", "Deprecated", "Fatal error" or "Uncaught" in the output. POST-only routes requested by GET must redirect, not error.
 
+*Outcome:* test database, PHPUnit suites (unit / integration / http) and `bin/smoke_test.php` built and green before anything moved; HTTP tests added for every write path whose SQL moved in Stage 2 — `d188740`, `0c42af6`, `5319f07`.
+
 **Stage 2 — SQL out of controllers (§2, R5)**
 - New models: `User`, `Setting`, `Holiday`, `Lookup`. Methods are added to the existing models.
 - Each statement moves word for word, keeping prepared statements and parameter order. `verify_csrf()` and `require_post()` stay in the controllers.
 
+*Outcome:* no SQL left in controllers (was 50 call sites) or in `bin/send_reminders.php` (was 10); new `User`, `Setting`, `Holiday`, `Lookup`, query methods on `AuditLog`/`Notification`, `Database::transaction()` — `d20e433`.
+
 **Stage 3 — `render()` in ApplicantController**
 - 5 manual header/footer blocks become `render(view, compact(...) + ['pageScripts' => …], title)`. `footer.php` reads `$pageScripts` from the same scope, so the scripts still load.
+
+*Outcome:* every applicant page renders through `render()` — `935c1d2`.
 
 **Stage 4 — split the large files (§1)**
 - Every caller is updated in the same commit (R3).
 - `DocumentStorage::validate()` gets its unit test.
 
+*Outcome:* 9 large files split (counts in §9):
+- 4a `6536cd5`: `DocumentStorage`;
+- 4b `7b6feae`: `TermDocument`;
+- 4c `843de56`: `ApplicationEligibility`, `ApplicationSearch`;
+- 4d `7e63621`: `Interview` → `InterviewSlots`, `InterviewAssignment`, `InterviewScore`;
+- 4e `071529e`: `Analytics` → 5 `Analytics*` classes + `WorkQueues`;
+- 4f `07a24b4`: `UserController`, `SettingsController`, `AuditController`;
+- 4g `5e01f63`: `ApplicantController` → 4 controllers + `ApplicantJourney`;
+- 4h `618d73b`: form partials;
+- 4i `3f7d5c9`: wizard JS.
+
 **Stage 5 — inline scripts out (§3, R4)**
 - Data goes through `data-*` attributes or `<script type="application/json">` produced by `js_json()`.
 - Every script tag goes through `asset()`, so it keeps its `?v=`.
 
+*Outcome:* the 18 inline scripts are now `public/assets/js/pages/*.js` and `application/flags.js`; the 36 inline handlers became `data-confirm` / `data-autosubmit` / `data-no-submit` (handled once in `ui.js`) and `data-*` payloads — `53d24ac`.
+
 **Stage 6 — duplication (§4)**
 - `peso()`, `fmt_date()`, `paginate()`, `input_*()`, `not_found()`, `Program::fromRequest()`, the new colour constants, `STAFF_ROLES`.
+
+*Outcome:*
+- 6a `30ade45`: `peso()` + `fmt_date/fmt_datetime/fmt_long_date` replace 21 money and 52 date copies;
+- 6b `602831b`: `not_found()`, `require_post()`, `paginate()`, `Program::fromRequest()`, and `get_int/post_str/…` (103 reads);
+- 6c `cb104d4`: `STAFF_ROLES`, the 3 colour maps, `missedCount()` reuse, `MAX_FILE_SIZE_TEXT`, the suggestion-window constants.
 
 **Stage 7 — consistency (§6, R6, R7)**
 - Validator where the messages can stay identical;
 - named constants;
 - the 3 parameter types;
 - comments only where the reason isn't obvious.
+
+*Outcome:* typed parameters everywhere; named constants (semesters per year, reminder hours, page sizes, list caps, OTP lifetime); `Validator::newPassword()`; stale comments fixed — `9955923`.
 
 *Outcome (R6):* the Validator now checks registration (as before) and all four "new password + confirm" forms
 (reset password, admin create user, admin reset password, My Profile) through one rule, `newPassword()`, with each
@@ -267,4 +301,31 @@ form's own wording. The remaining hand-written checks stay as they are, because 
 - The 3 CSS classes;
 - whatever Validator rules are still unused.
 
-**After every stage**, I'll re-run the existing browser checks from the UI and application-form work as an extra check (application form, sign-in, calendar, page sweep at 4 sizes). Then I'll report per-file before/after line counts, what moved where, the test results, and a "How the code is organised" section in `docs/CODE_ORGANISATION.md` for your panel.
+*Outcome:* the 3 CSS rules and `Validator::min/numeric/date/in` deleted — `088964e`.
+
+**Extra checks beyond PHPUnit and the smoke test** (done):
+- the application-form browser walkthrough (47 checks) after Stages 4i, 5 and 6c, the ones that changed the wizard's JavaScript or markup;
+- a browser behaviour recording of 46 pages (modals, confirm dialogs, filters, charts, calendar, locked fields, OTP countdown), identical before and after Stages 5 and 7;
+- a full-site HTML snapshot of 585 pages and reports, byte-identical through Stages 6–8 except one intended data attribute.
+
+The line counts are in §9. How the code is organised now is in `docs/CODE_ORGANISATION.md`.
+
+---
+
+## 9. Before / after: the split files
+
+"Before" is the line count at the Stage 0 commit `58f9dce` (from `git show 58f9dce:<file> | wc -l`); "after" is the
+current file. The new files' counts include later changes (stages 5–8, the B1 fix).
+
+| Before (lines at `58f9dce`) | After (lines now) |
+|---|---|
+| `app/controllers/ApplicantController.php` **739** | `ApplicantController` 89 (route table + dashboard), `ApplicationFormController` 110, `ApplicantDocumentController` 80, `ScholarshipController` 75, `ApplicantAccountController` 65, model `ApplicantJourney` 145 |
+| `app/models/Interview.php` **667** | `Interview` 254 (schedules), `InterviewSlots` 125, `InterviewAssignment` 281, `InterviewScore` 98 |
+| `app/views/applicant/application_form.php` **666** | `application_form.php` 94, `form/_personal.php` 118, `form/_education.php` 77, `form/_family.php` 105, `form/_documents.php` 85, `form/_review.php` 176; its inline Returned-flags script became `application/flags.js` 31 (Stage 5) |
+| `app/models/Application.php` **530** | `Application` 451, `ApplicationEligibility` 64, `ApplicationSearch` 61 |
+| `app/models/Analytics.php` **527** | *(removed)* `AnalyticsFunnel` 121, `AnalyticsBudget` 89, `AnalyticsInterviews` 62, `AnalyticsClaims` 74, `AnalyticsProfiles` 190, `WorkQueues` 24 |
+| `public/assets/js/application-autosave.js` **509** | *(removed)* `application/shared.js` 46, `application/field-autosave.js` 202, `application/steps.js` 40, `application/document-upload.js` 254 |
+| `public/assets/js/application-review.js` **150** | renamed, unchanged (100% similarity), to `application/review.js` 150 |
+| `app/controllers/AdminController.php` **474** | `AdminController` 245 (route table + dashboard, programs, applications, notifications), `UserController` 82, `SettingsController` 84, `AuditController` 27 |
+| `app/models/Term.php` **369** | `Term` 304, `TermDocument` 96 |
+| `app/models/Document.php` **327** | `Document` 209, `DocumentStorage` 143 |

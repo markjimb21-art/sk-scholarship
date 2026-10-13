@@ -6,9 +6,11 @@ A web application for the Sangguniang Kabataan (SK) college scholarship. It cove
 
 Built as a plain PHP MVC application (no framework) on top of PDO/MySQL, with Composer for PHP dependencies and npm for front-end libraries.
 
+**How the code is organised** (request flow, folders, which controller and model handle each step, database tables, security, tests): [docs/CODE_ORGANISATION.md](docs/CODE_ORGANISATION.md). **Automated tests** (separate test database, PHPUnit, smoke test): [tests/README.md](tests/README.md).
+
 ## Tech stack
 
-- **Backend:** PHP 8+ (no framework), custom front-controller router in [public/index.php](public/index.php)
+- **Backend:** PHP 8.3 (no framework), custom front-controller router in [public/index.php](public/index.php)
 - **Database:** MySQL / MariaDB via PDO
 - **PHP packages ([composer.json](composer.json)):**
   - `phpmailer/phpmailer` — outbound email (OTP codes, notifications)
@@ -20,7 +22,7 @@ Built as a plain PHP MVC application (no framework) on top of PDO/MySQL, with Co
 
 ## Requirements
 
-- PHP 8.1+ with the `pdo_mysql`, `mbstring`, `fileinfo`, and `openssl` extensions (checked at boot in [config/config.php](config/config.php))
+- PHP 8.3, the version XAMPP ships (developed and tested on 8.3.30), with the `pdo_mysql`, `mbstring`, `fileinfo`, and `openssl` extensions (checked at boot in [config/config.php](config/config.php)). The oldest version that runs the app is 8.1 (it uses `never` and `readonly`); the tests need 8.2 (PHPUnit 11).
 - MySQL/MariaDB
 - Composer
 - Node.js/npm (only needed if you want to manage the front-end packages in `node_modules`; they are already checked into the repo)
@@ -30,21 +32,20 @@ Built as a plain PHP MVC application (no framework) on top of PDO/MySQL, with Co
 
 ```
 app/
-  controllers/   AuthController (A1), ApplicantController (A2–A9),
-                 AdminController (router + dashboard, programs, users, settings, audit),
-                 ScreeningController (B2), InterviewController (B3–B5),
-                 FundsController (B6–B10), ReportController (reports + analytics),
-                 CalendarController (admin calendar + its JSON feed)
-  models/        Analytics, Applicant, Application, Budget, Document, Interview, Program,
-                 Renewal, Report, Scholar, Term, TermSchedule
+  controllers/   one per part of the process, e.g. AuthController (A1), ApplicationFormController (A2/A3),
+                 ScreeningController (B2), InterviewController (B3–B5), FundsController (B6–B10);
+                 AdminController and ApplicantController hold the route tables
+  models/        the data and the rules (Application, Interview, Budget, Term, Analytics*, …)
   views/         admin/, applicant/, auth/, errors/, layouts/
+                 (the full list, and which class handles what: docs/CODE_ORGANISATION.md)
 bin/             send_reminders.php (interview and claim/renewal deadline reminders, command line only)
 config/          config.php, constants.php (statuses, rubric, document types), database.php
 core/            Auth, AuditLog, Helpers, Notification, Otp, Validator
 database/        sk_scholarship.sql (schema + sample data), schema.sql (schema + reference lists), migrations/
-docs/            PROCESS.md, CHANGE_PLAN.md … CHANGE_PLAN_3.md, TEST_CHECKLIST.md … TEST_CHECKLIST_4.md
-public/          index.php (front controller), assets/
+docs/            PROCESS.md, CODE_ORGANISATION.md, REFACTOR_PLAN.md, CHANGE_PLAN*.md, TEST_CHECKLIST*.md
+public/          index.php (front controller), assets/ (css, js/pages/*.js per page, js/application/*.js)
 storage/         private documents (documents/, term-documents/) + logs, outside the web root
+tests/           PHPUnit tests and their separate test database (see tests/README.md)
 ```
 
 Requests go through a single front controller, [public/index.php](public/index.php), with a `?r=` parameter (e.g. `/?r=admin/dashboard`). `AdminController` holds the list of admin routes; any route not in that list returns 404.
@@ -83,8 +84,7 @@ Requests go through a single front controller, [public/index.php](public/index.p
 
    **Upgrading an existing database?** Don't re-import. **Back up first**, then run the files in [database/migrations/](database/migrations/) you haven't applied yet, oldest first. Each is meant to be run once. `2026_09_28_restructure.sql` maps the old data to the new process and then drops what's no longer used — read its header before running it. After `2026_09_30_scheduling_and_docs.sql`, scholars can't upload claim or renewal documents until you create a window under **Claim schedule** / **Renewal schedule**. The `2026_10_01_*.sql` files (notifications digest, slot requests and holidays, data retention, profile sex, staff roles) are independent of each other.
    ```bash
-   mysqldump -u root sk_scholarship > C:
-mpp\sk-scholarship-backups\backup_YYYY-MM-DD.sql   # outside the project
+   mysqldump -u root sk_scholarship > C:\xampp\sk-scholarship-backups\backup_YYYY-MM-DD.sql   # outside the project
    mysql -u root -p sk_scholarship < database/migrations/2026_09_27_add_education_general_average.sql
    ```
 
@@ -147,8 +147,7 @@ You can also run it by hand: `C:\xampp\php\php.exe C:\xampp\htdocs\sk-scholarshi
 
 ## Security notes
 
-- **Keep database dumps and backups outside the project folder** (e.g. `C:
-mpp\sk-scholarship-backups\`). They contain applicants' personal data and password hashes. `.gitignore` refuses `backup_*.sql` and any `.sql` in the project root, but the safe place is outside `htdocs` entirely.
+- **Keep database dumps and backups outside the project folder** (e.g. `C:\xampp\sk-scholarship-backups\`). They contain applicants' personal data and password hashes. `.gitignore` refuses `backup_*.sql` and any `.sql` in the project root, but the safe place is outside `htdocs` entirely.
 - **Rotate any credential that was ever committed, pasted or shared** (in chat, e-mail, screenshots or a backup copied to someone): change the MySQL password (`DB_PASS`) and generate a new Gmail App Password (`MAIL_PASS`), then update `.env`. `.env` has never been committed to this repository, but a credential shown anywhere else should still be treated as exposed.
 - Staff roles: `AdminController::ROUTES` lists the roles allowed on every admin route (default deny); give staff the narrowest role that fits.
 
