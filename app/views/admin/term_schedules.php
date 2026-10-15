@@ -1,7 +1,7 @@
 <?php
 // Claim (release) or renewal submission windows. Expects $purpose, $schedules, $needed, $missed, $programs, $years.
 $isRelease = $purpose === 'release';
-$stateColor = ['open' => 'success', 'not_open_yet' => 'info', 'deadline_passed' => 'warning', 'closed' => 'secondary', 'cancelled' => 'danger', 'not_created' => 'secondary'];
+$stateColor = TermSchedule::STATE_COLORS;
 $dt = static fn(?string $v): string => $v ? fmt_datetime($v) : '—';
 $local = static fn(?string $v): string => $v ? date('Y-m-d\TH:i', strtotime($v)) : '';
 $editId = get_int('edit');   // opened straight away by pages/term-schedules.js

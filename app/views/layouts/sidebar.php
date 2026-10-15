@@ -51,6 +51,7 @@ $item = function (string $route, string $icon, string $label) use ($current) {
       $item('admin/interviews', 'bi-calendar-plus', 'Interviews');
       $item('admin/decisions', 'bi-clipboard-check', 'Decisions');
       $section('Releasing of budget');
+      $item('admin/academic-years', 'bi-calendar2-range', 'Academic years');
       $item('admin/budget', 'bi-wallet2', 'Budget');
       $item('admin/release-schedule', 'bi-calendar-check', 'Claim schedule');
       $item('admin/claims', 'bi-file-earmark-check', 'Claims');

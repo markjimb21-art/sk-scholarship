@@ -148,7 +148,7 @@ final class Budget
 
         $program = Program::find($programId);
         if (!$program) return ['ok' => false, 'error' => 'Choose a scholarship program.'];
-        if (!in_array($year, self::academicYears(), true)) return ['ok' => false, 'error' => 'Choose an academic year from the list.'];
+        if ($err = AcademicYear::missingError($year)) return ['ok' => false, 'error' => $err];
         if (!is_numeric($total) || (float)$total <= 0) return ['ok' => false, 'error' => 'Total budget must be a number greater than 0.'];
         $released = self::actualReleased($programId, $year);
         if ((float)$total < $released) {

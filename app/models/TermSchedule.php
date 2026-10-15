@@ -25,6 +25,11 @@ final class TermSchedule
         'closed'          => 'Closed',
         'cancelled'       => 'Cancelled',
     ];
+    /** Bootstrap colour per window state (window pages and the Academic years page). */
+    public const STATE_COLORS = [
+        'open' => 'success', 'not_open_yet' => 'info', 'deadline_passed' => 'warning', 'closed' => 'secondary',
+        'cancelled' => 'danger', 'not_created' => 'secondary',
+    ];
 
     public static function find(int $id): ?array
     {

@@ -16,6 +16,7 @@ require_once BASE_PATH . '/app/models/Scholar.php';
 require_once BASE_PATH . '/app/models/Term.php';
 require_once BASE_PATH . '/app/models/TermDocument.php';
 require_once BASE_PATH . '/app/models/Renewal.php';
+require_once BASE_PATH . '/app/models/AcademicYear.php';
 require_once BASE_PATH . '/app/models/Budget.php';
 require_once BASE_PATH . '/app/models/TermSchedule.php';
 require_once BASE_PATH . '/app/models/WorkQueues.php';
@@ -86,6 +87,11 @@ final class AdminController
         // B5 decisions
         'decisions'                 => ['InterviewController', 'decisions', self::REVIEW],
         'decisions/decide'          => ['InterviewController', 'decide', self::REVIEW],
+        // Academic years (before B6: budgets, windows and new scholars use them)
+        'academic-years'            => ['AcademicYearController', 'index', self::FUNDS],
+        'academic-years-save'       => ['AcademicYearController', 'save', self::FUNDS],
+        'academic-years-set-current' => ['AcademicYearController', 'setCurrent', self::FUNDS],
+        'academic-years-delete'     => ['AcademicYearController', 'delete', self::FUNDS],
         // B6 budget
         'budget'                    => ['FundsController', 'budget', self::FUNDS],
         'budget-save'               => ['FundsController', 'budgetSave', self::FUNDS],

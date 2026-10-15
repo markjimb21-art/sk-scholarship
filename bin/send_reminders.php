@@ -33,6 +33,7 @@ require_once __DIR__ . '/../core/Notification.php';
 require_once __DIR__ . '/../app/models/Interview.php';
 require_once __DIR__ . '/../app/models/InterviewAssignment.php';
 require_once __DIR__ . '/../app/models/Program.php';
+require_once __DIR__ . '/../app/models/AcademicYear.php';
 require_once __DIR__ . '/../app/models/Budget.php';
 require_once __DIR__ . '/../app/models/Term.php';
 require_once __DIR__ . '/../app/models/TermSchedule.php';

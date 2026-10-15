@@ -16,12 +16,23 @@ final class Program
         )->fetchAll();
     }
 
-    /** id + name + A.Y. for program pickers, newest first. */
+    /**
+     * Programs for pickers, newest first: id, program_name, application dates and 'label' — the name, plus the
+     * application dates when two programs share a name (so they can be told apart).
+     */
     public static function options(): array
     {
-        return Database::conn()->query(
-            "SELECT id, program_name, academic_year FROM scholarship_programs ORDER BY application_start DESC, id DESC"
+        $rows = Database::conn()->query(
+            "SELECT id, program_name, academic_year, application_start, application_end FROM scholarship_programs ORDER BY application_start DESC, id DESC"
         )->fetchAll();
+        $names = array_count_values(array_column($rows, 'program_name'));
+        foreach ($rows as &$r) {
+            $r['label'] = $names[$r['program_name']] > 1
+                ? $r['program_name'] . ' · ' . fmt_date($r['application_start']) . ' – ' . fmt_date($r['application_end'])
+                : $r['program_name'];
+        }
+        unset($r);
+        return $rows;
     }
 
     public static function find(int $id): ?array
