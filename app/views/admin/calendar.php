@@ -10,9 +10,13 @@
   /* Bootstrap styles every <a>; FullCalendar's day numbers and weekday headers are links. */
   .fc a.fc-daygrid-day-number, .fc a.fc-col-header-cell-cushion { color: inherit; text-decoration: none; }
   /* Every event is ONE line (full text in the hover tooltip), so a busy week never makes its row taller than the others. */
-  .fc .fc-daygrid-block-event .fc-event-main-frame { flex-wrap: nowrap; min-width: 0; }
-  .fc .fc-daygrid-event .fc-event-time { white-space: nowrap; flex: none; }
-  .fc .fc-daygrid-event .fc-event-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 auto; }
+  /* The title gives up its space first; the time is cut only when even it doesn't fit (narrow cell at A++). Nothing leaves its day cell. */
+  .fc .fc-daygrid-block-event .fc-event-main-frame { flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+  .fc .fc-daygrid-event .fc-event-time { white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .fc .fc-daygrid-event .fc-event-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1 1 0; }
+  /* Toolbar wraps instead of overflowing when the text is larger or the screen narrower. */
+  .fc .fc-header-toolbar.fc-toolbar { flex-wrap: wrap; gap: .5rem; }
+  .fc .fc-toolbar-title { font-size: 1.5rem; }
   .fc .fc-daygrid-event { font-size: .875rem; line-height: 1.3; }
   .fc .fc-daygrid-more-link { font-size: .875rem; font-weight: 700; }
   .fc .fc-button { min-height: var(--target-min); font-weight: 700; }

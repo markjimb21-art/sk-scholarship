@@ -13,7 +13,9 @@
     var select = document.getElementById('calProgram'), listEl = document.getElementById('calList');
     var selectedId = null;
     var mounted = {};   // event id -> Set of rendered elements
-    var MONTH_HEIGHT = 640;
+    // Month height in rem (36rem = 648px at A), so it grows with A+ / A++ and the grid never needs its own scrollbar.
+    function monthHeight() { return Math.round(36 * parseFloat(getComputedStyle(document.documentElement).fontSize)); }
+    function viewHeight(type) { return type === 'dayGridMonth' ? monthHeight() : 'auto'; }
 
     var calendar = new FullCalendar.Calendar(calEl, {
       initialView: 'dayGridMonth',
@@ -21,13 +23,18 @@
       buttonText: { today: 'Today', month: 'Month', week: 'Week' },
       eventDisplay: 'block',
       displayEventEnd: true,
+      eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short' },   // 3:47pm
+      defaultRangeSeparator: '-',                                                    // 3:47pm-6:47pm
+      // A deadline has no end, so FullCalendar gives it 1 hour; at 11:06pm that would spill into the next day.
+      // Only an event that runs past 9am the next day is drawn on that day too.
+      nextDayThreshold: '09:00:00',
       // Month: fixed overall height; a day shows as many events as fit its row and puts the rest behind "+N more", so every week row stays the same height.
       // Week is a single row, so it keeps all its events and grows to fit them (see datesSet).
-      height: MONTH_HEIGHT,
+      height: monthHeight(),
       dayMaxEvents: true,
       views: { dayGridWeek: { dayMaxEvents: false } },
       datesSet: function (info) {
-        var h = info.view.type === 'dayGridMonth' ? MONTH_HEIGHT : 'auto';
+        var h = viewHeight(info.view.type);
         if (calendar.getOption('height') !== h) calendar.setOption('height', h);
       },
       events: { url: calEl.dataset.feedUrl, extraParams: function () { return { program_id: select.value }; } },
@@ -46,6 +53,12 @@
       eventClick: function (info) { info.jsEvent.preventDefault(); select_(info.event.id, 'calendar'); }
     });
     calendar.render();
+
+    // A / A+ / A++ (ui.js) changes the root font size without a window resize: re-measure the grid.
+    new MutationObserver(function () {
+      calendar.setOption('height', viewHeight(calendar.view.type));
+      calendar.updateSize();
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-text-size'] });
 
     select.addEventListener('change', function () {
       var u = new URL(window.location.href);
