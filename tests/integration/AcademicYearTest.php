@@ -97,4 +97,16 @@ final class AcademicYearTest extends DatabaseTestCase
         $this->assertNotNull($byProgram[1]['windows']['release']['2nd Semester'], 'seed: the claim window of the 2nd semester');
         $this->assertNull($byProgram[2]['windows']['release']['1st Semester']);
     }
+
+    public function testARenewalIntoAYearThatDoesNotExistAsksForTheYearFirst(): void
+    {
+        // Scott's 2nd semester (2026-2027) released: he renews into 2027-2028 1st Semester, which the seed doesn't have.
+        Database::conn()->exec("UPDATE scholar_terms SET claim_status = 'Released' WHERE id = 2");
+        $need = array_values(array_filter(TermSchedule::needed('renewal'), static fn($n) => $n['academic_year'] === '2027-2028'));
+        $this->assertCount(1, $need);
+        $this->assertFalse($need[0]['year_exists']);
+        AcademicYear::create('2027-2028', false, false, 1);
+        $need = array_values(array_filter(TermSchedule::needed('renewal'), static fn($n) => $n['academic_year'] === '2027-2028'));
+        $this->assertTrue($need[0]['year_exists']);
+    }
 }

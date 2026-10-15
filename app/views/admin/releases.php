@@ -41,12 +41,12 @@
   <form method="GET" action="<?= url('admin/releases') ?>" class="d-flex gap-2 align-items-end flex-wrap">
     <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm">
       <option value="">All programs</option>
-      <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>" <?= $filters['program_id'] === (string)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?></option><?php endforeach; ?>
+      <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>" <?= $filters['program_id'] === (string)$p['id'] ? 'selected' : '' ?>><?= e($p['label']) ?></option><?php endforeach; ?>
     </select></div>
     <div><label class="form-label" for="f_academic_year">Academic year</label><select id="f_academic_year" name="academic_year" class="form-select form-select-sm">
       <option value="">All years</option>
       <?php foreach ($years as $y): ?><option value="<?= e($y) ?>" <?= $filters['academic_year'] === $y ? 'selected' : '' ?>><?= e($y) ?></option><?php endforeach; ?>
-    </select></div>
+    </select><div><?php require VIEW_PATH . '/admin/_new_year_link.php'; ?></div></div>
     <button class="btn btn-sm btn-outline-primary">Filter</button>
   </form>
 </div>

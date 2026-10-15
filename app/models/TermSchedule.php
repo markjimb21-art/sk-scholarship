@@ -195,7 +195,7 @@ final class TermSchedule
     }
 
     /**
-     * Semesters that need a window and don't have one yet: [['program_id','program_name','academic_year','semester','count']].
+     * Semesters that need a window and don't have one yet: [['program_id','program_name','academic_year','semester','n','year_exists']].
      *   release: Active scholars' semesters still Waiting for Requirements / Resubmit;
      *   renewal: the semester after an Active scholar's current, Released semester with no renewal request yet.
      */
@@ -231,8 +231,12 @@ final class TermSchedule
             }
             $need = array_values($grouped);
         }
-        return array_values(array_filter($need, static fn($n) =>
+        $need = array_values(array_filter($need, static fn($n) =>
             !self::forSemester((int)$n['program_id'], $n['academic_year'], $n['semester'], $purpose)));
+        // A renewal can be into a year that hasn't been created yet: the page then links to Academic years first.
+        foreach ($need as &$n) $n['year_exists'] = AcademicYear::exists($n['academic_year']);
+        unset($n);
+        return $need;
     }
 
     /** Accepts the datetime-local format (Y-m-d\TH:i) and Y-m-d H:i[:s]. Returns 'Y-m-d H:i:s' or null. */

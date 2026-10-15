@@ -16,7 +16,7 @@ $pct = static fn($r) => $r === null ? 'no data' : number_format($r * 100, 1) . '
     <?php if ($data): ?>
     <div><label class="form-label" for="f_academic_year">Academic year</label><select id="f_academic_year" name="academic_year" class="form-select form-select-sm" data-autosubmit title="Academic year for the budget analysis">
       <?php foreach ($years as $y): ?><option value="<?= e($y) ?>" <?= $data['ay'] === $y ? 'selected' : '' ?>>A.Y. <?= e($y) ?></option><?php endforeach; ?>
-    </select></div>
+    </select><div><?php require VIEW_PATH . '/admin/_new_year_link.php'; ?></div></div>
     <?php endif; ?>
   </form>
   <?php endif; ?>

@@ -2,10 +2,14 @@
  * Claim / renewal schedule page: the New / Edit window modal.
  *  - data-schedule-modal: empty for "New window", the window as JSON for Edit;
  *  - data-schedule-prefill: "Create window" for a semester that has none yet (program, year and semester filled in);
- *  - data-open-edit on the modal: the window to open straight away (?edit=<id>, e.g. from a notification link).
+ *  - data-open-edit on the modal: the window to open straight away (?edit=<id>, e.g. from a notification link);
+ *  - data-open-prefill on the modal: New window opened straight away, pre-filled (from the Academic years page);
+ *  - data-current-year on the modal: the year a New window starts with.
  */
 (function () {
   'use strict';
+
+  var modal = document.getElementById('scheduleModal');
 
   function openScheduleModal(s, prefill) {
     var edit = !!s, v = function (id, val) { document.getElementById(id).value = val == null ? '' : val; };
@@ -24,6 +28,7 @@
     }
     v('schProgram', p.program_id || '');
     if (p.academic_year) v('schYear', p.academic_year);
+    else if (!edit && modal.dataset.currentYear) v('schYear', modal.dataset.currentYear);
     if (p.semester) v('schSemester', p.semester);
     v('schOpens', edit ? s.opens_at : '');
     v('schDeadline', edit ? s.submission_deadline : '');
@@ -40,7 +45,12 @@
     btn.addEventListener('click', function () { openScheduleModal(null, JSON.parse(btn.dataset.schedulePrefill)); });
   });
 
-  var editId = Number(document.getElementById('scheduleModal').dataset.openEdit);
+  if (modal.dataset.openPrefill) {
+    openScheduleModal(null, JSON.parse(modal.dataset.openPrefill));
+    bootstrap.Modal.getOrCreateInstance(modal).show();
+  }
+
+  var editId = Number(modal.dataset.openEdit);
   if (editId) {
     document.addEventListener('DOMContentLoaded', function () {
       var b = document.querySelector('[data-edit-id="' + editId + '"]');

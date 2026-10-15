@@ -49,7 +49,14 @@
   </ul>
 </div></div>
 
-<div class="modal fade" id="budgetModal" tabindex="-1">
+<?php
+// Add defaults to the current academic year. ?new=1&program_id=&academic_year= (from Academic years) opens Add pre-filled.
+$openNew = get_str('new') === '1'
+    ? ['program_id' => get_int('program_id'), 'academic_year' => in_array(get_str('academic_year'), $years, true) ? get_str('academic_year') : '']
+    : null;
+?>
+<div class="modal fade" id="budgetModal" tabindex="-1" data-current-year="<?= e(AcademicYear::currentLabel() ?? '') ?>"
+     data-open-new="<?= $openNew ? e(js_json($openNew)) : '' ?>">
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/budget-save') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="id" id="budgetId">
@@ -72,7 +79,7 @@
             <option value="">Choose…</option>
             <?php foreach ($years as $y): ?><option value="<?= e($y) ?>"><?= e($y) ?></option><?php endforeach; ?>
           </select>
-          <div class="form-text">Years of programs and of scholars’ semesters (scholars renew into later years).</div>
+          <div class="form-text">From Releasing of budget → Academic years. <?php require VIEW_PATH . '/admin/_new_year_link.php'; ?></div>
         </div>
         <div class="mb-1">
           <label class="form-label">Total budget (₱)</label>

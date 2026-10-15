@@ -1,14 +1,18 @@
 /**
  * Budget page: the Add / Edit modal. Each Add/Edit button carries data-budget-modal (empty for Add, the budget row as
  * JSON for Edit). The suggested total comes from the server (Budget::suggestedTotal) on each program <option>.
+ * Add defaults to the current academic year (data-current-year); data-open-new (?new=1 from the Academic years page)
+ * opens Add straight away with that program and year.
  */
 (function () {
   'use strict';
 
-  function openBudgetModal(b) {
+  var modal = document.getElementById('budgetModal');
+  function openBudgetModal(b, prefill) {
+    var p = prefill || {};
     document.getElementById('budgetId').value = b ? b.id : '';
-    document.getElementById('budgetProgram').value = b ? b.program_id : '';
-    document.getElementById('budgetYear').value = b ? b.academic_year : '';
+    document.getElementById('budgetProgram').value = b ? b.program_id : (p.program_id || '');
+    document.getElementById('budgetYear').value = b ? b.academic_year : (p.academic_year || modal.dataset.currentYear || '');
     document.getElementById('budgetTotal').value = b ? b.total_budget : '';
     document.getElementById('budgetTitle').textContent = b ? 'Edit budget' : 'Add budget';
     showBudgetSuggestion();
@@ -32,4 +36,9 @@
   document.getElementById('budgetProgram').addEventListener('change', function () {
     showBudgetSuggestion();
   });
+
+  if (modal.dataset.openNew) {
+    openBudgetModal(null, JSON.parse(modal.dataset.openNew));
+    bootstrap.Modal.getOrCreateInstance(modal).show();
+  }
 })();
