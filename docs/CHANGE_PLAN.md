@@ -26,7 +26,7 @@ migrations, plus read-only queries against the local `sk_scholarship` database (
 |---|---|---|
 | D1 | **Staff and official accounts** (see §6). Convert to admin, deactivate, or delete? | Deactivate both, then drop the `staff`/`official` roles; I won't delete accounts unless you say so |
 | D2 | May a **Returned** applicant resubmit after the program's end date? | Yes — the original submission was on time and the admin asked for the fix |
-| D3 | **Which semester opens on approval?** B1 has no semester field. | Always the 1st Semester of the program's academic year; drop `scholarship_programs.semester` |
+| D3 | **Which semester opens on approval?** B1 has no semester field. | Always the 1st Semester of the program's academic year; drop `scholarship_programs.semester`. **Changed by CHANGE_PLAN_4:** programs have no academic year; it is the 1st Semester of the *current* academic year. |
 | D4 | Live data: scholars #1 and #2 exist, but their applications are "For Interview" and "Interview Completed", not Approved. | Set any application that has a scholar record to **Approved** |
 | D5 | Extra deletions beyond your list (marked ★ in §3): civil status, citizenship, the stored `age` and duplicate `email` in personal info, `combined_income`, the schedule title / interviewer / remarks, assignment instructions, `applicants.application_code`, the legacy password-reset **link**, release "recipient confirmed" | Delete all ★ items |
 | D6 | `schools` and `courses` tables are used — only as autocomplete suggestions in Step 2. | Keep them (they keep school and course names consistent in reports) |
