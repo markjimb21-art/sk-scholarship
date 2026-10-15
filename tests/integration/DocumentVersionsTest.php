@@ -9,12 +9,12 @@ final class DocumentVersionsTest extends DatabaseTestCase
 {
     public function testCurrentIsTheNewestCurrentVersionAcrossBothTables(): void
     {
-        $sid = Document::current(8, 'School ID');
+        $sid = Document::current(8, 'School ID')[''];   // seeded before sides existed: one file
         $this->assertSame('term_documents', $sid['source_table']);
         $this->assertSame('school-id-3.pdf', $sid['original_filename']);
 
-        $this->assertSame('enrollment.pdf', Document::current(8, 'Enrollment Form')['original_filename']);
-        $residency = Document::current(8, 'Certificate of Residency');
+        $this->assertSame('enrollment.pdf', Document::current(8, 'Enrollment Form')['']['original_filename']);
+        $residency = Document::current(8, 'Certificate of Residency')[''];
         $this->assertSame('documents', $residency['source_table']);
         $this->assertSame('1.pdf', $residency['original_filename']);
     }
@@ -27,7 +27,7 @@ final class DocumentVersionsTest extends DatabaseTestCase
 
     public function testEmptyPlaceholdersAreNotDocuments(): void
     {
-        $this->assertNull(Document::current(1, 'School ID'), 'the Draft only has empty placeholder rows');
+        $this->assertSame([], Document::current(1, 'School ID'), 'the Draft only has empty placeholder rows');
         $this->assertSame(DOCUMENT_TYPES, Document::missingTypes(1));
         $this->assertSame([], Document::missingTypes(2));
     }

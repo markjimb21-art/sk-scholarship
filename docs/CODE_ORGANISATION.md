@@ -44,7 +44,7 @@ Every form that changes data is sent as a **POST** and its CSRF token is checked
 | `app/views/` | Templates: `admin/`, `applicant/` (the application form is split into `form/_personal.php` … `_review.php`), `auth/`, `layouts/`, `errors/` |
 | `bin/` | `send_reminders.php` (scheduled task: interview and deadline reminders, daily digest), `smoke_test.php` (§8) |
 | `database/` | `schema.sql` and migrations |
-| `storage/` | Uploaded documents, **outside the web root**: they can only be reached through a controller that checks who is asking |
+| `storage/` | Uploaded documents and session files (`storage/sessions`, this app's own, so other apps on localhost can't touch them), **outside the web root**: they can only be reached through a controller that checks who is asking |
 | `tests/` | Automated tests and their separate test database (§8) |
 | `docs/` | `PROCESS.md` (the scholarship process, step by step), the change plans, test checklists |
 
@@ -112,7 +112,7 @@ All 29 tables are created by `database/schema.sql`. Many classes read a table; t
 | `education_records` | Form section II: school, year level, course, major, GWA, other scholarships | `Applicant` |
 | `family_background` | Form section III: parents, incomes, family size | `Applicant` |
 | `applications` | One application per applicant per program: status, return remarks and flagged items, decision, dates | `Application` |
-| `documents` | The five application documents, every uploaded version (current or not, status, reason if invalid) | `Document` |
+| `documents` | The five application documents, every uploaded version (current or not, status, reason if invalid, front/back side) | `Document` |
 | `interview_schedules` | Interview batches: date, time, venue, capacity, Open/Cancelled | `Interview` |
 | `interview_assignments` | An application on a schedule: attendance (Scheduled / Attended / No-show), reschedule count, reminder sent | `InterviewAssignment` |
 | `interview_evaluations` | Rubric scores and total of each interviewed application | `InterviewScore` |
@@ -121,7 +121,7 @@ All 29 tables are created by `database/schema.sql`. Many classes read a table; t
 | `record_history` | Old and new value of every changed applicant field | `RecordHistory` |
 | `scholars` | Approved applicants: scholar code, program, Active or Ended (with the reason) | `Scholar` |
 | `scholar_terms` | One row per scholar per semester, with its claim status | `Term` |
-| `term_documents` | Claim and renewal documents of a semester, every version | `TermDocument` |
+| `term_documents` | Claim and renewal documents of a semester, every version (front/back side of the School ID) | `TermDocument` |
 | `term_schedules` | Claim and renewal submission windows per program, academic year and semester | `TermSchedule` |
 | `renewal_requests` | A scholar's renewal from one semester into the next | `Renewal` |
 | `scholarship_releases` | Each cash release: amount, date, method, reference, staff member | `Term` |

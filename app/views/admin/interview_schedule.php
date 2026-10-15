@@ -1,7 +1,8 @@
 <?php
 $cancelled = $schedule['status'] === 'Cancelled';
 $started = $schedule['interview_date'] <= date('Y-m-d');   // attendance and scores only from the interview date
-$future = $schedule['interview_date'] >= date('Y-m-d');    // assigning only for today or later
+$closed = !$cancelled && Interview::isClosed($schedule);    // closed by the admin, or its end time has passed: no more assigning
+$timePassed = $closed && $schedule['status'] !== 'Closed';
 $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] !== 'Scheduled');
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
@@ -9,7 +10,8 @@ $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] 
     <a href="<?= url('admin/interviews&program_id=' . (int)$schedule['program_id']) ?>" class="small text-muted text-decoration-none"><i class="bi bi-arrow-left"></i> All schedules</a>
     <h4 class="fw-bold mb-0 mt-1"><?= e(Interview::describe($schedule)) ?></h4>
     <p class="text-muted small mb-0"><?= e($schedule['program_name']) ?> · <?= (int)$schedule['assigned_count'] ?> / <?= (int)$schedule['max_slots'] ?> assigned
-      <?= $cancelled ? '<span class="badge bg-danger ms-1">Cancelled</span>' : '' ?></p>
+      <?php $shown = Interview::displayStatus($schedule); ?><span class="badge bg-<?= e(Interview::STATUS_COLORS[$shown]) ?> ms-1"><?= e($shown) ?></span>
+      <?= $timePassed ? '<span class="small text-muted ms-1">— closed by itself: its time has passed</span>' : '' ?></p>
   </div>
   <?php if (!$cancelled): ?>
   <div class="d-flex gap-2">
@@ -72,7 +74,10 @@ $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] 
   </div>
 </div>
 
-<?php if (!$cancelled && $future): ?>
+<?php if ($closed): ?>
+<div class="alert alert-secondary small">This schedule is <strong>closed</strong><?= $timePassed ? ' (its time has passed)' : '' ?>, so nobody can be assigned to it. Attendance and scores can still be recorded.
+  <?= $timePassed ? '' : 'To assign applicants again, set its status to Open in Edit.' ?></div>
+<?php elseif (!$cancelled): ?>
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-white d-flex justify-content-between align-items-center">
     <h6 class="mb-0">Assign Qualified applicants</h6>
@@ -119,6 +124,11 @@ $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] 
         </div>
         <div class="mb-2"><label class="form-label small">Venue</label><input name="venue" class="form-control" value="<?= e($schedule['venue']) ?>" required></div>
         <div class="mb-2"><label class="form-label small">Capacity</label><input type="number" name="max_slots" class="form-control" min="<?= max(1, (int)$schedule['assigned_count']) ?>" value="<?= (int)$schedule['max_slots'] ?>" required></div>
+        <div class="mb-2"><label class="form-label small" for="schedStatus">Status</label>
+          <select name="status" id="schedStatus" class="form-select">
+            <?php foreach (['Open', 'Closed'] as $st): ?><option <?= $schedule['status'] === $st ? 'selected' : '' ?>><?= $st ?></option><?php endforeach; ?>
+          </select>
+          <div class="form-text">Closed: nobody more can be assigned; attendance and scores can still be recorded. A schedule also closes by itself once its end time has passed. To cancel it, use Cancel schedule.</div></div>
         <div class="form-text">Changing the date, time or venue notifies everyone still waiting for this interview.</div>
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>

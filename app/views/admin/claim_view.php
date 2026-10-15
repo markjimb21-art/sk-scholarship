@@ -18,7 +18,7 @@ $minGwa = $term['min_gpa'] !== null ? (float)$term['min_gpa'] : 0.0;
       <?php if ($canDecide): ?>
         <form method="POST" action="<?= url('admin/claims/decide') ?>" class="mb-3">
           <?= csrf_field() ?><input type="hidden" name="term_id" value="<?= (int)$term['id'] ?>"><input type="hidden" name="decision" value="verify">
-          <label class="form-label">GWA shown on the Grades <span class="text-danger">*</span></label>
+          <label class="form-label">GWA shown on the college grades <span class="text-danger">*</span></label>
           <input type="number" name="gwa" id="gwaInput" class="form-control mb-1" min="1" max="5" step="0.01" required data-min-gwa="<?= e(js_json($minGwa)) ?>">
           <div class="form-text mb-2">Program minimum: <?= $minGwa > 0 ? e(number_format($minGwa, 2)) . ' or better (1.00 is highest)' : 'none' ?>.</div>
           <div id="gwaWarning" class="alert alert-warning py-2 small d-none">This GWA is below the program minimum. You decide — nothing happens automatically.</div>
@@ -56,7 +56,7 @@ $minGwa = $term['min_gpa'] !== null ? (float)$term['min_gpa'] : 0.0;
       <div class="modal-body">
         <p class="small mb-1">Documents to re-upload:</p>
         <?php foreach (TERM_DOCUMENT_TYPES['claim'] as $t): ?>
-          <div class="form-check"><input class="form-check-input" type="checkbox" name="types[]" value="<?= e($t) ?>" id="rt<?= md5($t) ?>" checked><label class="form-check-label" for="rt<?= md5($t) ?>"><?= e($t) ?></label></div>
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="types[]" value="<?= e($t) ?>" id="rt<?= md5($t) ?>" checked><label class="form-check-label" for="rt<?= md5($t) ?>"><?= e(TermDocument::label($t)) ?></label></div>
         <?php endforeach; ?>
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="invalid" value="1" id="markInvalid">
           <label class="form-check-label" for="markInvalid">The file is invalid (wrong person or wrong document) — remove it. The record is kept, marked Invalid with your remarks.</label></div>

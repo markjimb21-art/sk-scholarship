@@ -94,56 +94,54 @@ $screening = Application::can('qualify', $app['status']);
 <div class="tab-content">
   <div class="tab-pane fade show active" id="tab-docs">
     <div class="row g-3">
-      <?php foreach ($app['documents'] as $d):
-        $has = $d['file_path'] !== '';
+      <?php
+      $docSets = Document::bySide($app['documents']);
+      foreach (DOCUMENT_TYPES as $type):
+        $set = $docSets[$type] ?? [];
         // School ID / Enrollment Form: show the applicant's CURRENT version (a later claim/renewal upload replaces this one).
-        $cur = $currentDocs[$d['document_type']] ?? null;
-        $isNewer = $cur && !($cur['source_table'] === 'documents' && (int)$cur['id'] === (int)$d['id']);
-        if ($isNewer) {
-            $has = true;
-            $src = $cur['admin_url'];
-            $shown = ['mime_type' => $cur['mime_type'], 'original_filename' => $cur['original_filename'], 'uploaded_at' => $cur['uploaded_at'], 'status' => $cur['status']];
-        } else {
-            $src = url('admin/documents/view&id=' . (int)$d['id']);
-            $shown = $d;
-        } ?>
+        $cur = $currentDocs[$type] ?? [];
+        $own = array_map(static fn($d) => 'documents#' . $d['id'], $set);
+        $isNewer = $cur && array_diff(array_map(static fn($c) => $c['source_table'] . '#' . $c['id'], $cur), $own);
+        $files = [];   // side key => row + its view URL and table
+        foreach ($isNewer ? $cur : $set as $k => $d) {
+            if (!$isNewer && $d['file_path'] === '') continue;   // empty placeholder of a Draft
+            $files[$k] = $d + ['src' => $isNewer ? $d['admin_url'] : url('admin/documents/view&id=' . (int)$d['id']), 'table' => $isNewer ? $d['source_table'] : 'documents'];
+        }
+        // Boxes shown: one file with the whole document if there is one; otherwise every side this document needs.
+        $needed = Document::sidesFor($type);
+        $keys = isset($files['']) ? [''] : ($needed === [null] && $files ? array_keys($files) : array_map([Document::class, 'sideKey'], $needed));
+        $valid = array_filter($files, static fn($f) => $f['status'] !== 'Invalid');
+        $complete = isset($valid['']) || ($valid && !array_diff($keys, array_keys($valid)));
+        [$badge, $color] = !$valid ? ['Missing', 'secondary'] : (!$complete ? ['Incomplete', 'warning']
+            : (!array_diff(array_column($valid, 'status'), ['Verified']) ? ['Verified', 'success']
+            : (in_array('Resubmit', array_column($valid, 'status'), true) ? ['Resubmit', 'info'] : ['Uploaded', 'info']))); ?>
         <div class="col-md-6 col-xl-4">
           <div class="card border-0 shadow-sm h-100"><div class="card-body">
             <div class="d-flex justify-content-between mb-2">
-              <strong><?= e($d['document_type']) ?></strong>
-              <span class="badge bg-<?= $has ? ($shown['status'] === 'Verified' ? 'success' : 'info') : 'secondary' ?>"><?= $has ? e($shown['status'] === 'Verified' ? 'Verified' : ($shown['status'] === 'Resubmit' ? 'Resubmit' : 'Uploaded')) : 'Missing' ?></span>
+              <strong><?= e($type) ?></strong>
+              <span class="badge bg-<?= $color ?>"><?= e($badge) ?></span>
             </div>
-            <?php if ($isNewer): ?>
+            <?php if ($isNewer): $c = reset($cur); ?>
               <div class="small mb-2"><span class="badge bg-primary">Current version</span>
-                updated during <?= e($cur['uploaded_during']) ?> · <?= e($cur['context']) ?>. The one from this application is in the document history.</div>
+                updated during <?= e($c['uploaded_during']) ?> · <?= e($c['context']) ?>. The one from this application is in the document history.</div>
             <?php endif; ?>
-            <?php if (!$isNewer && $d['status'] === 'Invalid'): $has = false; ?>
-              <div class="alert alert-danger py-2 small mb-0">Marked invalid<?= $d['invalidated_at'] ? ' ' . e(fmt_date($d['invalidated_at'])) : '' ?>: <?= e($d['invalid_reason']) ?>
-                <div class="text-muted">The file was removed; the record is kept (see the document history).</div></div>
-            <?php endif; ?>
-            <?php if ($has): ?>
-              <?php if (in_array($shown['mime_type'], ['image/jpeg', 'image/png'], true)): ?>
-                <a href="<?= e($src) ?>" target="_blank" rel="noopener">
-                  <img src="<?= e($src) ?>" class="img-fluid rounded border mb-2" style="max-height:180px" alt="<?= e($d['document_type']) ?>">
-                </a>
-              <?php endif; ?>
-              <div class="small">
-                <a href="<?= e($src) ?>" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Open</a> ·
-                <a href="<?= e($src . '&download=1') ?>"><i class="bi bi-download"></i> Download</a>
-                <div class="text-muted"><?= e($shown['original_filename']) ?> · <?= e(fmt_date($shown['uploaded_at'])) ?></div>
-              </div>
-              <?php $invTable = $isNewer ? $cur['source_table'] : 'documents'; $invId = $isNewer ? (int)$cur['id'] : (int)$d['id']; ?>
-              <details class="small mt-2">
-                <summary class="text-danger">Mark this file invalid…</summary>
-                <form method="POST" action="<?= url('admin/documents/invalidate') ?>" class="mt-1" data-confirm="Remove this file? The record is kept, marked Invalid with your reason.">
-                  <?= csrf_field() ?><input type="hidden" name="table" value="<?= e($invTable) ?>"><input type="hidden" name="id" value="<?= $invId ?>">
-                  <input type="hidden" name="back" value="<?= e('admin/application&id=' . (int)$app['id']) ?>">
-                  <label class="form-label" for="invReason<?= $invId ?>">Why is this file invalid?</label>
-                  <input name="reason" id="invReason<?= $invId ?>" class="form-control form-control-sm mb-1" required maxlength="500" placeholder="e.g. another person's ID">
-                  <button class="btn btn-sm btn-outline-danger">Mark invalid and remove the file</button>
-                </form>
-              </details>
-            <?php endif; ?>
+            <div class="row g-2">
+              <?php foreach ($keys as $k): $f = $files[$k] ?? null; ?>
+                <div class="<?= count($keys) > 1 ? 'col-6' : 'col-12' ?>">
+                  <?php if ($f && $f['status'] === 'Invalid'): ?>
+                    <?php if ($k !== ''): ?><div class="small fw-semibold text-muted"><?= e($k) ?></div><?php endif; ?>
+                    <div class="alert alert-danger py-2 small mb-0">Marked invalid<?= !empty($f['invalidated_at']) ? ' ' . e(fmt_date($f['invalidated_at'])) : '' ?>: <?= e($f['invalid_reason']) ?>
+                      <div class="text-muted">The file was removed; the record is kept (see the document history).</div></div>
+                  <?php elseif ($f): ?>
+                    <?php $src = $f['src']; $sideLabel = $k; $imgHeight = 180; $invalidTable = $f['table'];
+                      $invalidBack = 'admin/application&id=' . (int)$app['id']; require VIEW_PATH . '/admin/_document_file.php'; ?>
+                  <?php else: ?>
+                    <?php if ($k !== ''): ?><div class="small fw-semibold text-muted"><?= e($k) ?></div><?php endif; ?>
+                    <div class="small text-muted">Not uploaded.</div>
+                  <?php endif; ?>
+                </div>
+              <?php endforeach; ?>
+            </div>
           </div></div>
         </div>
       <?php endforeach; ?>

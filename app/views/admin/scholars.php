@@ -5,10 +5,10 @@
 
 <form method="GET" action="<?= url('admin/scholars') ?>" class="card border-0 shadow-sm mb-3">
   <div class="card-body row g-2 align-items-end">
-    <div class="col-md-5"><div><label class="form-label" for="f_q">Search</label><input id="f_q" name="q" class="form-control" placeholder="Name, e-mail or scholar ID" value="<?= e($filters['q']) ?>"></div></div>
-    <div class="col-md-2">
+    <div class="col-md-4"><div><label class="form-label" for="f_q">Search</label><input id="f_q" name="q" class="form-control" placeholder="Name, e-mail or scholar ID" value="<?= e($filters['q']) ?>"></div></div>
+    <div class="col-md-3">
       <div><label class="form-label" for="f_status">Status</label><select id="f_status" name="status" class="form-select">
-        <?php foreach (['Active' => 'Active', 'Ended' => 'Ended', 'all' => 'All'] as $v => $l): ?>
+        <?php foreach (Scholar::LIST_FILTERS as $v => $l): ?>
           <option value="<?= $v ?>" <?= $filters['status'] === $v ? 'selected' : '' ?>><?= $l ?></option>
         <?php endforeach; ?>
       </select></div>
@@ -35,7 +35,7 @@
             <td><small><?= e($r['program_name']) ?></small></td>
             <td><?= e($sem ?: '—') ?><?php if ($claim): ?><br><span class="badge bg-<?= e(CLAIM_STATUS_COLORS[$claim] ?? 'secondary') ?>"><?= e($claim) ?></span><?php endif; ?></td>
             <td><?= e(peso($r['total_released'])) ?></td>
-            <td><?= $r['status'] === 'Active' ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">Ended — ' . e($r['end_reason']) . '</span>' ?></td>
+            <td><?php [$label, $color] = Scholar::statusBadge($r); ?><span class="badge bg-<?= e($color) ?>"><?= e($label) ?></span></td>
             <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?= url('admin/scholar&id=' . (int)$r['id']) ?>">Open</a></td>
           </tr>
         <?php endforeach; ?>

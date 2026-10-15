@@ -52,7 +52,16 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
             <td><span class="badge bg-<?= e($stateColor[$s['state']]) ?>"><?= e(TermSchedule::STATE_LABELS[$s['state']]) ?></span></td>
             <td class="text-end">
               <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#scheduleModal" data-edit-id="<?= (int)$s['id'] ?>"
-                      data-schedule-modal="<?= e(js_json(array_intersect_key($s, array_flip(['id', 'program_id', 'program_name', 'academic_year', 'semester', 'status', 'notes', 'planned_date'])) + ['opens_at' => $local($s['opens_at']), 'submission_deadline' => $local($s['submission_deadline'])])) ?>"><i class="bi bi-pencil"></i></button>
+                      data-schedule-modal="<?= e(js_json(array_intersect_key($s, array_flip(['id', 'program_id', 'program_name', 'academic_year', 'semester', 'status', 'notes', 'planned_date', 'submitted_count'])) + ['opens_at' => $local($s['opens_at']), 'submission_deadline' => $local($s['submission_deadline'])])) ?>"
+                      aria-label="Edit window"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+              <?php if ((int)$s['submitted_count'] === 0): // nobody submitted under it yet (TermSchedule::delete) ?>
+                <form method="POST" action="<?= url('admin/term-schedule-delete') ?>" class="d-inline"
+                      data-confirm="<?= e('Delete the ' . strtolower(TermSchedule::TITLES[$purpose]) . ' window ' . $s['academic_year'] . ' ' . $s['semester'] . ' (' . $s['program_name'] . ')?'
+                          . ($s['status'] !== 'Cancelled' && (int)$s['pending_count'] > 0 ? ' The ' . (int)$s['pending_count'] . ' scholar(s) it applies to will be told it was cancelled.' : '')) ?>">
+                  <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="purpose" value="<?= e($purpose) ?>">
+                  <button class="btn btn-sm btn-outline-danger" aria-label="Delete window"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                </form>
+              <?php endif; ?>
             </td>
           </tr>
           <?php if ($s['notes']): ?><tr><td></td><td colspan="7" class="small text-muted border-top-0 pt-0"><?= e($s['notes']) ?></td></tr><?php endif; ?>
@@ -96,7 +105,8 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
           </div>
           <?php if (!$isRelease): ?><div class="form-text mb-2">The semester scholars are renewing <em>into</em> (the one after their current semester).</div><?php endif; ?>
         </div>
-        <div id="schFixedText" class="mb-2 fw-semibold d-none"></div>
+        <div id="schFixedText" class="mb-2 d-none"><div class="fw-semibold" id="schFixedName"></div>
+          <div class="form-text">Program and semester can't change: scholars already submitted under this window. Close or cancel it instead.</div></div>
         <div class="row g-2 mb-2">
           <div class="col-6"><label class="form-label">Opens</label><input type="datetime-local" name="opens_at" id="schOpens" class="form-control" required></div>
           <div class="col-6"><label class="form-label">Submission deadline</label><input type="datetime-local" name="submission_deadline" id="schDeadline" class="form-control" required></div>

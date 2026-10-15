@@ -1,45 +1,79 @@
 <?php
-/** One upload row for a claim or renewal document. */
-$docRow = static function (string $purpose, string $type, ?array $doc, bool $canEdit, int $termId): void { ?>
-  <div class="border rounded p-3 mb-2">
-    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-      <div>
-        <strong><?= e($type) ?></strong>
-        <?php if ($doc && $doc['status'] === 'Invalid'): ?>
-          <span class="badge bg-danger ms-1">Invalid — please upload again</span>
-          <div class="small text-danger"><?= e($doc['invalid_reason']) ?></div>
-        <?php elseif ($doc): ?>
-          <span class="badge bg-<?= e(TERM_DOC_STATUS_COLORS[$doc['status']]) ?> ms-1">
-            <?= e($doc['status'] === 'Resubmit' ? 'Please re-upload' : ($doc['status'] === 'Verified' ? 'Verified' : 'Uploaded')) ?>
-          </span>
-          <div class="small text-muted">
-            <a href="<?= url('applicant/term-documents/view&id=' . (int)$doc['id']) ?>" target="_blank" rel="noopener"><?= e($doc['original_filename']) ?></a>
-            · <?= e(fmt_datetime($doc['uploaded_at'])) ?>
-          </div>
-        <?php else: ?>
-          <span class="badge bg-secondary ms-1">Missing</span>
-        <?php endif; ?>
+/**
+ * One claim or renewal document: a box per side (School ID: Front and Back; the others: one file). A chosen file is
+ * saved at once by pages/term-documents.js (no Upload button); without JavaScript each box is a plain upload form.
+ * $set: side key => newest row (TermDocument::forTerm).
+ */
+$docCard = static function (string $purpose, string $type, array $set, bool $canEdit, int $termId): void {
+  $sides = Document::sidesFor($type);
+  $twoSided = count($sides) > 1;
+  $whole = $twoSided && isset($set['']) ? $set[''] : null;   // one file uploaded before sides existed: counts for both
+  $statusText = static fn(?array $d) => !$d ? 'Missing'
+      : ($d['status'] === 'Invalid' ? 'Invalid — upload again' : ($d['status'] === 'Resubmit' ? 'Please re-upload' : ($d['status'] === 'Verified' ? 'Verified' : 'Uploaded')));
+  $statusColor = static fn(?array $d) => $d ? TERM_DOC_STATUS_COLORS[$d['status']] : 'secondary'; ?>
+  <div class="border rounded p-3 mb-2" data-term-doc-card>
+    <strong><?= e(TermDocument::label($type)) ?></strong><?= $twoSided ? ' <span class="small text-muted">— a picture of the front and of the back</span>' : '' ?>
+    <?php if ($whole): ?>
+      <div class="small text-muted mt-1" data-term-doc-whole>
+        On file as one file with both sides: <a href="<?= url('applicant/term-documents/view&id=' . (int)$whole['id']) ?>" target="_blank" rel="noopener"><?= e($whole['original_filename']) ?></a>
+        <span class="badge bg-<?= e($statusColor($whole)) ?>"><?= e($statusText($whole)) ?></span>
+        <?= $canEdit ? '· Uploading a front or back picture replaces it.' : '' ?>
       </div>
-      <?php if ($canEdit): ?>
-        <form method="POST" action="<?= url("applicant/$purpose/upload") ?>" enctype="multipart/form-data" class="d-flex gap-2">
-          <?= csrf_field() ?>
-          <input type="hidden" name="term_id" value="<?= $termId ?>">
-          <input type="hidden" name="type" value="<?= e($type) ?>">
-          <input type="file" name="file" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png" required>
-          <button class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-upload"></i> <?= $doc ? 'Replace' : 'Upload' ?></button>
-        </form>
-      <?php endif; ?>
+    <?php endif; ?>
+    <div class="row g-2 mt-0">
+      <?php foreach ($sides as $side):
+        $d = $set[Document::sideKey($side)] ?? null;
+        $hasFile = $d && $d['status'] !== 'Invalid';
+        $isImage = $hasFile && in_array($d['mime_type'], ['image/jpeg', 'image/png'], true);
+        $viewUrl = $d ? url('applicant/term-documents/view&id=' . (int)$d['id']) : ''; ?>
+        <div class="<?= $twoSided ? 'col-sm-6' : 'col-12' ?>">
+          <form method="POST" action="<?= url("applicant/$purpose/upload") ?>" enctype="multipart/form-data" class="h-100"
+                data-term-doc-slot data-key="<?= e("$termId::$purpose::$type::" . ($side ?? '')) ?>">
+            <?= csrf_field() ?>
+            <input type="hidden" name="term_id" value="<?= $termId ?>">
+            <input type="hidden" name="type" value="<?= e($type) ?>">
+            <input type="hidden" name="side" value="<?= e($side ?? '') ?>">
+            <div class="d-flex justify-content-between align-items-center small mb-1">
+              <span class="fw-semibold"><?= $side ? e($side) : 'File' ?></span>
+              <span class="badge bg-<?= e($statusColor($d)) ?>" data-slot-status><?= e($statusText($d)) ?></span>
+            </div>
+            <?php if ($d && $d['status'] === 'Invalid'): ?><div class="small text-danger mb-1">Removed: <?= e($d['invalid_reason']) ?></div><?php endif; ?>
+            <?php if ($d && $d['status'] === 'Resubmit' && $d['remarks']): ?><div class="small text-warning-emphasis mb-1"><?= e($d['remarks']) ?></div><?php endif; ?>
+            <?php if ($canEdit): ?>
+              <div class="doc-dropzone" data-doc-dropzone tabindex="0" role="button" aria-label="Choose the <?= e(strtolower($side ?? 'file') . ' of your ' . TermDocument::label($type)) ?>">
+                <div class="doc-preview" data-doc-preview style="<?= $hasFile ? '' : 'display:none' ?>">
+                  <img src="<?= $isImage ? e($viewUrl) : '' ?>" alt="Preview" data-doc-preview-img class="<?= $isImage ? '' : 'd-none' ?>">
+                  <i class="bi bi-file-earmark-pdf display-6 text-danger <?= $hasFile && !$isImage ? '' : 'd-none' ?>" data-doc-preview-icon></i>
+                </div>
+                <div class="doc-dropzone-empty" data-doc-dropzone-empty style="<?= $hasFile ? 'display:none' : '' ?>">
+                  <i class="bi bi-cloud-arrow-up fs-3 text-muted"></i>
+                  <div class="small">Drop the <?= e(strtolower($side ?? 'file')) ?> here or <span class="text-primary text-decoration-underline">Choose File</span></div>
+                </div>
+                <div class="small text-primary mt-1" data-doc-replace-hint style="<?= $hasFile ? '' : 'display:none' ?>">Click or drop a file to replace it</div>
+              </div>
+              <input type="file" name="file" class="form-control form-control-sm mt-2" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required data-doc-file>
+              <noscript><button class="btn btn-sm btn-outline-primary mt-2"><i class="bi bi-upload"></i> Upload</button></noscript>
+            <?php endif; ?>
+            <div class="small text-muted mt-1" data-slot-meta style="<?= $hasFile ? '' : 'display:none' ?>">
+              <a href="<?= e($viewUrl) ?>" target="_blank" rel="noopener" data-slot-link><?= e($hasFile ? $d['original_filename'] : '') ?></a>
+              · <span data-slot-time><?= $hasFile ? e(fmt_datetime($d['uploaded_at'])) : '' ?></span>
+            </div>
+            <div class="small text-danger mt-1 d-none" data-doc-error></div>
+          </form>
+        </div>
+      <?php endforeach; ?>
     </div>
   </div>
 <?php };
 ?>
+<div class="d-none" data-term-docs-config data-user-id="<?= (int)Auth::user()['id'] ?>" data-max-bytes="<?= MAX_FILE_SIZE ?>" data-max-text="<?= e(MAX_FILE_SIZE_TEXT) ?>"></div>
 <div class="mb-4">
   <h4 class="fw-bold mb-1">My Scholarship</h4>
   <?php if ($scholar): ?>
     <p class="text-muted mb-0"><?= e($scholar['program_name']) ?> · Scholar ID <code><?= e($scholar['scholar_code']) ?></code>
       · <?= $scholar['status'] === 'Active'
             ? '<span class="badge bg-success">Active</span>'
-            : '<span class="badge bg-secondary">Ended — ' . e($scholar['end_reason']) . '</span>' ?></p>
+            : '<span class="badge bg-' . e(Scholar::statusBadge($scholar)[1]) . '">' . e(Scholar::statusBadge($scholar)[0]) . '</span>' ?></p>
   <?php endif; ?>
 </div>
 
@@ -79,14 +113,15 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
           <?php endif; ?>
         </div>
       <?php endif; ?>
-      <p class="text-muted small">Upload your School ID and your Grades for <?= e($sem) ?> (PDF, JPG or PNG, max <?= e(MAX_FILE_SIZE_TEXT) ?> each), then submit.</p>
-      <?php foreach (TERM_DOCUMENT_TYPES['claim'] as $type) $docRow('claim', $type, $claimDocs[$type] ?? null, $claimEditable, (int)$term['id']); ?>
+      <p class="text-muted small">Upload the front and back of your School ID and your college grades for <?= e($sem) ?>
+        (PDF, JPG or PNG, max <?= e(MAX_FILE_SIZE_TEXT) ?> each). Each file is <strong>saved as soon as you choose it</strong>; then submit.</p>
+      <?php foreach (TERM_DOCUMENT_TYPES['claim'] as $type) $docCard('claim', $type, $claimDocs[$type] ?? [], $claimEditable, (int)$term['id']); ?>
 
       <?php if ($claimEditable): ?>
         <form method="POST" action="<?= url('applicant/claim/submit') ?>" class="mt-3">
           <?= csrf_field() ?>
           <input type="hidden" name="term_id" value="<?= (int)$term['id'] ?>">
-          <button class="btn btn-success" <?= TermDocument::ready((int)$term['id'], 'claim') ? '' : 'disabled title="Upload both documents first."' ?>>
+          <button class="btn btn-success" data-term-submit="claim" <?= TermDocument::ready((int)$term['id'], 'claim') ? '' : 'disabled title="Upload every file first."' ?>>
             <i class="bi bi-send-check"></i> Submit claim
           </button>
         </form>
@@ -119,17 +154,39 @@ $docRow = static function (string $purpose, string $type, ?array $doc, bool $can
         <?php endif; ?>
       </div>
     <?php endif; ?>
-    <p class="text-muted small">Upload your updated Enrollment Form and School ID for <?= e($nextSem) ?>, then submit.</p>
-    <?php foreach (TERM_DOCUMENT_TYPES['renewal'] as $type) $docRow('renewal', $type, $renewalDocs[$type] ?? null, $renewalEditable, (int)$term['id']); ?>
+    <p class="text-muted small">Upload your updated Enrollment Form and the front and back of your School ID for <?= e($nextSem) ?>.
+      Each file is <strong>saved as soon as you choose it</strong>; then submit.</p>
+    <?php foreach (TERM_DOCUMENT_TYPES['renewal'] as $type) $docCard('renewal', $type, $renewalDocs[$type] ?? [], $renewalEditable, (int)$term['id']); ?>
     <?php if ($renewalEditable): ?>
+      <?php $yl = $renewal['year_level'] ?? ($education['year_level'] ?? '');
+        $ylOther = $renewal ? ($renewal['year_level_other'] ?? '') : ($education['year_level_other'] ?? ''); ?>
       <form method="POST" action="<?= url('applicant/renewal/submit') ?>" class="mt-3">
         <?= csrf_field() ?>
         <input type="hidden" name="term_id" value="<?= (int)$term['id'] ?>">
-        <button class="btn btn-success" <?= TermDocument::ready((int)$term['id'], 'renewal') ? '' : 'disabled title="Upload both documents first."' ?>>
+        <div class="row g-2 mb-3">
+          <div class="col-sm-6 col-lg-4">
+            <label class="form-label" for="renewYearLevel">Your year level for <?= e($nextSem) ?> <span class="text-danger">*</span></label>
+            <select name="year_level" id="renewYearLevel" class="form-select" required>
+              <option value="">Choose…</option>
+              <?php foreach (YEAR_LEVELS as $opt): ?>
+                <option <?= $yl === $opt ? 'selected' : '' ?>><?= e($opt) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <div class="form-text">Updates the year level on your application form.</div>
+          </div>
+          <div class="col-sm-6 col-lg-4">
+            <label class="form-label" for="renewYearLevelOther">If Other, specify</label>
+            <input name="year_level_other" id="renewYearLevelOther" class="form-control" maxlength="50" value="<?= e((string)$ylOther) ?>">
+          </div>
+        </div>
+        <button class="btn btn-success" data-term-submit="renewal" <?= TermDocument::ready((int)$term['id'], 'renewal') ? '' : 'disabled title="Upload every file first."' ?>>
           <i class="bi bi-send-check"></i> Submit renewal
         </button>
       </form>
     <?php elseif ($renewal && $renewal['status'] !== 'Resubmit'): ?>
+      <?php if (!empty($renewal['year_level'])): ?>
+        <p class="small mt-2 mb-0">Year level for <?= e($nextSem) ?>: <strong><?= e($renewal['year_level'] === 'Other' ? $renewal['year_level_other'] : $renewal['year_level']) ?></strong></p>
+      <?php endif; ?>
       <p class="small text-muted mt-2 mb-0">Nothing to do — we will e-mail you when your renewal is reviewed.</p>
     <?php endif; ?>
   </div>

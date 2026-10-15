@@ -172,6 +172,20 @@ final class Applicant
         )->execute(['applicant_id' => $applicantId] + $values);
     }
 
+    /**
+     * A9 renewal: the scholar's year level for the semester they renew into — the application form's Year Level shows it
+     * from now on. Only year_level / year_level_other change; a year-level change is kept in record_history.
+     */
+    public static function updateYearLevel(int $applicantId, string $yearLevel, string $other, int $userId): void
+    {
+        $old = self::education($applicantId);
+        if (!$old) return;
+        $values = ['year_level' => $yearLevel, 'year_level_other' => $yearLevel === 'Other' ? $other : ''];
+        Database::conn()->prepare("UPDATE education_records SET year_level = :year_level, year_level_other = :year_level_other WHERE id = :id")
+            ->execute($values + ['id' => (int)$old['id']]);
+        RecordHistory::record('education_records', (int)$old['id'], $applicantId, $old, $values, $userId);
+    }
+
     /** Family background: upserted in place (one row per applicant); income changes go to record_history. */
     public static function saveFamily(int $applicantId, array $post, int $userId = 0): void
     {

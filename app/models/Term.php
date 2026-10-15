@@ -125,7 +125,7 @@ final class Term
     {
         if (!self::claimEditable($term)) return ['ok' => false, 'error' => self::closedReason($term, 'claim') ?? 'This claim can’t be submitted right now.'];
         if (!TermDocument::ready((int)$term['id'], 'claim')) {
-            return ['ok' => false, 'error' => 'Upload both your School ID and Grades first.'];
+            return ['ok' => false, 'error' => 'Upload your School ID (front and back) and your college grades first.'];
         }
         self::changeClaimStatus($term, 'submit', $userId, ['submitted_at' => date('Y-m-d H:i:s')]);
         Notification::adminEvent('Claim submitted', "{$term['full_name']} ({$term['scholar_code']}) — {$term['academic_year']} {$term['semester']} claim is waiting for verification.",

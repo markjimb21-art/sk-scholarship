@@ -74,30 +74,33 @@
       if (!card) return;
       const ok = card.dataset.docHasFile === '1';
       const pill = card.querySelector('[data-doc-status-pill]');
-      const name = card.querySelector('[data-doc-filename]');
-      const link = card.querySelector('[data-doc-view-link]');
+      // Every saved side of the document ("Front: a.jpg View · Back: b.jpg View", or one file).
+      const savedSlots = Array.from(card.querySelectorAll('[data-doc-slot][data-has-file="1"]'));
       const status = row.querySelector('[data-review-doc-status]');
       status.className = 'fw-semibold ' + (ok ? 'text-success' : 'text-danger');
       status.innerHTML = '';
       const icon = document.createElement('i');
       icon.className = 'bi ' + (ok ? 'bi-check-circle-fill' : 'bi-x-circle-fill');
-      status.append(icon, ' ' + (ok ? (pill ? pill.textContent.trim() : 'Uploaded') : 'Missing'));
-      row.querySelector('[data-review-doc-file]').textContent = ok && name ? name.textContent : '';
-      let a = row.querySelector('[data-review-doc-link]');
-      if (ok && link) {
-        if (!a) {
-          a = document.createElement('a');
+      status.append(icon, ' ' + (ok ? (pill ? pill.textContent.trim() : 'Uploaded') : (savedSlots.length ? 'Add the other side' : 'Missing')));
+      const files = row.querySelector('[data-review-doc-files]');
+      files.innerHTML = '';
+      savedSlots.forEach((slot) => {
+        const name = slot.querySelector('[data-doc-filename]');
+        const link = slot.querySelector('[data-doc-view-link]');
+        const span = document.createElement('span');
+        span.className = 'small text-muted ms-1';
+        span.textContent = (slot.dataset.side ? slot.dataset.side + ': ' : '') + (name ? name.textContent : '');
+        files.appendChild(span);
+        if (link && link.href) {
+          const a = document.createElement('a');
           a.className = 'small ms-1';
           a.target = '_blank';
           a.rel = 'noopener';
-          a.setAttribute('data-review-doc-link', '');
+          a.href = link.href;
           a.textContent = 'View';
-          status.parentNode.appendChild(a);
+          files.appendChild(a);
         }
-        a.href = link.href;
-      } else if (a) {
-        a.remove();
-      }
+      });
       if (ok) saved++; else missing.push('Document: ' + type);
     });
     const count = review.querySelector('[data-review-doc-count]');

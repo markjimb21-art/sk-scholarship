@@ -79,7 +79,7 @@
       <div class="progress my-2" style="height:8px">
         <div class="progress-bar" style="width: <?= $program['slots_available'] > 0 ? min(100, round($slotsUsed / $program['slots_available'] * 100)) : 0 ?>%"></div>
       </div>
-      <div class="small text-muted">Scholars from this program, not counting scholars ended before a second semester opened.</div>
+      <div class="small text-muted">Scholars from this program, not counting graduated scholars or scholars ended before a second semester opened.</div>
     </div></div>
   </div>
   <?php if ($showBudget): ?>

@@ -10,12 +10,12 @@ final class CalendarController
 {
     /** Hex colours: interview statuses mirror the Bootstrap badge colours of Interview::STATUS_COLORS. */
     public const COLORS = [
-        'Open' => '#198754', 'Full' => '#ffc107', 'Done' => '#6c757d', 'Cancelled' => '#dc3545',
+        'Open' => '#198754', 'Full' => '#ffc107', 'Closed' => '#6c757d', 'Cancelled' => '#dc3545',
         'release' => '#0d6efd', 'renewal' => '#6f42c1',
         'due_soon' => '#fd7e14', 'overdue' => '#dc3545', 'past' => '#6c757d',
     ];
     public const LEGEND = [
-        ['Interview — open', 'Open', false], ['Interview — full', 'Full', false], ['Interview — done', 'Done', false],
+        ['Interview — open', 'Open', false], ['Interview — full', 'Full', false], ['Interview — closed', 'Closed', false],
         ['Interview — cancelled', 'Cancelled', false], ['Claim deadline', 'release', false], ['Renewal deadline', 'renewal', false],
         ['Deadline within ' . TERM_SCHEDULE_REMINDER_HOURS . ' hours', 'due_soon', false], ['Overdue (someone missed it)', 'overdue', false],
         ['Planned release / semester start', 'release', true],

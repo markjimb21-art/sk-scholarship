@@ -52,9 +52,18 @@ const DOCUMENT_TYPES = [
 // Document types a scholar updates later (claim/renewal); the newest version is shown everywhere, older ones in history.
 const VERSIONED_DOCUMENT_TYPES = ['School ID', 'Enrollment Form'];
 
+// Two-sided documents are uploaded as a Front and a Back picture (documents.side / term_documents.side): the School ID
+// (application, claim, renewal) and the application's Form 138. side NULL = one file with the whole document, which also
+// covers both sides (every upload made before sides existed). The claim's college grades stay one file.
+const DOCUMENT_SIDES = ['Front', 'Back'];
+const TWO_SIDED_DOCUMENT_TYPES = ['School ID', 'Form 138 / Grades'];
+
 // Semesters: 1st -> 2nd (same A.Y.) -> 1st of the next A.Y.
 const SEMESTERS = ['1st Semester', '2nd Semester'];
 define('SEMESTERS_PER_YEAR', count(SEMESTERS));   // budgets and projections count a scholar's year as this many releases
+// A program's academic year follows its application start date: from this month (June) on it is that year's A.Y.,
+// before it the A.Y. that began the year before (Program::academicYearFor, pages/programs.js).
+const ACADEMIC_YEAR_START_MONTH = 6;
 
 // Semester claim (scholar_terms.claim_status) => label shown to the scholar.
 const CLAIM_STATUS_LABELS = [
@@ -84,6 +93,8 @@ const TERM_DOCUMENT_TYPES = [
     'claim'   => ['School ID', 'Grades'],
     'renewal' => ['Enrollment Form', 'School ID'],
 ];
+// What the scholar and staff see for a claim/renewal document type (the stored type name stays the same).
+const TERM_DOCUMENT_LABELS = ['Grades' => 'College grades (Certificate of Grades)'];
 
 // Why a scholarship ends (B10).
 const SCHOLAR_END_REASONS = ['Graduated', 'Dropped out', 'Failed grade requirement', 'Did not renew'];

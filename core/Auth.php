@@ -8,6 +8,12 @@ final class Auth
             ini_set('session.use_strict_mode', '1');
             ini_set('session.use_only_cookies', '1');
             ini_set('session.gc_maxlifetime', (string)SESSION_LIFETIME);
+            // This app's own cookie name and session folder: other PHP apps on the same host (PHPSESSID in the shared
+            // C:\xampp\tmp) can then neither replace our session on their login/logout nor delete it in their own
+            // cleanup (often after 24 minutes) — either one used to break every open form ("CSRF token mismatch").
+            session_name(SESSION_NAME);
+            if (!is_dir(SESSION_PATH)) @mkdir(SESSION_PATH, 0700, true);
+            if (is_dir(SESSION_PATH) && is_writable(SESSION_PATH)) session_save_path(SESSION_PATH);
             session_set_cookie_params([
                 'lifetime' => SESSION_LIFETIME,
                 'path' => '/',

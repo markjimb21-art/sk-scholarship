@@ -7,7 +7,7 @@ final class UserController
     public function users(): void
     {
         $q = trim(get_str('q'));
-        $role = in_array($_GET['role'] ?? '', [...STAFF_ROLES, 'applicant'], true) ? $_GET['role'] : '';
+        $role = in_array($_GET['role'] ?? '', [...STAFF_ROLES, 'applicant', ...User::SHOWN_ROLES], true) ? $_GET['role'] : '';
         $users = User::search($q, $role);
         render('admin/users', compact('users', 'q', 'role') + ['pageScripts' => [asset('js/pages/users.js')]], 'Users');
     }

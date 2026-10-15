@@ -56,12 +56,15 @@ final class AdminController
         'calendar'                  => ['CalendarController', 'index', self::STAFF],
         'calendar-feed'             => ['CalendarController', 'feed', self::STAFF],
         'application'               => ['ScreeningController', 'view', self::REVIEW],
-        'documents/view'            => ['ScreeningController', 'document', self::REVIEW],
+        // Document files: an application page shows a newer claim/renewal upload and a scholar page shows the
+        // application's upload (Document::current()), so reviewers and treasurers both need both file routes.
+        'documents/view'            => ['ScreeningController', 'document', self::STAFF],
         'documents/invalidate'      => ['ScreeningController', 'invalidateDocument', self::STAFF],
         // B1 programs
         'programs'                  => ['AdminController', 'programs', self::ADMIN],
         'program-save'              => ['AdminController', 'programSave', self::ADMIN],
         'program-toggle'            => ['AdminController', 'programToggle', self::ADMIN],
+        'program-delete'            => ['AdminController', 'programDelete', self::ADMIN],
         // B2 screening
         'screening'                 => ['ScreeningController', 'queue', self::REVIEW],
         'screening/decide'          => ['ScreeningController', 'decide', self::REVIEW],
@@ -91,7 +94,7 @@ final class AdminController
         'claims'                    => ['FundsController', 'claims', self::FUNDS],
         'claims/view'               => ['FundsController', 'claimView', self::FUNDS],
         'claims/decide'             => ['FundsController', 'claimDecide', self::FUNDS],
-        'term-documents/view'       => ['FundsController', 'termDocument', self::FUNDS],
+        'term-documents/view'       => ['FundsController', 'termDocument', self::STAFF],   // see documents/view
         // B8 releases
         'releases'                  => ['FundsController', 'releases', self::FUNDS],
         'release-save'              => ['FundsController', 'releaseSave', self::FUNDS],
@@ -103,6 +106,7 @@ final class AdminController
         'release-schedule'          => ['FundsController', 'releaseSchedule', self::FUNDS],
         'renewal-schedule'          => ['FundsController', 'renewalSchedule', self::FUNDS],
         'term-schedule-save'        => ['FundsController', 'termScheduleSave', self::FUNDS],
+        'term-schedule-delete'      => ['FundsController', 'termScheduleDelete', self::FUNDS],
         // B10 scholars
         'scholars'                  => ['FundsController', 'scholars', self::FUNDS],
         'scholar'                   => ['FundsController', 'scholar', self::FUNDS],
@@ -240,6 +244,17 @@ final class AdminController
         $state = Program::toggle(post_int('id'));
         if ($state === null) flash('danger', 'Program not found.');
         else flash('success', $state ? 'Program opened. Applicants can apply while today is inside its dates.' : 'Program closed.');
+        redirect('admin/programs');
+    }
+
+    /** Only a program nobody applied to (Program::delete). */
+    public function programDelete(): void
+    {
+        require_post('admin/programs');
+        $r = Program::delete(post_int('id'), admin_id());
+        flash($r['ok'] ? 'success' : 'danger', $r['ok']
+            ? 'Program deleted.' . ($r['drafts'] ? " {$r['drafts']} unfinished application(s) on it were removed and the applicants told." : '')
+            : $r['error']);
         redirect('admin/programs');
     }
 }

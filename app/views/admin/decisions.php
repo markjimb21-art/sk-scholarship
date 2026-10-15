@@ -21,7 +21,7 @@
   <div class="card-body d-flex align-items-center gap-4 flex-wrap">
     <div>
       <div class="fs-3 fw-bold <?= $full ? 'text-danger' : 'text-success' ?>">Slots: <?= $slotsUsed ?> approved / <?= $slots ?> total</div>
-      <div class="small text-muted">Approved = scholars from this program, not counting scholars ended before a second semester opened.</div>
+      <div class="small text-muted">Approved = scholars from this program, not counting graduated scholars or scholars ended before a second semester opened.</div>
     </div>
     <?php if ($full): ?><span class="badge bg-danger">Full — the server blocks further approvals</span><?php endif; ?>
   </div>

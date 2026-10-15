@@ -13,7 +13,7 @@ final class WorkQueues
             'to_screen'        => $count("SELECT COUNT(*) FROM applications WHERE status = 'Submitted'"),
             'qualified'        => $count("SELECT COUNT(*) FROM applications WHERE status = 'Qualified'"),
             'interviews_today' => $count("SELECT COUNT(*) FROM interview_assignments ia JOIN interview_schedules s ON s.id = ia.schedule_id
-                                          WHERE ia.attendance = 'Scheduled' AND s.status = 'Open' AND s.interview_date = ?", [$today]),
+                                          WHERE ia.attendance = 'Scheduled' AND s.status <> 'Cancelled' AND s.interview_date = ?", [$today]),
             'slot_requests'    => $count("SELECT COUNT(*) FROM slot_requests WHERE status = 'Pending'"),
             'to_decide'        => $count("SELECT COUNT(*) FROM applications WHERE status = 'Interviewed'"),
             'claims_to_verify' => $count("SELECT COUNT(*) FROM scholar_terms WHERE claim_status = 'Submitted'"),

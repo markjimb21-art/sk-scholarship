@@ -1,7 +1,10 @@
 <?php
 // Staff roles and what each may open (AdminController::ROUTES).
-$roleLabels = ['admin' => 'Admin', 'reviewer' => 'Reviewer', 'treasurer' => 'Treasurer', 'applicant' => 'Applicant'];
-$roleColors = ['admin' => 'danger', 'reviewer' => 'primary', 'treasurer' => 'success', 'applicant' => 'secondary'];
+// Applicants show as Scholar while their scholarship is Active, and Graduated after it (User::search shown_role).
+$roleLabels = ['admin' => 'Admin', 'reviewer' => 'Reviewer', 'treasurer' => 'Treasurer', 'applicant' => 'Applicant',
+               'scholar' => 'Scholar', 'graduated' => 'Graduated'];
+$roleColors = ['admin' => 'danger', 'reviewer' => 'primary', 'treasurer' => 'success', 'applicant' => 'secondary',
+               'scholar' => 'info', 'graduated' => 'dark'];
 $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' => 'screening, interviews, decisions (no budget or releases)',
              'treasurer' => 'budget, claims, releases, renewals, scholars (no applicant review)'];
 ?>
@@ -19,7 +22,7 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
     <div class="col-md-4">
       <div><label class="form-label" for="f_role">Role</label><select id="f_role" name="role" class="form-select">
         <option value="">All roles</option>
-        <?php foreach ($roleLabels as $rk => $rl): ?><option value="<?= e($rk) ?>" <?= $role === $rk ? 'selected' : '' ?>><?= e($rk === 'applicant' ? 'Applicant / scholar' : $rl) ?></option><?php endforeach; ?>
+        <?php foreach ($roleLabels as $rk => $rl): ?><option value="<?= e($rk) ?>" <?= $role === $rk ? 'selected' : '' ?>><?= e($rl) ?></option><?php endforeach; ?>
       </select></div>
     </div>
     <div class="col-md-2"><button class="btn btn-primary w-100" aria-label="Search"><i class="bi bi-search" aria-hidden="true"></i></button></div>
@@ -35,7 +38,7 @@ $roleHelp = ['admin' => 'everything, including users and settings', 'reviewer' =
           <tr>
             <td class="fw-semibold"><?= e($u['full_name']) ?></td>
             <td><?= e($u['email']) ?><?= !$u['email_verified'] ? ' <span class="badge bg-warning">not verified</span>' : '' ?></td>
-            <td><span class="badge bg-<?= e($roleColors[$u['role_name']] ?? 'secondary') ?>"><?= e($roleLabels[$u['role_name']] ?? $u['role_name']) ?></span></td>
+            <td><span class="badge bg-<?= e($roleColors[$u['shown_role']] ?? 'secondary') ?>"><?= e($roleLabels[$u['shown_role']] ?? $u['shown_role']) ?></span></td>
             <td><span class="badge bg-<?= $u['is_active'] ? 'success' : 'secondary' ?>"><?= $u['is_active'] ? 'Active' : 'Deactivated' ?></span></td>
             <td><small class="text-muted"><?= $u['last_login'] ? e(fmt_datetime($u['last_login'])) : 'Never' ?></small></td>
             <td class="text-end text-nowrap">

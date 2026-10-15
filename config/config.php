@@ -38,6 +38,8 @@ define('BASE_URL', rtrim(getenv('BASE_URL') ?: 'http://localhost/sk-scholarship/
 
 // Security
 define('SESSION_LIFETIME', 3600 * 2);
+define('SESSION_NAME', 'SK_SCHOLARSHIP_SESSION');   // not PHPSESSID: other apps on localhost use that one (core/Auth.php)
+define('SESSION_PATH', STORAGE_PATH . '/sessions'); // PRIVATE session files, outside the web root
 define('MAX_LOGIN_ATTEMPTS', 5);
 define('LOCKOUT_MINUTES', 15);
 define('CSRF_TOKEN_NAME', '_csrf');

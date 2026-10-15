@@ -78,7 +78,7 @@ final class Interview
     }
 
     /** Bootstrap colour per displayed schedule status — shared by the Interviews list and the calendar. */
-    public const STATUS_COLORS = ['Open' => 'success', 'Full' => 'warning', 'Done' => 'secondary', 'Cancelled' => 'danger'];
+    public const STATUS_COLORS = ['Open' => 'success', 'Full' => 'warning', 'Closed' => 'secondary', 'Cancelled' => 'danger'];
 
     /**
      * What a schedule shows as on the Interviews list and the calendar: Cancelled, Done (date passed), Full (assigned
@@ -87,8 +87,19 @@ final class Interview
     public static function displayStatus(array $schedule): string
     {
         if ($schedule['status'] === 'Cancelled') return 'Cancelled';
-        if ($schedule['interview_date'] < date('Y-m-d')) return 'Done';
+        if (self::isClosed($schedule)) return 'Closed';
         return (int)$schedule['assigned_count'] >= (int)$schedule['max_slots'] ? 'Full' : 'Open';
+    }
+
+    /**
+     * Closed = the admin closed it (Edit schedule), or its end time has passed (closes by itself; the row is unchanged).
+     * Nobody can be assigned or moved onto a closed schedule; attendance and scores can still be recorded.
+     */
+    public static function isClosed(array $schedule, ?string $now = null): bool
+    {
+        if ($schedule['status'] === 'Closed') return true;
+        $end = $schedule['interview_date'] . ' ' . substr((string)$schedule['end_time'], 0, 8);
+        return strtotime($end) <= strtotime($now ?? date('Y-m-d H:i:s'));
     }
 
     /**
@@ -101,7 +112,7 @@ final class Interview
         $pdo = Database::conn();
         $stmt = $pdo->prepare(
             "SELECT s.*, sp.program_name FROM interview_schedules s JOIN scholarship_programs sp ON sp.id = s.program_id
-             WHERE s.interview_date = ? AND s.status = 'Open' ORDER BY s.start_time, s.id"
+             WHERE s.interview_date = ? AND s.status <> 'Cancelled' ORDER BY s.start_time, s.id"
         );
         $stmt->execute([$date]);
         $schedules = $stmt->fetchAll();
@@ -179,7 +190,10 @@ final class Interview
         return ['ok' => true, 'id' => $id];
     }
 
-    /** Edit; if date, time or venue changed, applicants still waiting are notified and their reminder is reset. */
+    /**
+     * Edit; status Open or Closed (cancelling is its own action, cancelSchedule). If date, time or venue changed,
+     * applicants still waiting are notified and their reminder is reset.
+     */
     public static function updateSchedule(int $id, array $data, int $adminId): array
     {
         $old = self::schedule($id);
@@ -190,10 +204,12 @@ final class Interview
         if ($in['max_slots'] < (int)$old['assigned_count']) {
             return ['ok' => false, 'error' => "Capacity can’t be lower than the {$old['assigned_count']} applicants already assigned."];
         }
+        $in['status'] = (string)($data['status'] ?? $old['status']);
+        if (!in_array($in['status'], ['Open', 'Closed'], true)) return ['ok' => false, 'error' => 'Choose Open or Closed. To cancel, use Cancel schedule.'];
 
         $pdo = Database::conn();
-        $pdo->prepare("UPDATE interview_schedules SET interview_date = ?, start_time = ?, end_time = ?, venue = ?, max_slots = ? WHERE id = ?")
-            ->execute([$in['interview_date'], $in['start_time'], $in['end_time'], $in['venue'], $in['max_slots'], $id]);
+        $pdo->prepare("UPDATE interview_schedules SET interview_date = ?, start_time = ?, end_time = ?, venue = ?, max_slots = ?, status = ? WHERE id = ?")
+            ->execute([$in['interview_date'], $in['start_time'], $in['end_time'], $in['venue'], $in['max_slots'], $in['status'], $id]);
         AuditLog::write('schedule_updated', 'interview_schedules', $id, 'Interview schedule updated: ' . self::describe($in), $old, $in);
 
         $hm = static fn(string $t): string => date('H:i', strtotime($t));

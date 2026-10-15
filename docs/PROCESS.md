@@ -11,9 +11,14 @@ Roles: **Applicant** (becomes a **Scholar** when approved — same account) and 
 | **Reviewer** | dashboard, calendar, notifications · screening, applications, interviews (incl. scheduling and slot requests), decisions — **no** budget, claims, releases |
 | **Treasurer** | dashboard, calendar, notifications · budget, claim/renewal schedules, claims, releases, renewals, scholars — **no** applicant review |
 
+Every staff role may open document files (`admin/documents/view`, `admin/term-documents/view`): an application page
+shows the applicant's current School ID / Enrollment Form even when it came from a claim or renewal, and a scholar page
+shows it even when it came from the application.
+
 Every admin route lists the roles allowed to open it; the check runs on every request, including POSTs. The sidebar,
 the dashboard (counters, cards, charts) and the calendar feed show only what the role may open. Admins create staff,
-change their role and deactivate them under **Users**; a role change is audit-logged (`user_role_changed`), nobody can
+change their role and deactivate them under **Users** (where an applicant account is shown as **Scholar** while its
+scholarship is Active and **Graduated** after it — the login role stays applicant; `User::search`); a role change is audit-logged (`user_role_changed`), nobody can
 change their own role, and the last active admin can’t be demoted or deactivated. Notifications to "admins"
 (§8) go to the admin role.
 
@@ -58,7 +63,7 @@ to decide which buttons appear):
 
 ### Scholar (`scholars.status`)
 - **Active** — can claim and renew.
-- **Ended** — with `end_reason` = Graduated / Dropped out / Failed grade requirement / Did not renew. Can't claim or renew **(server)**.
+- **Ended** — with `end_reason` = Graduated / Dropped out / Failed grade requirement / Did not renew. Can't claim or renew **(server)**. Ended with reason Graduated is shown as **Graduated** (`Scholar::statusBadge`).
 
 ### Semester claim (`scholar_terms.claim_status`)
 | Status | Label | Meaning |
@@ -86,14 +91,14 @@ Scheduled | Attended | No-show.
 | Step | What the applicant does / sees | Page (route) | Status |
 |---|---|---|---|
 | A1 | Register → 6-digit e-mail code → login. Forgot password uses the same OTP. | `register`, `verify-otp`, `resend-otp`, `login`, `forgot-password`, `verify-reset-otp`, `reset-password` | — |
-| A2 | Multi-step form: Personal (incl. height, weight, blood type, religion, citizenship), Education, Family, Documents (Certificate of Residency, Form 138 / Grades, Enrollment Form, School ID, 2x2 Photo), Review & Submit. Autosaves a draft. **(server)** Only while a program is open and inside its dates; Submit only when complete. | `applicant/application`, `applicant/application/autosave`, `applicant/documents/upload`, `applicant/documents/view`, `applicant/application/submit` | Draft → Submitted |
+| A2 | Multi-step form: Personal (incl. height, weight, blood type, religion, citizenship), Education, Family, Documents (Certificate of Residency, Form 138 / Grades, Enrollment Form, School ID, 2x2 Photo — School ID and Form 138 each as a front and a back picture, see §4b), Review & Submit. Autosaves a draft; each file is saved as soon as it is chosen. **(server)** Only while a program is open and inside its dates; Submit only when complete. | `applicant/application`, `applicant/application/autosave`, `applicant/documents/upload`, `applicant/documents/view`, `applicant/application/submit` | Draft → Submitted |
 | A3 | Waits for screening. If Returned: the remarks are shown on the dashboard and at the top of the form; the form becomes editable; resubmit. | `applicant/dashboard`, `applicant/application` | Submitted / Returned / Rejected / Qualified |
 | A4 | Waits for a schedule — and may **pick one of 3 suggested slots** (§3a), which the SK office confirms; then sees date, time and venue (in-app + e-mail), a reminder before, and "Your interview is today" on the day. | `applicant/dashboard` ("Pick an interview slot" box), `applicant/slot-request`, `applicant/slot-request/cancel` | Qualified → Interview Scheduled (only by the admin's confirm/assign) |
 | A5 | Attends. A first no-show goes back to "waiting for a new schedule" (one reschedule); a second no-show is Rejected. | `applicant/dashboard` | Interview Scheduled → Interviewed / Qualified / Rejected |
 | A6 | Waits for the final result. | `applicant/dashboard` | Interviewed → Approved / Waitlisted / Rejected |
 | A7 | Approved → Scholar; Semester 1 opens automatically. | `applicant/scholarship` *(rebuilt)* | Approved; term = Waiting for Requirements |
-| A8 | Claims cash for the current semester: uploads School ID + Grades → waits → re-uploads if Resubmit → sees Released (amount, date, reference). **(server)** Only while the admin's **claim window** for that program + semester is open (§4a). | `applicant/scholarship`, `applicant/claim/upload` *new*, `applicant/claim/submit` *new*, `applicant/term-documents/view` *new* | claim_status |
-| A9 | After the current semester is Released: uploads Enrollment Form + School ID for the next semester → waits → re-uploads if Resubmit → Approved opens the next semester (back to A8). **(server)** Only while the admin's **renewal window** for the next semester is open (§4a). | `applicant/scholarship`, `applicant/renewal/upload` *new*, `applicant/renewal/submit` *new* | renewal status |
+| A8 | Claims cash for the current semester: uploads School ID (front + back) + college grades — each file saved as soon as it is chosen, then **Submit claim** → waits → re-uploads if Resubmit → sees Released (amount, date, reference). **(server)** Only while the admin's **claim window** for that program + semester is open (§4a). | `applicant/scholarship`, `applicant/claim/upload` *new*, `applicant/claim/submit` *new*, `applicant/term-documents/view` *new* | claim_status |
+| A9 | After the current semester is Released: uploads Enrollment Form + School ID (front + back) for the next semester — each file saved as soon as it is chosen — and gives their **year level** for that semester (required; it updates the year level on their application form, the old value kept under Changes to key information), then **Submit renewal** → waits → re-uploads if Resubmit → Approved opens the next semester (back to A8). **(server)** Only while the admin's **renewal window** for the next semester is open (§4a). | `applicant/scholarship`, `applicant/renewal/upload` *new*, `applicant/renewal/submit` *new* | renewal status |
 
 **One application at a time (server):** while an applicant holds an **Active** scholarship, their
 "current" application is the one that made them a scholar and they can't start another; once the
@@ -112,11 +117,11 @@ Other applicant pages kept: `applicant/notifications` (inbox), `applicant/profil
 
 | Step | Page (route) | What it does | Rules (server) |
 |---|---|---|---|
-| B1 | `admin/programs`, `admin/program-save`, `admin/program-toggle` | Create/edit a program: name, academic year, application start/end, slots, amount per scholar per semester, minimum GWA, maximum family income, maximum age. Open / close. | end ≥ start; numbers ≥ 0; applicants can apply only when open **and** today is inside the dates |
+| B1 | `admin/programs`, `admin/program-save`, `admin/program-toggle`, `admin/program-delete` | Create/edit a program: name, application start/end, slots, amount per scholar per semester, minimum GWA, maximum family income, maximum age. Open / close. The **academic year** is not entered: it follows the application start date (June–December → that year's A.Y., January–May → the A.Y. that began the year before; `Program::academicYearFor`) and is fixed once the program has scholars. **Delete** only a program nobody submitted an application to; its Draft applications (with their files — each applicant is notified), budgets, claim/renewal windows and interview schedules are deleted with it (`Program::delete`). | end ≥ start; numbers ≥ 0; applicants can apply only when open **and** today is inside the dates |
 | B2 | `admin/screening` *new* (queue: Submitted), `admin/application&id=` (one page per application, any status), `admin/screening/decide` *new*, `admin/documents/view` | One page per application: form data, every document viewable, eligibility check as pass/fail rows. Buttons: **Qualify for interview**, **Return for correction** (remarks required; tick the wrong fields/documents — see Data retention), **Reject** (reason required). Any document can be **marked invalid** (`admin/documents/invalidate`). | transition map; remarks/reason non-empty; on a flagged return only the flagged items can change and flagged documents must be re-uploaded before resubmitting |
-| B3 | `admin/interviews` *renamed from admin/interview-scheduling*, `admin/interview-schedule-save`, `-update`, `-cancel`, `-delete`, `admin/interview-schedule&id=` *renamed from interview-schedule-detail*, `admin/interview-assign` (bulk), `admin/interview-unassign` | Create a schedule (date, start/end, venue, capacity); bulk-assign Qualified applicants. Assign, edit (date/time/venue) and cancel notify the applicants. | capacity; only Qualified; delete only when empty; cancel sends everyone back to Qualified |
+| B3 | `admin/interviews` *renamed from admin/interview-scheduling*, `admin/interview-schedule-save`, `-update`, `-cancel`, `-delete`, `admin/interview-schedule&id=` *renamed from interview-schedule-detail*, `admin/interview-assign` (bulk), `admin/interview-unassign` | Create a schedule (date, start/end, venue, capacity); bulk-assign Qualified applicants. Assign, edit (date/time/venue) and cancel notify the applicants. Status **Open / Closed / Cancelled**: Edit sets Open or Closed; a schedule is also shown **Closed** once its end time has passed (`Interview::isClosed`, the row is unchanged). | capacity; only Qualified; nobody assigned or moved onto a Closed schedule (attendance and scores can still be recorded); delete only when empty; cancel sends everyone back to Qualified |
 | B4 | `admin/interview-schedule&id=` (attendance column), `admin/interview-no-show` *new*, `admin/interview-score&id=` (saving a score marks Attended) *renamed from interview-evaluate*, `admin/interview-score-save` *renamed* | Mark Attended / No-show; score attendees with the rubric + remarks. | rubric bounds from the one constant; one reschedule |
-| B5 | `admin/decisions&program_id=` *new*, `admin/decisions/decide` *new* | Ranking of Interviewed (and Waitlisted) applicants: score, GWA, family income, eligibility result; "Slots: X approved / Y total". Approve / Waitlist / Reject (reason). "Promote next waitlisted?" prompt when a first-semester scholar ends. | approve blocked when X ≥ Y |
+| B5 | `admin/decisions&program_id=` *new*, `admin/decisions/decide` *new* | Ranking of Interviewed (and Waitlisted) applicants: score, GWA, family income, eligibility result; "Slots: X approved / Y total". Approve / Waitlist / Reject (reason). "Promote next waitlisted?" prompt when a scholar graduates or a first-semester scholar ends. | approve blocked when X ≥ Y |
 
 ### 3a. Interview scheduling page and suggestions
 
@@ -157,8 +162,9 @@ Financial need 0–40 · Academic performance 0–30 · Communication / motivati
 
 **Ranking order (B5):** interview total (high → low), then total family income (low → high), then GWA (better = lower number first).
 
-**Slots used (B5 counter):** scholars created from this program, not counting scholars who were ended
-before any second semester was opened (their slot is free again — that's when "Promote next waitlisted?" appears).
+**Slots used (B5 counter):** scholars created from this program, not counting **graduated** scholars or scholars who
+were ended before any second semester was opened (their slot is free again — that's when "Promote next waitlisted?"
+appears). Example: 2 / 2 used, one scholar graduates → 1 / 2.
 
 ---
 
@@ -167,27 +173,33 @@ before any second semester was opened (their slot is free again — that's when 
 | Step | Page (route) | What it does | Rules (server) |
 |---|---|---|---|
 | B6 | `admin/budget`, `admin/budget-save`, `admin/budget-delete` | One budget per program + academic year (total). Shows Total, Released, Remaining, Committed. | Remaining = Total − Released, where Released is always re-summed from `scholarship_releases` |
-| B7 | `admin/claims` *new* (queue: Submitted), `admin/claims/view&id=` *new*, `admin/claims/decide` *new* | View School ID + Grades, type the GWA (stored on the semester), then **Verified** or **Resubmit** (remarks required). Warning if GWA is worse than the program minimum. | only Submitted claims; remarks required for Resubmit; GWA 1.00–5.00 |
+| B7 | `admin/claims` *new* (queue: Submitted), `admin/claims/view&id=` *new*, `admin/claims/decide` *new* | View School ID (front + back) + college grades, type the GWA (stored on the semester), then **Verified** or **Resubmit** (remarks required). Warning if GWA is worse than the program minimum. | only Submitted claims; remarks required for Resubmit; GWA 1.00–5.00 |
 | B8 | `admin/releases` *(rebuilt: "Ready to release" + history)*, `admin/release-save` | Amount pre-filled with the program's amount per semester; date, method (Cash / GCash / Bank / Check), reference no. Scholar is notified. | only Verified claims; one release per semester (`term_id` unique); blocked if no budget for program + A.Y., or if it would exceed Remaining |
-| B9 | `admin/renewals` *(rebuilt queue: Submitted)*, `admin/renewals/view&id=` *new*, `admin/renewals/decide` *new* | Enrollment Form + School ID → **Approved** (opens the next semester) or **Resubmit** (remarks). | only Submitted; scholar Active |
-| B10 | `admin/scholars`, `admin/scholar&id=` *renamed from scholar-view*, `admin/scholar-end` *new* | End the scholarship with a reason. Scholar is notified. | reason from the fixed list; Ended can't claim or renew |
+| B9 | `admin/renewals` *(rebuilt queue: Submitted)*, `admin/renewals/view&id=` *new*, `admin/renewals/decide` *new* | Enrollment Form + School ID and the year level the scholar gave → **Approved** (opens the next semester) or **Resubmit** (remarks). | only Submitted; scholar Active |
+| B10 | `admin/scholars`, `admin/scholar&id=` *renamed from scholar-view*, `admin/scholar-end` *new* | List opens with Active **and Graduated** scholars (filters: Active and graduated · Active · Graduated · Ended (other reasons) · All). End the scholarship with a reason (Graduated → shown as Graduated). Scholar is notified. | reason from the fixed list; Ended can't claim or renew |
 
 ### 4a. Claim and renewal windows (`term_schedules`)
 
 | Page (route) | What it does | Rules (server) |
 |---|---|---|
-| `admin/release-schedule`, `admin/renewal-schedule`, `admin/term-schedule-save` | One window per program + academic year + semester + purpose: **release** = the cash claim of that semester (Grades + School ID); **renewal** = the renewal *into* that semester (Enrollment Form + School ID). Opens at, submission deadline, planned release date / semester start, notes, status Open / Closed / Cancelled. Lists semesters that have waiting scholars but no window yet, and **Missed deadline**. | opens < deadline; deadline in the future when created or changed; planned date ≥ deadline date; one per program + A.Y. + semester + purpose |
+| `admin/release-schedule`, `admin/renewal-schedule`, `admin/term-schedule-save`, `admin/term-schedule-delete` | One window per program + academic year + semester + purpose: **release** = the cash claim of that semester (Grades + School ID); **renewal** = the renewal *into* that semester (Enrollment Form + School ID). Opens at, submission deadline, planned release date / semester start, notes, status Open / Closed / Cancelled. Lists semesters that have waiting scholars but no window yet, and **Missed deadline**. | opens < deadline; deadline in the future when created or changed; planned date ≥ deadline date; one per program + A.Y. + semester + purpose |
 
 - **Window open** = status Open and opens_at ≤ now ≤ deadline. Before that, the scholar sees "Not open yet" and no upload form; after it, "The deadline has passed — contact the SK office".
 - A re-upload the admin asked for (**Resubmit**) is still allowed after the deadline, unless the window is Cancelled.
 - Creating a window, changing its deadline and cancelling it notify every scholar who hasn't submitted (in-app + e-mail). A reminder goes out 48 h before the deadline (`bin/send_reminders.php`, once per window via `deadline_reminder_sent_at`, reset when the deadline changes).
 - Missed deadlines are listed on Claims, Renewals and the window pages. Nothing happens automatically: extend the deadline, follow up, or end the scholarship (B10).
+- **Fixing or deleting a window (server):** while **nobody has submitted** under a window, Edit can also change its program, academic year and semester (like cancelling it and creating the new one: the scholars it was announced to are told it was cancelled, those of the new semester that it is open), and it can be **deleted** (scholars it was announced to are told it was cancelled, unless it already was). Once someone has submitted, the window belongs to their record and the on-time figures: only its dates, status and notes change — Close or Cancel it instead. Audit-logged (`TermSchedule::save`, `TermSchedule::delete`).
 
 ### 4b. Document versions
 
 A School ID or Enrollment Form uploaded during a claim or renewal becomes the applicant's **current** version (`is_current`). Older versions — in `documents` or `term_documents` — are marked superseded (`superseded_at`), never deleted, and audit-logged (`Document::supersede`). The application view and scholar view show the current version (`Document::current`) and a **Document history** list (`Document::history`). A claim or renewal review always shows what was submitted for it.
 
-**Suggestions (never filled in without a click):** B3 "New schedule" offers up to 5 free 2-hour slots, and the scheduling page and applicant dashboard rank existing schedules first — rules in §3a (`InterviewSlots::suggestSlots`). B6 offers a total budget = slots × amount per semester × 2 — `Budget::suggestedTotal`.
+**Front and back (`side`).** Some documents are two pictures, a **Front** and a **Back** (`documents.side`, `term_documents.side`); `side` NULL is one file with the whole document. Which documents (`Document::sidesFor`, `TWO_SIDED_DOCUMENT_TYPES`): the **School ID** (application, claim, renewal) and the application's **Form 138 / Grades**, for every year level. The claim's **Grades** stays one file (shown as "College grades (Certificate of Grades)").
+- **Complete** (`Document::covers`, used by Submit for applications, claims and renewals): both sides of a two-sided document, or one file with the whole document — so files uploaded before sides existed still count. **(server)**
+- **Versions per side:** a new Front supersedes the current Front and any one-file version; a new Back likewise; a new one-file upload supersedes every side. Each side keeps its own history.
+- A Resubmit or an invalid flag on a two-sided document applies to both sides.
+
+**Suggestions (never filled in without a click):** B3 "New schedule" offers up to 5 free 2-hour slots, and the scheduling page and applicant dashboard rank existing schedules first — rules in §3a (`InterviewSlots::suggestSlots`). B6 offers a total budget = number of Active scholars of the program × (amount per semester × 2 semesters), none while the program has no scholar — `Budget::suggestedTotal`.
 
 ---
 
@@ -335,7 +347,7 @@ Every status change is also written to the audit log (`AuditLog::write`).
 
 Correct data is kept; only data explicitly flagged as invalid is removed — and even then the record stays.
 
-**Never hard-deleted (no code path deletes them):** applicants, applications, scholars, semesters, renewal requests, releases,
+**Never hard-deleted (no code path deletes them):** applicants, applications (except a Draft on a program that is deleted, see below), scholars, semesters, renewal requests, releases,
 application documents and claim/renewal documents, record history, audit logs.
 
 - **Re-uploads are versions.** A new application, claim or renewal upload adds a row; the older one is superseded
@@ -361,6 +373,7 @@ application documents and claim/renewal documents, record history, audit logs.
 | Budget | only while nothing was released against it | Budget → delete |
 | Document **file** | only when flagged invalid (row kept) | as above |
 | Holiday | any time (a setting, not a record) | Settings → Holidays |
+| Program | only while nobody submitted an application to it; its Drafts (with their files; the applicants are notified), budgets, windows and schedules go with it | Programs → Delete |
 
 A waiting interview attempt that is moved or unassigned is removed (it never happened); attempts with attendance
 recorded are kept.

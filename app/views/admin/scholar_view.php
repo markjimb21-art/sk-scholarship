@@ -2,7 +2,7 @@
   <div>
     <a href="<?= url('admin/scholars') ?>" class="small text-muted text-decoration-none"><i class="bi bi-arrow-left"></i> Scholars</a>
     <h4 class="fw-bold mb-0 mt-1"><?= e($scholar['full_name']) ?>
-      <?= $scholar['status'] === 'Active' ? '<span class="badge bg-success ms-1">Active</span>' : '<span class="badge bg-secondary ms-1">Ended — ' . e($scholar['end_reason']) . '</span>' ?></h4>
+      <?php [$label, $color] = Scholar::statusBadge($scholar); ?><span class="badge bg-<?= e($color) ?> ms-1"><?= e($label) ?></span></h4>
     <p class="text-muted small mb-0">
       <code><?= e($scholar['scholar_code']) ?></code> · <?= e($scholar['program_name']) ?> · approved <?= e(fmt_date($scholar['approval_date'])) ?>
       · application <a href="<?= url('admin/application&id=' . (int)$scholar['application_id']) ?>"><?= e($scholar['application_code']) ?></a>
@@ -50,22 +50,24 @@
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-header bg-white"><h6 class="mb-0">Current documents</h6></div>
   <div class="card-body"><div class="row g-3">
-    <?php foreach ($currentDocs as $type => $cur): ?>
+    <?php foreach ($currentDocs as $type => $cur):   // side key => current row (Document::current)
+      $keys = isset($cur['']) || !$cur ? array_keys($cur) : array_map([Document::class, 'sideKey'], Document::sidesFor($type)); ?>
       <div class="col-md-6">
         <div class="border rounded p-3 h-100">
           <div class="d-flex justify-content-between mb-2"><strong><?= e($type) ?></strong>
             <?= $cur ? '<span class="badge bg-success">Current</span>' : '<span class="badge bg-secondary">None</span>' ?></div>
-          <?php if ($cur): ?>
-            <?php if (in_array($cur['mime_type'], ['image/jpeg', 'image/png'], true)): ?>
-              <a href="<?= e($cur['admin_url']) ?>" target="_blank" rel="noopener"><img src="<?= e($cur['admin_url']) ?>" class="img-fluid rounded border mb-2" style="max-height:160px" alt="<?= e($type) ?>"></a>
-            <?php endif; ?>
-            <div class="small">
-              <a href="<?= e($cur['admin_url']) ?>" target="_blank" rel="noopener"><i class="bi bi-eye"></i> Open</a> ·
-              <a href="<?= e($cur['admin_url'] . '&download=1') ?>"><i class="bi bi-download"></i> Download</a>
-              <div class="text-muted"><?= e($cur['original_filename']) ?> · <?= e(fmt_date($cur['uploaded_at'])) ?>
-                · uploaded during <?= e($cur['uploaded_during']) ?> (<?= e($cur['context']) ?>)</div>
-            </div>
-          <?php endif; ?>
+          <div class="row g-2">
+            <?php foreach ($keys as $k): $f = $cur[$k] ?? null; ?>
+              <div class="<?= count($keys) > 1 ? 'col-6' : 'col-12' ?>">
+                <?php if ($f): ?>
+                  <?php $src = $f['admin_url']; $sideLabel = $k; $imgHeight = 160; $invalidBack = null; require VIEW_PATH . '/admin/_document_file.php'; ?>
+                  <div class="small text-muted">uploaded during <?= e($f['uploaded_during']) ?> (<?= e($f['context']) ?>)</div>
+                <?php else: ?>
+                  <div class="small fw-semibold text-muted"><?= e($k) ?></div><div class="small text-muted">Not uploaded.</div>
+                <?php endif; ?>
+              </div>
+            <?php endforeach; ?>
+          </div>
         </div>
       </div>
     <?php endforeach; ?>

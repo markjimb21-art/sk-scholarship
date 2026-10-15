@@ -1,6 +1,10 @@
 /**
  * Application wizard, step IV: each document uploads as soon as it is chosen (no upload button), a file not saved yet is
  * kept in IndexedDB and re-sent after a reload, and "Next: Review" waits until all 5 are saved. Needs application/shared.js.
+ *
+ * A card holds one box per side ([data-doc-slot], data-side "" = one file, "Front", "Back"). Two-sided cards need the
+ * front AND the back (data-doc-sided="1": School ID, Form 138); one file with the whole document, uploaded before sides
+ * existed, covers both (Document::covers on the server).
  */
 (function () {
   'use strict';
@@ -12,7 +16,7 @@
   /* ---------------- Step 4: documents auto-save — each file uploads as soon as it is chosen ---------------- */
   const MAX_SIZE = Number(wizard.dataset.maxBytes);   // MAX_FILE_SIZE (config.php); the server checks it again
   const ALLOWED_EXT = ['pdf', 'jpg', 'jpeg', 'png'];
-  const pendingFiles = {}; // { [docType]: File } — chosen but not saved yet (uploading, or failed and waiting for a retry)
+  const pendingFiles = {}; // { ["type::side"]: File } — chosen but not saved yet (uploading, or failed and waiting for a retry)
   let uploadQueue = Promise.resolve(); // uploads run one at a time, in the order the files were chosen
   const docsWarning = document.getElementById('docsIncompleteWarning');
   const docCards = wizard.querySelectorAll('[data-doc-card]');
@@ -35,27 +39,66 @@
       } catch (e) { resolve(undefined); } // IndexedDB unavailable (private mode etc.): uploads still work, just not kept
     });
   }
-  function pendingKey(docType) { return `${userId}::${docType}`; }
-  function keepPending(docType, file) {
-    return pendingDb('readwrite', (s) => s.put({ blob: file, name: file.name, type: file.type }, pendingKey(docType)));
+  function slotKey(slot) { return slot.closest('[data-doc-card]').dataset.docType + '::' + slot.dataset.side; }
+  function pendingKey(key) { return `${userId}::${key}`; }
+  function keepPending(key, file) {
+    return pendingDb('readwrite', (s) => s.put({ blob: file, name: file.name, type: file.type }, pendingKey(key)));
   }
-  function forgetPending(docType) { return pendingDb('readwrite', (s) => s.delete(pendingKey(docType))); }
+  function forgetPending(key) { return pendingDb('readwrite', (s) => s.delete(pendingKey(key))); }
 
-  function cardFor(docType) {
-    return wizard.querySelector(`[data-doc-card][data-doc-type="${CSS.escape(docType)}"]`);
+  function slotFor(key) {
+    const i = key.lastIndexOf('::');
+    const card = wizard.querySelector(`[data-doc-card][data-doc-type="${CSS.escape(key.slice(0, i))}"]`);
+    return card && card.querySelector(`[data-doc-slot][data-side="${CSS.escape(key.slice(i + 2))}"]`);
   }
-  function setPill(card, text, status) {
+  function slotOf(card, side) { return card.querySelector(`[data-doc-slot][data-side="${side}"]`); }
+  function hasFile(card, side) { const s = slotOf(card, side); return !!s && s.dataset.hasFile === '1'; }
+
+  /* ---------------- two-sided or one file ---------------- */
+  function isSided(card) { return card.dataset.docSided === '1'; }
+  /** The rule of Document::covers(): one file covers both sides; two-sided needs both; one-file needs any file. */
+  function isComplete(card) {
+    if (hasFile(card, '')) return true;
+    return isSided(card) ? hasFile(card, 'Front') && hasFile(card, 'Back') : hasFile(card, 'Front') || hasFile(card, 'Back');
+  }
+  function show(el, visible) { if (el) el.style.display = visible ? '' : 'none'; }
+
+  /** Show the boxes that apply (a replaced one-file version disappears), and refresh the card's "complete" flag and pill. */
+  function refreshCard(card) {
+    const sided = isSided(card);
+    card.querySelectorAll('[data-doc-slot]').forEach((slot) => {
+      const whole = slot.dataset.side === '';
+      const has = slot.dataset.hasFile === '1' || !!pendingFiles[slotKey(slot)];
+      show(slot, whole ? (!sided || has) : (sided || has));
+      show(slot.querySelector('[data-doc-dropzone]'), whole ? !sided : sided);
+      show(slot.querySelector('[data-doc-whole-hint]'), sided);
+    });
+    show(card.querySelector('[data-doc-sides-hint]'), sided);
+    const complete = isComplete(card);
+    card.dataset.docHasFile = complete ? '1' : '0';
     const pill = card.querySelector('[data-doc-status-pill]');
-    if (pill) { pill.textContent = text; pill.className = 'doc-pill doc-' + status; }
+    if (pill && !pill.dataset.saving) {
+      const any = ['', 'Front', 'Back'].some((s) => hasFile(card, s));
+      pill.textContent = complete ? (pill.dataset.savedLabel || 'Uploaded') : (any ? 'Add the other side' : 'Missing');
+      pill.className = 'doc-pill doc-' + (complete ? 'Submitted' : 'Not-Submitted');
+    }
   }
-  function showDocError(card, msg) {
-    const el = card.querySelector('[data-doc-error]');
+
+  function setPill(card, text, status, saving) {
+    const pill = card.querySelector('[data-doc-status-pill]');
+    if (!pill) return;
+    pill.textContent = text;
+    pill.className = 'doc-pill doc-' + status;
+    if (saving) pill.dataset.saving = '1'; else delete pill.dataset.saving;
+  }
+  function showDocError(slot, msg) {
+    const el = slot.querySelector('[data-doc-error]');
     if (!el) return;
     el.textContent = msg;
     el.classList.remove('d-none');
   }
-  function clearDocError(card) {
-    const el = card.querySelector('[data-doc-error]');
+  function clearDocError(slot) {
+    const el = slot.querySelector('[data-doc-error]');
     if (el) el.classList.add('d-none');
   }
 
@@ -64,35 +107,43 @@
     return Array.from(docCards).every((card) => card.dataset.docHasFile === '1');
   }
 
-  function showPreview(card, file) {
-    const previewBox = card.querySelector('[data-doc-preview]');
-    const emptyBox = card.querySelector('[data-doc-dropzone-empty]');
-    const img = card.querySelector('[data-doc-preview-img]');
-    const icon = card.querySelector('[data-doc-preview-icon]');
+  function showPreview(slot, file) {
+    const previewBox = slot.querySelector('[data-doc-preview]');
+    const emptyBox = slot.querySelector('[data-doc-dropzone-empty]');
+    const img = slot.querySelector('[data-doc-preview-img]');
+    const icon = slot.querySelector('[data-doc-preview-icon]');
     if (!previewBox) return;
     previewBox.style.display = '';
     if (emptyBox) emptyBox.style.display = 'none';
     const isImage = file.type === 'image/jpeg' || file.type === 'image/png';
-    if (isImage && img) {
-      img.src = URL.createObjectURL(file);
-      img.classList.remove('d-none');
-      if (icon) icon.style.display = 'none';
-    } else {
-      if (img) img.classList.add('d-none');
-      if (icon) icon.style.display = '';
-    }
+    if (img) { img.classList.toggle('d-none', !isImage); if (isImage) img.src = URL.createObjectURL(file); }
+    if (icon) icon.classList.toggle('d-none', isImage);
   }
 
-  /** Upload one document now (queued behind any upload already running). Resolves true when it is saved. */
-  function uploadDoc(docType) {
+  /** A box whose version was replaced on the server (Document::supersede): it no longer holds a file. */
+  function clearSlot(slot) {
+    if (!slot || slot.dataset.hasFile !== '1') return;
+    slot.dataset.hasFile = '0';
+    show(slot.querySelector('[data-doc-preview]'), false);
+    show(slot.querySelector('[data-doc-dropzone-empty]'), true);
+    show(slot.querySelector('[data-doc-meta]'), false);
+    const wrong = slot.querySelector('form[action*="documents/invalidate"]');
+    if (wrong) wrong.remove();
+  }
+
+  /** Upload one box now (queued behind any upload already running). Resolves true when it is saved. */
+  function uploadDoc(key) {
     const run = () => {
-      const file = pendingFiles[docType];
-      const card = cardFor(docType);
-      if (!file || !card) return Promise.resolve(true);
-      setPill(card, 'Saving…', 'Submitted');
+      const file = pendingFiles[key];
+      const slot = slotFor(key);
+      if (!file || !slot) return Promise.resolve(true);
+      const card = slot.closest('[data-doc-card]');
+      const side = slot.dataset.side;
+      setPill(card, 'Saving…', 'Submitted', true);
       setIndicator('saving', 'Saving documents…');
       const body = new FormData();
-      body.append('document_type', docType);
+      body.append('document_type', card.dataset.docType);
+      body.append('side', side);
       body.append('file', file);
       body.append('_csrf', csrfToken);
       return fetch(uploadUrl, {
@@ -101,26 +152,33 @@
         credentials: 'same-origin',
         headers: { 'X-CSRF-Token': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
       })
-        .then((r) => r.json())
+        // A server error answers with an error page, not JSON: say so (the catch below is for a lost connection only).
+        .then((r) => r.json().catch(() => ({ success: false, message: `The server could not save this file (error ${r.status}). Try again; if it keeps failing, tell the SK office.` })))
         .then((res) => {
-          if (pendingFiles[docType] !== file) return true; // a newer file was chosen meanwhile; its own upload follows
+          if (pendingFiles[key] !== file) return true; // a newer file was chosen meanwhile; its own upload follows
           if (!res.success) {
-            setPill(card, 'Not saved', 'Not-Submitted');
-            showDocError(card, (res.message || 'Upload failed.') + ' Choose the file again to retry.');
+            setPill(card, 'Not saved', 'Not-Submitted', true);
+            showDocError(slot, (res.message || 'Upload failed.') + ' Choose the file again to retry.');
             setIndicator('error', 'A document was not saved');
             return false;
           }
-          delete pendingFiles[docType];
-          forgetPending(docType);
-          clearDocError(card);
-          updateDocCard(card, res.document);
+          delete pendingFiles[key];
+          forgetPending(key);
+          clearDocError(slot);
+          // The server replaced what this upload covers: one file replaces both sides, a side replaces one file.
+          if (side === '') { clearSlot(slotOf(card, 'Front')); clearSlot(slotOf(card, 'Back')); }
+          else clearSlot(slotOf(card, ''));
+          updateSlot(slot, res.document);
+          setPill(card, '', 'Submitted', false);
+          card.querySelector('[data-doc-status-pill]').dataset.savedLabel = res.document.status_label || 'Uploaded';
+          refreshCard(card);
           setIndicator('saved', 'Documents saved');
           if (allRequiredDocsSaved() && docsWarning) docsWarning.classList.add('d-none');
           return true;
         })
         .catch(() => {
-          setPill(card, 'Not saved', 'Not-Submitted');
-          showDocError(card, 'Upload failed — check your connection. It is tried again when you click Next.');
+          setPill(card, 'Not saved', 'Not-Submitted', true);
+          showDocError(slot, 'Upload failed — check your connection. It is tried again when you click Next.');
           setIndicator('error', 'A document was not saved');
           return false;
         });
@@ -130,38 +188,38 @@
     return p;
   }
 
-  function selectFile(card, file) {
-    clearDocError(card);
+  function selectFile(slot, file) {
+    clearDocError(slot);
     const ext = file.name.split('.').pop().toLowerCase();
     if (!ALLOWED_EXT.includes(ext) || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
-      showDocError(card, 'Only PDF, JPG, or PNG files are allowed.');
+      showDocError(slot, 'Only PDF, JPG, or PNG files are allowed.');
       return;
     }
     if (file.size > MAX_SIZE) {
-      showDocError(card, 'File is too large (max ' + wizard.dataset.maxText + ').');
+      showDocError(slot, 'File is too large (max ' + wizard.dataset.maxText + ').');
       return;
     }
-    const docType = card.dataset.docType;
-    pendingFiles[docType] = file;
-    keepPending(docType, file);
-    showPreview(card, file);
-    const filenameEl = card.querySelector('[data-doc-filename]');
-    const filesizeEl = card.querySelector('[data-doc-filesize]');
-    const meta = card.querySelector('[data-doc-meta]');
+    const key = slotKey(slot);
+    pendingFiles[key] = file;
+    keepPending(key, file);
+    showPreview(slot, file);
+    const filenameEl = slot.querySelector('[data-doc-filename]');
+    const filesizeEl = slot.querySelector('[data-doc-filesize]');
+    const meta = slot.querySelector('[data-doc-meta]');
     if (filenameEl) filenameEl.textContent = file.name;
     if (filesizeEl) filesizeEl.textContent = ' · ' + (file.size / 1024 / 1024).toFixed(2) + ' MB';
     if (meta) meta.style.display = '';
-    card.querySelector('.card')?.classList.remove('border-danger');
-    uploadDoc(docType); // auto-save: there is no separate upload button
+    slot.closest('[data-doc-card]').querySelector('.card')?.classList.remove('border-danger');
+    uploadDoc(key); // auto-save: there is no separate upload button
   }
 
   // Re-send any file that was chosen but not saved before the page was closed or reloaded.
-  docCards.forEach((card) => {
-    if (!card.querySelector('[data-doc-file]')) return; // this document cannot be changed now
-    const docType = card.dataset.docType;
-    pendingDb('readonly', (s) => s.get(pendingKey(docType))).then((rec) => {
-      if (!rec || !rec.blob || pendingFiles[docType]) return;
-      selectFile(card, new File([rec.blob], rec.name, { type: rec.type }));
+  wizard.querySelectorAll('[data-doc-slot]').forEach((slot) => {
+    if (!slot.querySelector('[data-doc-file]')) return; // this document cannot be changed now
+    const key = slotKey(slot);
+    pendingDb('readonly', (s) => s.get(pendingKey(key))).then((rec) => {
+      if (!rec || !rec.blob || pendingFiles[key]) return;
+      selectFile(slot, new File([rec.blob], rec.name, { type: rec.type }));
     });
   });
 
@@ -170,17 +228,18 @@
     if (Object.keys(pendingFiles).length) { e.preventDefault(); e.returnValue = ''; }
   });
 
-  docCards.forEach((card) => {
-    const dropzone = card.querySelector('[data-doc-dropzone]');
-    const fileInput = card.querySelector('[data-doc-file]');
+  wizard.querySelectorAll('[data-doc-slot]').forEach((slot) => {
+    const dropzone = slot.querySelector('[data-doc-dropzone]');
+    const fileInput = slot.querySelector('[data-doc-file]');
     if (!dropzone || !fileInput) return; // not editable — no dropzone rendered
 
     dropzone.addEventListener('click', () => fileInput.click());
     dropzone.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
     });
+    fileInput.addEventListener('click', (e) => e.stopPropagation()); // the input sits inside the dropzone
     fileInput.addEventListener('change', () => {
-      if (fileInput.files[0]) selectFile(card, fileInput.files[0]);
+      if (fileInput.files[0]) selectFile(slot, fileInput.files[0]);
       fileInput.value = ''; // choosing the same file again (to retry) still fires "change"
     });
     ['dragenter', 'dragover'].forEach((evt) => {
@@ -191,30 +250,21 @@
     });
     dropzone.addEventListener('drop', (e) => {
       const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (file) selectFile(card, file);
+      if (file) selectFile(slot, file);
     });
   });
 
-  function updateDocCard(card, doc) {
-    card.dataset.docHasFile = '1';
-    setPill(card, doc.status_label || doc.status, doc.status.replace(/ /g, '-'));
-    const meta = card.querySelector('[data-doc-meta]');
-    const filenameEl = card.querySelector('[data-doc-filename]');
+  function updateSlot(slot, doc) {
+    slot.dataset.hasFile = '1';
+    const meta = slot.querySelector('[data-doc-meta]');
+    const filenameEl = slot.querySelector('[data-doc-filename]');
     if (meta && filenameEl) {
       filenameEl.textContent = doc.original_filename;
       meta.style.display = '';
-      let link = card.querySelector('[data-doc-view-link]');
-      if (!link) {
-        link = document.createElement('a');
-        link.setAttribute('data-doc-view-link', '');
-        link.target = '_blank';
-        link.rel = 'noopener';
-        meta.appendChild(link);
-      }
-      link.href = doc.view_url;
-      link.textContent = 'View';
+      const link = slot.querySelector('[data-doc-view-link]');
+      if (link) { link.href = doc.view_url; link.textContent = 'View'; }
     }
-    const remarks = card.querySelector('[data-doc-remarks]');
+    const remarks = slot.querySelector('[data-doc-remarks]');
     if (remarks) remarks.style.display = 'none';
   }
 
@@ -235,7 +285,7 @@
       btn.disabled = true;
       btn.innerHTML = 'Saving documents…';
       // Retry every file that is still unsaved (uploads are queued, so this also waits for any running one).
-      Promise.all(unsaved.map((t) => uploadDoc(t))).then(() => uploadQueue).then(() => {
+      Promise.all(unsaved.map((k) => uploadDoc(k))).then(() => uploadQueue).then(() => {
         btn.disabled = false;
         btn.innerHTML = label;
         if (allRequiredDocsSaved()) {

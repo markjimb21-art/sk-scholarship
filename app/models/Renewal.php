@@ -179,20 +179,28 @@ final class Renewal
         return ['ok' => true];
     }
 
-    /** A9: submit (or resubmit) the renewal for the next semester. */
-    public static function submit(array $term, int $userId): array
+    /**
+     * A9: submit (or resubmit) the renewal for the next semester, with the scholar's year level for it (YEAR_LEVELS;
+     * 'Other' needs $yearLevelOther). The year level is kept on the request and updates the applicant's education record.
+     */
+    public static function submit(array $term, int $userId, string $yearLevel, string $yearLevelOther): array
     {
         if (!self::editable($term)) return ['ok' => false, 'error' => Term::closedReason($term, 'renewal') ?? 'A renewal can’t be submitted right now.'];
         if (!TermDocument::ready((int)$term['id'], 'renewal')) {
-            return ['ok' => false, 'error' => 'Upload both your Enrollment Form and School ID first.'];
+            return ['ok' => false, 'error' => 'Upload your Enrollment Form and your School ID (front and back) first.'];
         }
+        $yearLevelOther = mb_substr(trim($yearLevelOther), 0, 50);
+        if (!in_array($yearLevel, YEAR_LEVELS, true)) return ['ok' => false, 'error' => 'Choose your year level for the next semester.'];
+        if ($yearLevel === 'Other' && $yearLevelOther === '') return ['ok' => false, 'error' => 'Write your year level (you chose Other).'];
+        if ($yearLevel !== 'Other') $yearLevelOther = '';
 
         $pdo = Database::conn();
         $req = self::forTerm((int)$term['id']);
         $now = date('Y-m-d H:i:s');
         if ($req) {
-            $stmt = $pdo->prepare("UPDATE renewal_requests SET status = 'Submitted', submitted_at = ? WHERE id = ? AND status = 'Resubmit'");
-            $stmt->execute([$now, $req['id']]);
+            $stmt = $pdo->prepare("UPDATE renewal_requests SET status = 'Submitted', submitted_at = ?, year_level = ?, year_level_other = ?
+                                   WHERE id = ? AND status = 'Resubmit'");
+            $stmt->execute([$now, $yearLevel, $yearLevelOther ?: null, $req['id']]);
             if ($stmt->rowCount() !== 1) return ['ok' => false, 'error' => 'This renewal was changed by someone else. Please reload the page.'];
             $id = (int)$req['id'];
             $target = ['academic_year' => $req['academic_year'], 'semester' => $req['semester']];
@@ -200,18 +208,21 @@ final class Renewal
             $target = Term::nextSemester($term['academic_year'], $term['semester']);
             try {
                 $pdo->prepare(
-                    "INSERT INTO renewal_requests (scholar_id, from_term_id, academic_year, semester, status, submitted_at)
-                     VALUES (?, ?, ?, ?, 'Submitted', ?)"
-                )->execute([(int)$term['scholar_id'], (int)$term['id'], $target['academic_year'], $target['semester'], $now]);
+                    "INSERT INTO renewal_requests (scholar_id, from_term_id, academic_year, semester, status, submitted_at, year_level, year_level_other)
+                     VALUES (?, ?, ?, ?, 'Submitted', ?, ?, ?)"
+                )->execute([(int)$term['scholar_id'], (int)$term['id'], $target['academic_year'], $target['semester'], $now, $yearLevel, $yearLevelOther ?: null]);
             } catch (PDOException $e) {
                 if ((int)($e->errorInfo[1] ?? 0) === 1062) return ['ok' => false, 'error' => 'A renewal for that semester already exists.'];
                 throw $e;
             }
             $id = (int)$pdo->lastInsertId();
         }
+        $yearText = $yearLevel === 'Other' ? $yearLevelOther : $yearLevel;
         AuditLog::write('renewal_submit', 'renewal_requests', $id,
-            "Renewal requested for {$target['academic_year']} {$target['semester']}",
-            ['status' => $req['status'] ?? null], ['status' => 'Submitted', 'by' => $userId]);
+            "Renewal requested for {$target['academic_year']} {$target['semester']} (year level: $yearText)",
+            ['status' => $req['status'] ?? null], ['status' => 'Submitted', 'year_level' => $yearText, 'by' => $userId]);
+        // The application form's Year Level follows the latest renewal (the old value stays in record_history).
+        Applicant::updateYearLevel((int)$term['applicant_id'], $yearLevel, $yearLevelOther, $userId);
         Notification::adminEvent($req ? 'Renewal resubmitted' : 'Renewal submitted',
             "{$term['full_name']} ({$term['scholar_code']}) — renewal for {$target['academic_year']} {$target['semester']} is waiting for review.",
             'admin/renewals/view&id=' . $id);

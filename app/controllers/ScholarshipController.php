@@ -16,9 +16,10 @@ final class ScholarshipController
         $nextSemester = $term ? Term::nextSemester($term['academic_year'], $term['semester']) : null;
         $claimWindow = $term ? Term::claimWindow($term) : null;
         $renewalWindow = $term && $term['claim_status'] === 'Released' ? Renewal::window($term, $renewal) : null;
+        $education = Applicant::education((int)$applicant['id']) ?? [];   // year level on file (pre-fills the renewal)
 
         render('applicant/scholarship', compact('applicant', 'scholar', 'terms', 'term', 'claimDocs', 'renewalDocs', 'renewal',
-            'nextSemester', 'claimWindow', 'renewalWindow'), 'My Scholarship');
+            'nextSemester', 'claimWindow', 'renewalWindow', 'education') + ['pageScripts' => [asset('js/pages/term-documents.js')]], 'My Scholarship');
     }
 
     /** The current semester of the logged-in scholar, only if $_POST['term_id'] is theirs. */
@@ -28,15 +29,32 @@ final class ScholarshipController
         return ($term && (int)$term['applicant_id'] === (int)Applicant::current()['id']) ? $term : null;
     }
 
+    /**
+     * A8/A9 upload of one claim or renewal file — saved as soon as it is chosen (pages/term-documents.js, AJAX → JSON with
+     * whether the claim/renewal can now be submitted), or from the plain form without JavaScript (redirect).
+     */
     public function uploadTermDocument(string $purpose): void
     {
+        $isAjax = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
         require_post('applicant/scholarship');
         $term = $this->ownTerm();
-        if (!$term) { flash('danger', 'Semester not found.'); redirect('applicant/scholarship'); }
         $type = post_str('type');
-        $result = TermDocument::upload($term, $purpose, $type, $_FILES['file'] ?? []);
-        if ($result['ok']) flash('success', "$type uploaded.");
-        else               flash('danger', $result['error']);
+        $side = in_array($_POST['side'] ?? '', DOCUMENT_SIDES, true) ? $_POST['side'] : null;   // School ID front/back
+        $result = $term ? TermDocument::upload($term, $purpose, $type, $_FILES['file'] ?? [], $side)
+                        : ['ok' => false, 'error' => 'Semester not found.'];
+        $what = TermDocument::label($type) . ($side ? ' (' . strtolower($side) . ')' : '');
+
+        if ($isAjax) {
+            if (!$result['ok']) json_response(['success' => false, 'message' => $result['error']], 400);
+            json_response(['success' => true, 'message' => "$what saved.", 'ready' => TermDocument::ready((int)$term['id'], $purpose),
+                'document' => [
+                    'id' => $result['id'], 'type' => $type, 'side' => $side, 'status_label' => 'Uploaded',
+                    'original_filename' => $result['original'], 'uploaded_at' => fmt_datetime(date('Y-m-d H:i:s')),
+                    'is_image' => in_array($result['mime'], ['image/jpeg', 'image/png'], true),
+                    'view_url' => url('applicant/term-documents/view&id=' . (int)$result['id']),
+                ]]);
+        }
+        flash($result['ok'] ? 'success' : 'danger', $result['ok'] ? "$what uploaded." : $result['error']);
         redirect('applicant/scholarship');
     }
 
@@ -60,7 +78,7 @@ final class ScholarshipController
         require_post('applicant/scholarship');
         $term = $this->ownTerm();
         if (!$term) { flash('danger', 'Semester not found.'); redirect('applicant/scholarship'); }
-        $result = Renewal::submit($term, (int)Auth::user()['id']);
+        $result = Renewal::submit($term, (int)Auth::user()['id'], post_str('year_level'), post_str('year_level_other'));
         if ($result['ok']) flash('success', 'Renewal submitted. We will e-mail you when it is reviewed.');
         else               flash('danger', $result['error']);
         redirect('applicant/scholarship');

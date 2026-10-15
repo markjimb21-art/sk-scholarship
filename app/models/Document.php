@@ -7,58 +7,129 @@ declare(strict_types=1);
  */
 final class Document
 {
-    /** The application's documents: the NEWEST version of each type (older versions stay in the table as history). */
+    /**
+     * The application's documents: for each type, the NEWEST file of each side (older versions stay in the table as
+     * history), as one flat list in DOCUMENT_TYPES order, Front before Back. See latestSides().
+     */
     public static function byApplication(int $applicationId): array
     {
-        $stmt = Database::conn()->prepare(
-            "SELECT d.* FROM documents d
-             WHERE d.application_id = ?
-               AND d.id = (SELECT MAX(d2.id) FROM documents d2 WHERE d2.application_id = d.application_id AND d2.document_type = d.document_type)
-             ORDER BY FIELD(d.document_type, 'Certificate of Residency','Form 138 / Grades','Enrollment Form','School ID','2x2 Photo')"
-        );
+        $stmt = Database::conn()->prepare("SELECT * FROM documents WHERE application_id = ? ORDER BY id");
         $stmt->execute([$applicationId]);
-        return $stmt->fetchAll();
+        $byType = [];
+        foreach ($stmt->fetchAll() as $d) $byType[$d['document_type']][] = $d;
+        $out = [];
+        foreach (DOCUMENT_TYPES as $type) {
+            foreach (self::latestSides($byType[$type] ?? []) as $d) $out[] = $d;
+        }
+        return $out;
+    }
+
+    /* ---------------- front and back (documents.side / term_documents.side) ---------------- */
+
+    /** The array key of a side: '' for one file with the whole document (side NULL), else 'Front' / 'Back'. */
+    public static function sideKey(?string $side): string
+    {
+        return $side ?? '';
+    }
+
+    /** Rows of documents and/or term_documents grouped as type => [side key => row]. */
+    public static function bySide(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $d) $out[$d['document_type'] ?? $d['type']][self::sideKey($d['side'] ?? null)] = $d;
+        return $out;
+    }
+
+    /**
+     * The newest file of each side among one type's versions (given oldest first): side key => row, ordered '', Front,
+     * Back. A one-file version replaces both sides; a Front or Back replaces that side and any one-file version.
+     */
+    public static function latestSides(array $rows): array
+    {
+        $set = [];
+        foreach ($rows as $d) {
+            $key = self::sideKey($d['side'] ?? null);
+            if ($key === '') $set = [];
+            else unset($set['']);
+            $set[$key] = $d;
+        }
+        return self::ordered($set);
+    }
+
+    private static function ordered(array $set): array
+    {
+        $order = ['' => 0, 'Front' => 1, 'Back' => 2];
+        uksort($set, static fn($a, $b) => $order[$a] <=> $order[$b]);
+        return $set;
+    }
+
+    /** The sides a document must have: DOCUMENT_SIDES (a Front and a Back picture, TWO_SIDED_DOCUMENT_TYPES) or [null] (one file). */
+    public static function sidesFor(string $type): array
+    {
+        return in_array($type, TWO_SIDED_DOCUMENT_TYPES, true) ? DOCUMENT_SIDES : [null];
+    }
+
+    /**
+     * Does $set (one type: side key => row, from latestSides/bySide) hold the $needed sides (sidesFor)? Only a stored
+     * file whose status is not in $unusable counts. One file with the whole document covers both sides; a one-file
+     * document is covered by any usable file (e.g. a Form 138 front uploaded before the year level changed).
+     */
+    public static function covers(array $set, array $needed, array $unusable = ['Invalid']): bool
+    {
+        $usable = array_filter($set, static fn($d) => $d['file_path'] !== '' && !in_array($d['status'], $unusable, true));
+        if (isset($usable[''])) return true;
+        if ($needed === [null]) return $usable !== [];
+        foreach ($needed as $side) {
+            if (!isset($usable[$side])) return false;
+        }
+        return true;
     }
 
     /**
      * A2 upload — the ONE place application documents are written. Never overwrites a file: a re-upload adds a new
-     * version row and supersedes the older one(s) of that type for the applicant (Document::supersede), keeping the file.
-     * Only an empty placeholder row (no file yet) is filled in place. The caller checks ownership and editability.
-     * Returns ['ok'=>true,'id','original','size'] or ['ok'=>false,'error'].
+     * version row and supersedes the older one(s) of that type and side for the applicant (Document::supersede), keeping
+     * the file. Only an empty placeholder row (no file yet) is filled in place. $side: 'Front'/'Back' for a two-sided
+     * document, null for one file (sidesFor). The caller checks ownership and editability.
+     * Returns ['ok'=>true,'id','original','size','mime'] or ['ok'=>false,'error'].
      */
-    public static function storeApplicationDocument(array $app, string $type, array $file, int $userId): array
+    public static function storeApplicationDocument(array $app, string $type, array $file, int $userId, ?string $side = null): array
     {
         if (!in_array($type, DOCUMENT_TYPES, true)) return ['ok' => false, 'error' => 'Invalid document type.'];
+        if (!in_array($side, self::sidesFor($type), true)) {
+            return ['ok' => false, 'error' => $side === null ? "Upload the front and the back of your $type separately." : 'Invalid side.'];
+        }
         $stored = DocumentStorage::store($file, DOCUMENT_PATH, 'storage/documents/', (string)(int)$app['id']);
         if (!$stored['ok']) return $stored;
 
-        $newest = null;
-        foreach (self::byApplication((int)$app['id']) as $d) if ($d['document_type'] === $type) $newest = $d;
+        $set = self::bySide(self::byApplication((int)$app['id']))[$type] ?? [];
+        $placeholder = isset($set['']) && $set['']['file_path'] === '' ? $set[''] : null;
+        $hadFile = (bool)array_filter($set, static fn($d) => $d['file_path'] !== '');
+        $what = $type . ($side ? ' (' . strtolower($side) . ')' : '');
         $pdo = Database::conn();
         try {
             $pdo->beginTransaction();
-            if ($newest && $newest['file_path'] === '') {
+            if ($placeholder) {
                 $pdo->prepare("UPDATE documents SET file_path = ?, original_filename = ?, file_size = ?, mime_type = ?, status = 'Submitted',
-                               uploaded_at = NOW(), remarks = NULL, is_current = 1, superseded_at = NULL WHERE id = ?")
-                    ->execute([$stored['rel'], $stored['original'], $stored['size'], $stored['mime'], (int)$newest['id']]);
-                $docId = (int)$newest['id'];
+                               uploaded_at = NOW(), remarks = NULL, is_current = 1, superseded_at = NULL, side = ? WHERE id = ?")
+                    ->execute([$stored['rel'], $stored['original'], $stored['size'], $stored['mime'], $side, (int)$placeholder['id']]);
+                $docId = (int)$placeholder['id'];
             } else {
-                $pdo->prepare("INSERT INTO documents (application_id, document_type, file_path, original_filename, file_size, mime_type, status, uploaded_at, is_current)
-                               VALUES (?, ?, ?, ?, ?, ?, 'Submitted', NOW(), 1)")
-                    ->execute([(int)$app['id'], $type, $stored['rel'], $stored['original'], $stored['size'], $stored['mime']]);
+                $pdo->prepare("INSERT INTO documents (application_id, document_type, side, file_path, original_filename, file_size, mime_type, status, uploaded_at, is_current)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, 'Submitted', NOW(), 1)")
+                    ->execute([(int)$app['id'], $type, $side, $stored['rel'], $stored['original'], $stored['size'], $stored['mime']]);
                 $docId = (int)$pdo->lastInsertId();
             }
             AuditLog::write('document_uploaded', 'documents', $docId,
-                "Uploaded $type for application {$app['application_code']}" . ($newest && $newest['file_path'] !== '' ? ' (new version; the previous file is kept)' : ''),
+                "Uploaded $what for application {$app['application_code']}" . ($hadFile ? ' (new version; the previous file is kept)' : ''),
                 null, ['by' => $userId]);
-            self::supersede((int)$app['applicant_id'], $type, 'documents', $docId);
+            self::supersede((int)$app['applicant_id'], $type, 'documents', $docId, $side);
             $pdo->commit();
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             DocumentStorage::deleteFile($stored['rel']);   // nothing references the new file
             throw $e;
         }
-        return ['ok' => true, 'id' => $docId, 'original' => $stored['original'], 'size' => $stored['size']];
+        return ['ok' => true, 'id' => $docId, 'original' => $stored['original'], 'size' => $stored['size'], 'mime' => $stored['mime']];
     }
 
     /**
@@ -94,14 +165,11 @@ final class Document
         return $stmt->fetch() ?: null;
     }
 
-    /** Names of the required document types that have no uploaded file yet. */
+    /** Names of the required document types without a complete upload yet (a two-sided one needs the front AND the back). */
     public static function missingTypes(int $applicationId): array
     {
-        $uploaded = [];
-        foreach (self::byApplication($applicationId) as $d) {
-            if ($d['file_path'] !== '' && $d['status'] !== 'Invalid') $uploaded[] = $d['document_type'];
-        }
-        return array_values(array_diff(DOCUMENT_TYPES, $uploaded));
+        $sets = self::bySide(self::byApplication($applicationId));
+        return array_values(array_filter(DOCUMENT_TYPES, static fn($type) => !self::covers($sets[$type] ?? [], self::sidesFor($type))));
     }
 
     /* ---------------- versions across documents + term_documents (docs/CHANGE_PLAN_2.md §5) ---------------- */
@@ -109,33 +177,38 @@ final class Document
     /**
      * A new upload of $type is the applicant's current one: mark every other current row of that type for that
      * applicant — in BOTH tables — as superseded (is_current = 0, superseded_at = now). Files are kept.
-     * $keepTable/$keepId is the new row itself. Each change is audit-logged. Returns how many rows were superseded.
+     * $side: a new Front (or Back) supersedes only the current Front (or Back) and any one-file version; a new one-file
+     * version (null) supersedes every side. $keepTable/$keepId is the new row itself. Each change is audit-logged.
+     * Returns how many rows were superseded.
      */
-    public static function supersede(int $applicantId, string $type, string $keepTable, int $keepId): int
+    public static function supersede(int $applicantId, string $type, string $keepTable, int $keepId, ?string $side = null): int
     {
         $pdo = Database::conn();
         $now = date('Y-m-d H:i:s');
         $found = [];
+        $sideSql = $side === null ? '' : ' AND (x.side IS NULL OR x.side = ?)';
+        $params = $side === null ? [$applicantId, $type] : [$applicantId, $type, $side];
         $stmt = $pdo->prepare(
-            "SELECT d.id FROM documents d JOIN applications a ON a.id = d.application_id
-             WHERE a.applicant_id = ? AND d.document_type = ? AND d.is_current = 1 AND d.file_path <> ''"
+            "SELECT x.id FROM documents x JOIN applications a ON a.id = x.application_id
+             WHERE a.applicant_id = ? AND x.document_type = ? AND x.is_current = 1 AND x.file_path <> ''$sideSql"
         );
-        $stmt->execute([$applicantId, $type]);
+        $stmt->execute($params);
         foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $id) $found[] = ['documents', (int)$id];
         $stmt = $pdo->prepare(
-            "SELECT td.id FROM term_documents td
-             JOIN scholar_terms t ON t.id = td.term_id JOIN scholars s ON s.id = t.scholar_id
-             WHERE s.applicant_id = ? AND td.type = ? AND td.is_current = 1"
+            "SELECT x.id FROM term_documents x
+             JOIN scholar_terms t ON t.id = x.term_id JOIN scholars s ON s.id = t.scholar_id
+             WHERE s.applicant_id = ? AND x.type = ? AND x.is_current = 1$sideSql"
         );
-        $stmt->execute([$applicantId, $type]);
+        $stmt->execute($params);
         foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $id) $found[] = ['term_documents', (int)$id];
 
+        $what = $type . ($side ? ' (' . strtolower($side) . ')' : '');
         $count = 0;
         foreach ($found as [$table, $id]) {
             if ($table === $keepTable && $id === $keepId) continue;
             $pdo->prepare("UPDATE `$table` SET is_current = 0, superseded_at = ? WHERE id = ? AND is_current = 1")->execute([$now, $id]);
             AuditLog::write('document_superseded', $table, $id,
-                "$type superseded by a newer upload ($keepTable #$keepId)", ['is_current' => 1], ['is_current' => 0, 'superseded_at' => $now]);
+                "$what superseded by a newer upload ($keepTable #$keepId)", ['is_current' => 1], ['is_current' => 0, 'superseded_at' => $now]);
             $count++;
         }
         return $count;
@@ -143,32 +216,38 @@ final class Document
 
     /**
      * Every version of one document type for an applicant, from the application(s) and from claims/renewals,
-     * newest first. Each row: source_table, id, type, original_filename, mime_type, uploaded_at, status, is_current,
-     * superseded_at, uploaded_during (Application | Claim | Renewal), context (application code or semester),
-     * admin_url (where an admin opens it).
+     * newest first. Each row: source_table, id, type, side (null = one file), original_filename, mime_type, uploaded_at,
+     * status, is_current, superseded_at, uploaded_during (Application | Claim | Renewal), context (application code or
+     * semester), admin_url (where an admin opens it).
      */
     public static function history(int $applicantId, string $type): array
     {
         return self::versions($applicantId, $type, false);
     }
 
-    /** The applicant's current version of a document type (newest is_current row across both tables), or null. */
-    public static function current(int $applicantId, string $type): ?array
+    /**
+     * The applicant's current version of a document type across both tables (the is_current rows): side key ('' = one
+     * file, 'Front', 'Back') => row, the newest per side. Empty when there is none.
+     */
+    public static function current(int $applicantId, string $type): array
     {
-        return self::versions($applicantId, $type, true)[0] ?? null;
+        $set = [];
+        foreach (self::versions($applicantId, $type, true) as $r) $set[self::sideKey($r['side'])] ??= $r;   // newest first
+        return self::ordered($set);
     }
 
     private static function versions(int $applicantId, string $type, bool $currentOnly): array
     {
         $stmt = Database::conn()->prepare(
             "SELECT * FROM (
-                SELECT 'documents' AS source_table, d.id, CAST(d.document_type AS CHAR(40)) AS type, d.original_filename,
+                SELECT 'documents' AS source_table, d.id, CAST(d.document_type AS CHAR(40)) AS type, CAST(d.side AS CHAR(5)) AS side,
+                       d.original_filename,
                        d.mime_type, d.uploaded_at, CAST(d.status AS CHAR(20)) AS status, d.is_current, d.superseded_at, d.invalid_reason,
                        'Application' AS uploaded_during, a.application_code AS context
                 FROM documents d JOIN applications a ON a.id = d.application_id
                 WHERE a.applicant_id = :applicant_doc AND d.document_type = :type_doc AND d.file_path <> ''
                 UNION ALL
-                SELECT 'term_documents', td.id, CAST(td.type AS CHAR(40)), td.original_filename,
+                SELECT 'term_documents', td.id, CAST(td.type AS CHAR(40)), CAST(td.side AS CHAR(5)), td.original_filename,
                        td.mime_type, td.uploaded_at, CAST(td.status AS CHAR(20)), td.is_current, td.superseded_at, td.invalid_reason,
                        IF(td.purpose = 'claim', 'Claim', 'Renewal'),
                        IF(td.purpose = 'claim', CONCAT(t.academic_year, ' ', t.semester),

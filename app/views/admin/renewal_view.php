@@ -5,6 +5,8 @@
   <p class="text-muted small mb-0"><a href="<?= url('admin/scholar&id=' . (int)$req['scholar_id']) ?>"><?= e($req['scholar_code']) ?></a> · <?= e($req['program_name']) ?>
     · <span class="badge bg-info"><?= e(RENEWAL_STATUS_LABELS[$req['status']]) ?></span>
     <?= $req['scholar_status'] !== 'Active' ? '<span class="badge bg-secondary">Scholarship ended</span>' : '' ?></p>
+  <p class="small mb-0">Year level for this semester:
+    <strong><?= $req['year_level'] ? e($req['year_level'] === 'Other' ? (string)$req['year_level_other'] : $req['year_level']) : 'not given (renewed before the year level was asked)' ?></strong></p>
 </div>
 
 <?php $types = TERM_DOCUMENT_TYPES['renewal']; require VIEW_PATH . '/admin/_term_documents.php'; ?>
@@ -50,7 +52,7 @@
       <div class="modal-body">
         <p class="small mb-1">Documents to re-upload:</p>
         <?php foreach (TERM_DOCUMENT_TYPES['renewal'] as $t): ?>
-          <div class="form-check"><input class="form-check-input" type="checkbox" name="types[]" value="<?= e($t) ?>" id="rn<?= md5($t) ?>" checked><label class="form-check-label" for="rn<?= md5($t) ?>"><?= e($t) ?></label></div>
+          <div class="form-check"><input class="form-check-input" type="checkbox" name="types[]" value="<?= e($t) ?>" id="rn<?= md5($t) ?>" checked><label class="form-check-label" for="rn<?= md5($t) ?>"><?= e(TermDocument::label($t)) ?></label></div>
         <?php endforeach; ?>
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="invalid" value="1" id="markInvalid">
           <label class="form-check-label" for="markInvalid">The file is invalid (wrong person or wrong document) — remove it. The record is kept, marked Invalid with your remarks.</label></div>

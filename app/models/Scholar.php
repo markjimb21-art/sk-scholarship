@@ -1,10 +1,27 @@
 <?php
 declare(strict_types=1);
 
-/** Scholars: Active or Ended (with a reason). Semesters, claims and renewals live in Term / Renewal. */
+/**
+ * Scholars: Active or Ended (with a reason). An Ended scholar whose reason is Graduated is shown as "Graduated".
+ * Semesters, claims and renewals live in Term / Renewal.
+ */
 final class Scholar
 {
     private const LIST_LIMIT = 500;   // scholars page
+
+    /** Scholars page status filter => label. 'current' (the default) = Active and graduated scholars. */
+    public const LIST_FILTERS = [
+        'current' => 'Active and graduated', 'Active' => 'Active', 'Graduated' => 'Graduated',
+        'Ended' => 'Ended (other reasons)', 'all' => 'All',
+    ];
+
+    /** The status a scholar is shown with: [label, Bootstrap colour] — Active, Graduated, or "Ended — <reason>". */
+    public static function statusBadge(array $scholar): array
+    {
+        if ($scholar['status'] === 'Active') return ['Active', 'success'];
+        if ($scholar['end_reason'] === 'Graduated') return ['Graduated', 'primary'];
+        return ['Ended — ' . $scholar['end_reason'], 'secondary'];
+    }
 
     public static function find(int $id): ?array
     {
@@ -64,7 +81,13 @@ final class Scholar
                 JOIN users u ON u.id = ap.user_id
                 WHERE 1=1";
         $params = [];
-        if (in_array($filters['status'] ?? '', ['Active', 'Ended'], true)) { $sql .= " AND s.status = :st"; $params['st'] = $filters['status']; }
+        $sql .= match ($filters['status'] ?? 'current') {
+            'current'   => " AND (s.status = 'Active' OR s.end_reason = 'Graduated')",
+            'Active'    => " AND s.status = 'Active'",
+            'Graduated' => " AND s.status = 'Ended' AND s.end_reason = 'Graduated'",
+            'Ended'     => " AND s.status = 'Ended' AND NOT (s.end_reason <=> 'Graduated')",
+            default     => '',   // 'all'
+        };
         if (!empty($filters['program_id'])) { $sql .= " AND s.program_id = :pid"; $params['pid'] = (int)$filters['program_id']; }
         if (($filters['q'] ?? '') !== '') {
             $sql .= " AND (u.full_name LIKE :q1 OR s.scholar_code LIKE :q2 OR u.email LIKE :q3)";
@@ -77,7 +100,8 @@ final class Scholar
 
     /**
      * B10 End the scholarship (Active -> Ended with a reason). An ended scholar can't claim or renew.
-     * Returns ['ok'=>true,'slot_freed'=>bool] — a slot is freed when it ended in the first semester.
+     * Returns ['ok'=>true,'slot_freed'=>bool] — a slot is freed when the scholar graduated or it ended in the first
+     * semester (Program::slotsUsed).
      */
     public static function end(int $id, string $reason, int $adminId): array
     {
@@ -96,7 +120,7 @@ final class Scholar
         Notification::send((int)$scholar['user_id'], 'Scholarship ended',
             "Your SK scholarship ({$scholar['program_name']}) has ended. Reason: $reason. Thank you for being an SK scholar.",
             'info', url('applicant/scholarship'), sendEmail: true);
-        return ['ok' => true, 'slot_freed' => (int)$terms->fetchColumn() <= 1, 'program_id' => (int)$scholar['program_id']];
+        return ['ok' => true, 'slot_freed' => $reason === 'Graduated' || (int)$terms->fetchColumn() <= 1, 'program_id' => (int)$scholar['program_id']];
     }
 
     /**

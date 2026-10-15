@@ -72,7 +72,7 @@ final class InterviewAssignment
         $sched = Interview::schedule($scheduleId);
         if (!$sched) return ['assigned' => 0, 'errors' => ['' => 'Schedule not found.']];
         if ($sched['status'] === 'Cancelled') return ['assigned' => 0, 'errors' => ['' => 'This schedule is cancelled.']];
-        if ($sched['interview_date'] < date('Y-m-d')) return ['assigned' => 0, 'errors' => ['' => 'This schedule is in the past.']];
+        if (Interview::isClosed($sched)) return ['assigned' => 0, 'errors' => ['' => 'This schedule is closed (closed by the SK office, or its time has passed).']];
 
         $pdo = Database::conn();
         $assigned = 0;
@@ -160,7 +160,7 @@ final class InterviewAssignment
             if (!$current || $current['attendance'] !== 'Scheduled') return ['ok' => false, 'error' => 'This interview already has attendance recorded.'];
             if ((int)$current['schedule_id'] === $scheduleId) return ['ok' => false, 'error' => 'The applicant is already on that schedule.'];
             $target = Interview::schedule($scheduleId);
-            if (!$target || $target['status'] === 'Cancelled') return ['ok' => false, 'error' => 'Choose an open schedule.'];
+            if (!$target || $target['status'] === 'Cancelled' || Interview::isClosed($target)) return ['ok' => false, 'error' => 'Choose an open schedule.'];
             if ((int)$target['assigned_count'] >= (int)$target['max_slots']) return ['ok' => false, 'error' => 'That schedule is full.'];
             $pdo = Database::conn();
             try {

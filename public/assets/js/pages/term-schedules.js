@@ -11,13 +11,20 @@
     var edit = !!s, v = function (id, val) { document.getElementById(id).value = val == null ? '' : val; };
     v('schId', edit ? s.id : '');
     document.getElementById('schTitle').textContent = edit ? 'Edit window' : 'New window';
-    document.getElementById('schFixed').classList.toggle('d-none', edit);
-    ['schProgram', 'schYear', 'schSemester'].forEach(function (id) { document.getElementById(id).disabled = edit; });
-    var fixed = document.getElementById('schFixedText');
-    fixed.classList.toggle('d-none', !edit);
-    fixed.textContent = edit ? s.program_name + ' — ' + s.academic_year + ' ' + s.semester : '';
-    var p = prefill || {};
-    if (!edit) { v('schProgram', p.program_id || ''); if (p.academic_year) v('schYear', p.academic_year); if (p.semester) v('schSemester', p.semester); }
+    // Program / A.Y. / semester can be chosen on a new window, and changed on one nobody has submitted under yet.
+    var locked = edit && Number(s.submitted_count) > 0;
+    document.getElementById('schFixed').classList.toggle('d-none', locked);
+    ['schProgram', 'schYear', 'schSemester'].forEach(function (id) { document.getElementById(id).disabled = locked; });
+    document.getElementById('schFixedText').classList.toggle('d-none', !locked);
+    document.getElementById('schFixedName').textContent = locked ? s.program_name + ' — ' + s.academic_year + ' ' + s.semester : '';
+    var p = edit ? s : (prefill || {});
+    var year = document.getElementById('schYear');
+    if (p.academic_year && !Array.from(year.options).some(function (o) { return o.value === p.academic_year; })) {
+      year.add(new Option(p.academic_year, p.academic_year));   // a year not in the list (e.g. an older window)
+    }
+    v('schProgram', p.program_id || '');
+    if (p.academic_year) v('schYear', p.academic_year);
+    if (p.semester) v('schSemester', p.semester);
     v('schOpens', edit ? s.opens_at : '');
     v('schDeadline', edit ? s.submission_deadline : '');
     v('schPlanned', edit ? s.planned_date : '');

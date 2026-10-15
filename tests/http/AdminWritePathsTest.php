@@ -44,9 +44,13 @@ final class AdminWritePathsTest extends HttpTestCase
     public function testUserSearch(): void
     {
         $c = self::signedIn('admin@test.local');
-        $html = $c->get('/admin/users&q=scott&role=applicant')->body;
+        $html = $c->get('/admin/users&q=scott&role=scholar')->body;   // Scott: an applicant account with an Active scholarship
         $this->assertStringContainsString('scholar@test.local', $html);
+        $this->assertStringContainsString('>Scholar</span>', $html);
         $this->assertStringNotContainsString('draft@test.local', $html);
+        $html = $c->get('/admin/users&role=applicant')->body;
+        $this->assertStringContainsString('draft@test.local', $html);
+        $this->assertStringNotContainsString('scholar@test.local', $html, 'a scholar is not listed as a plain applicant');
     }
 
     public function testSettingsAndHolidays(): void

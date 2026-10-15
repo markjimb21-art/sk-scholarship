@@ -2,10 +2,8 @@
 $app = $app ?? null;
 $editable = $editable ?? false;
 $documents = $documents ?? [];
-$docByType = [];
-foreach ($documents as $d) { $docByType[$d['document_type']] = $d; }
-$docsUploaded = 0;
-foreach (DOCUMENT_TYPES as $dt) { if (!empty($docByType[$dt]['file_path']) && $docByType[$dt]['status'] !== 'Invalid') $docsUploaded++; }
+$docSets = Document::bySide($documents);   // type => [side key ('' = one file, 'Front', 'Back') => newest row]
+$docsUploaded = count(array_filter(DOCUMENT_TYPES, static fn($dt) => Document::covers($docSets[$dt] ?? [], Document::sidesFor($dt))));
 $flags = $flags ?? [];
 $flagLabels = Application::flagOptions();
 $updatedAt = $app['updated_at'] ?? null;

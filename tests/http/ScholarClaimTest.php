@@ -20,18 +20,34 @@ final class ScholarClaimTest extends HttpTestCase
         $c = self::signedIn('scholar@test.local');
 
         $c->post('/applicant/claim/submit', ['term_id' => 2], [], [], '/applicant/scholarship');
-        $this->assertSame('Upload both your School ID and Grades first.', self::flashAfter($c));
+        $this->assertSame('Upload your School ID (front and back) and your college grades first.', self::flashAfter($c));
 
         $c->post('/applicant/claim/upload', ['term_id' => 2, 'type' => 'Birth Certificate'], ['file' => [self::pdf('x.pdf'), 'application/pdf', 'x.pdf']], [], '/applicant/scholarship');
         $this->assertSame('Invalid document type.', self::flashAfter($c));
 
-        foreach (['School ID', 'Grades'] as $type) {
-            $c->post('/applicant/claim/upload', ['term_id' => 2, 'type' => $type], ['file' => [self::pdf("$type.pdf"), 'application/pdf', "$type.pdf"]], [], '/applicant/scholarship');
-            $this->assertSame("$type uploaded.", self::flashAfter($c));
+        $c->post('/applicant/claim/upload', ['term_id' => 2, 'type' => 'School ID'], ['file' => [self::pdf('one.pdf'), 'application/pdf', 'one.pdf']], [], '/applicant/scholarship');
+        $this->assertSame('Upload the front and the back of your School ID separately.', self::flashAfter($c));
+
+        foreach ([['School ID', 'Front', 'School ID (front) uploaded.'], ['Grades', '', 'College grades (Certificate of Grades) uploaded.']] as [$type, $side, $flash]) {
+            $c->post('/applicant/claim/upload', ['term_id' => 2, 'type' => $type, 'side' => $side], ['file' => [self::pdf("$type$side.pdf"), 'application/pdf', "$type$side.pdf"]], [], '/applicant/scholarship');
+            $this->assertSame($flash, self::flashAfter($c));
         }
+        $this->assertFalse(TermDocument::ready(2, 'claim'), 'the back of the School ID is still missing');
+
+        // The page saves a file as soon as it is chosen (AJAX): the answer says whether the claim can now be submitted.
+        $c->post('/applicant/claim/upload', ['term_id' => 2, 'type' => 'School ID', 'side' => 'Back'],
+            ['file' => [self::pdf('School IDBack.pdf'), 'application/pdf', 'School IDBack.pdf']], ['X-Requested-With: XMLHttpRequest'], '/applicant/scholarship');
+        $r = $c->json();
+        $this->assertTrue($r['success'], $c->body);
+        $this->assertTrue($r['ready']);
+        $this->assertSame('Back', $r['document']['side']);
+
         $this->assertEqualsCanonicalizing(['School ID', 'Grades'], array_keys(TermDocument::forTerm(2, 'claim')));
+        $this->assertSame(['Front', 'Back'], array_keys(TermDocument::forTerm(2, 'claim')['School ID']));
         $this->assertTrue(TermDocument::ready(2, 'claim'));
-        $this->assertSame('School ID.pdf', Document::current(8, 'School ID')['original_filename'], 'the new upload is the current School ID');
+        $current = Document::current(8, 'School ID');
+        $this->assertSame(['Front', 'Back'], array_keys($current), 'the new front and back replace the one-file School ID');
+        $this->assertSame('School IDFront.pdf', $current['Front']['original_filename']);
 
         $c->post('/applicant/claim/submit', ['term_id' => 2], [], [], '/applicant/scholarship');
         $this->assertSame('Claim submitted. We will e-mail you when your documents are verified.', self::flashAfter($c));

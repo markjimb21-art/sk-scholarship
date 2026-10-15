@@ -300,7 +300,7 @@ final class Application
                     $notRedone[] = $d['document_type'];
                 }
             }
-            if ($notRedone) return ['ok' => false, 'error' => 'Upload a new ' . implode(' and ', $notRedone) . ' first — the SK office flagged it.'];
+            if ($notRedone) return ['ok' => false, 'error' => 'Upload a new ' . implode(' and ', array_unique($notRedone)) . ' first — the SK office flagged it.'];
         }
 
         try {

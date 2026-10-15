@@ -119,17 +119,23 @@
               </div>
               <table class="table table-sm mb-0 review-table"><tbody>
                 <?php foreach (DOCUMENT_TYPES as $dt):
-                  $doc = $docByType[$dt] ?? null;
-                  $ok = $doc && $doc['file_path'] && $doc['status'] !== 'Invalid'; ?>
+                  $set = $docSets[$dt] ?? [];
+                  $ok = Document::covers($set, Document::sidesFor($dt));
+                  $files = array_filter($set, static fn($d) => $d['file_path'] !== '' && $d['status'] !== 'Invalid');
+                  $first = reset($files); ?>
                   <tr data-review-doc="<?= e($dt) ?>">
                     <th class="text-muted fw-normal w-40"><?= e($dt) ?></th>
                     <td>
                       <span class="fw-semibold <?= $ok ? 'text-success' : 'text-danger' ?>" data-review-doc-status>
                         <i class="bi <?= $ok ? 'bi-check-circle-fill' : 'bi-x-circle-fill' ?>"></i>
-                        <?= e($ok ? ($docLabels[$doc['status']] ?? $doc['status']) : 'Missing') ?>
+                        <?= e($ok ? ($docLabels[$first['status']] ?? $first['status']) : ($files ? 'Add the other side' : 'Missing')) ?>
                       </span>
-                      <span class="small text-muted ms-1" data-review-doc-file><?= $ok ? e($doc['original_filename']) : '' ?></span>
-                      <?php if ($ok): ?><a class="small ms-1" href="<?= e(url('applicant/documents/view&id=' . (int)$doc['id'])) ?>" target="_blank" rel="noopener" data-review-doc-link>View</a><?php endif; ?>
+                      <span data-review-doc-files>
+                        <?php foreach ($files as $k => $f): ?>
+                          <span class="small text-muted ms-1"><?= $k !== '' ? e($k) . ': ' : '' ?><?= e($f['original_filename']) ?></span>
+                          <a class="small ms-1" href="<?= e(url('applicant/documents/view&id=' . (int)$f['id'])) ?>" target="_blank" rel="noopener">View</a>
+                        <?php endforeach; ?>
+                      </span>
                     </td>
                   </tr>
                 <?php endforeach; ?>

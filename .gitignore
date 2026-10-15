@@ -15,3 +15,6 @@ backup_*.sql
 # Test tools (tests/composer.json) and PHPUnit cache: installed locally, never committed
 tests/vendor/
 tests/.phpunit.cache/
+
+# Session files (private: who is signed in)
+storage/sessions/

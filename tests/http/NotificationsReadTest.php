@@ -44,7 +44,10 @@ final class NotificationsReadTest extends HttpTestCase
     {
         $c = self::signedIn('scholar@test.local');
         $c->get('/applicant/notifications');
-        $this->assertSame(419, $c->post('/applicant/notifications/mark-read', ['_csrf' => str_repeat('0', 64)])->status);
+        // As the page's script sends it: a JSON refusal (403) the script can show.
+        $c->post('/applicant/notifications/mark-read', ['_csrf' => str_repeat('0', 64)], [], ['X-Requested-With: XMLHttpRequest']);
+        $this->assertSame(403, $c->status);
+        $this->assertFalse($c->json()['success']);
         $this->assertSame(1, self::unread(11));
     }
 

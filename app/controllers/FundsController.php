@@ -163,13 +163,26 @@ final class FundsController
         redirect($back);
     }
 
+    /** Only a window nobody submitted under (TermSchedule::delete). */
+    public function termScheduleDelete(): void
+    {
+        $back = 'admin/' . (($_POST['purpose'] ?? '') === 'renewal' ? 'renewal' : 'release') . '-schedule';
+        require_post($back);
+        $r = TermSchedule::delete(post_int('id'), admin_id());
+        if ($r['ok']) $back = "admin/{$r['purpose']}-schedule";
+        flash($r['ok'] ? 'success' : 'danger', $r['ok']
+            ? 'Window deleted.' . ($r['notified'] ? " {$r['notified']} scholar(s) were told it was cancelled." : '')
+            : $r['error']);
+        redirect($back);
+    }
+
     /* ---------------- B10 scholars ---------------- */
 
     public function scholars(): void
     {
         $filters = [
             'q' => trim(get_str('q')),
-            'status' => (string)($_GET['status'] ?? 'Active'),
+            'status' => array_key_exists(get_str('status'), Scholar::LIST_FILTERS) ? get_str('status') : 'current',
             'program_id' => get_str('program_id'),
         ];
         $rows = Scholar::search($filters);
@@ -202,7 +215,8 @@ final class FundsController
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/scholar&id=' . $id); }
         flash('warning', 'Scholarship ended. The scholar was notified.');
         if ($r['slot_freed'] && AdminController::canAccess('decisions')) {
-            flash('info', 'It ended during the first semester, so a slot opened. Promote the next waitlisted applicant on the Decisions page.');
+            flash('info', (post_str('reason') === 'Graduated' ? 'The scholar graduated' : 'It ended during the first semester')
+                . ', so a slot opened. Promote the next waitlisted applicant on the Decisions page.');
             redirect('admin/decisions&program_id=' . $r['program_id']);
         }
         redirect('admin/scholar&id=' . $id);

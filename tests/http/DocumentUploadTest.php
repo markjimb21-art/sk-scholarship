@@ -48,23 +48,23 @@ final class DocumentUploadTest extends DatabaseTestCase
     }
 
     /** Upload as the wizard does (AJAX → JSON answer). */
-    private function upload(string $type, string $file, string $mime, string $name): array
+    private function upload(string $type, string $file, string $mime, string $name, string $side = ''): array
     {
-        self::$draft->post('/applicant/documents/upload', ['document_type' => $type], ['file' => [$file, $mime, $name]],
+        self::$draft->post('/applicant/documents/upload', ['document_type' => $type, 'side' => $side], ['file' => [$file, $mime, $name]],
             ['X-Requested-With: XMLHttpRequest'], '/applicant/application');
         return self::$draft->json() ?? ['raw' => self::$draft->body];
     }
 
     public function testATextFileNamedPdfIsRefused(): void
     {
-        $r = $this->upload('School ID', self::fixture('notes.pdf', "just some text\n"), 'application/pdf', 'notes.pdf');
+        $r = $this->upload('School ID', self::fixture('notes.pdf', "just some text\n"), 'application/pdf', 'notes.pdf', 'Front');
         $this->assertSame(['success' => false, 'message' => 'Only PDF, JPG, or PNG allowed.'], $r);
     }
 
     public function testAFileOverFiveMegabytesIsRefused(): void
     {
         $big = self::fixture('big.pdf', '%PDF-1.4' . str_repeat('0', MAX_FILE_SIZE));
-        $r = $this->upload('School ID', $big, 'application/pdf', 'big.pdf');
+        $r = $this->upload('School ID', $big, 'application/pdf', 'big.pdf', 'Front');
         $this->assertSame(['success' => false, 'message' => 'File too large (max 5MB).'], $r);
     }
 
@@ -76,7 +76,7 @@ final class DocumentUploadTest extends DatabaseTestCase
 
     public function testAnEmptyFileIsRefused(): void
     {
-        $r = $this->upload('School ID', self::fixture('empty.pdf', ''), 'application/pdf', 'empty.pdf');
+        $r = $this->upload('School ID', self::fixture('empty.pdf', ''), 'application/pdf', 'empty.pdf', 'Front');
         $this->assertFalse($r['success']);
     }
 
@@ -88,15 +88,45 @@ final class DocumentUploadTest extends DatabaseTestCase
 
     public function testAValidPdfIsStoredAndBecomesTheCurrentVersion(): void
     {
-        $r = $this->upload('School ID', self::fixture('school-id.pdf', "%PDF-1.4\n%%EOF\n"), 'application/pdf', 'school-id.pdf');
+        $r = $this->upload('School ID', self::fixture('school-id.pdf', "%PDF-1.4\n%%EOF\n"), 'application/pdf', 'school-id.pdf', 'Front');
         $this->assertTrue($r['success'], json_encode($r));
         $this->assertSame('Uploaded', $r['document']['status_label']);
         $current = Document::current(1, 'School ID');
-        $this->assertSame('school-id.pdf', $current['original_filename']);
+        $this->assertSame(['Front'], array_keys($current), 'only the front so far');
+        $this->assertSame('school-id.pdf', $current['Front']['original_filename']);
         $path = (string)self::value('SELECT file_path FROM documents WHERE id = ?', [$r['document']['id']]);
         $this->assertStringStartsWith('storage/documents/1/', $path);
         $this->assertFileExists(self::$server->storage . '/documents/1/' . basename($path), 'stored in the temporary storage');
         $this->assertFileDoesNotExist(BASE_PATH . '/' . $path, 'never in the real storage/');
+    }
+
+    public function testASchoolIdNeedsAFrontOrBackSide(): void
+    {
+        $r = $this->upload('School ID', self::fixture('one.pdf', "%PDF-1.4\n%%EOF\n"), 'application/pdf', 'one.pdf');
+        $this->assertSame(['success' => false, 'message' => 'Upload the front and the back of your School ID separately.'], $r);
+    }
+
+    public function testTheBackOfTheSchoolIdIsStoredBesideTheFront(): void
+    {
+        $this->upload('School ID', self::fixture('front.pdf', "%PDF-1.4\n%%EOF\n"), 'application/pdf', 'front.pdf', 'Front');
+        $r = $this->upload('School ID', self::fixture('back.pdf', "%PDF-1.4\n%%EOF\n"), 'application/pdf', 'back.pdf', 'Back');
+        $this->assertTrue($r['success'], json_encode($r));
+        $this->assertSame('Back', $r['document']['side']);
+        $current = Document::current(1, 'School ID');
+        $this->assertSame(['front.pdf', 'back.pdf'], [$current['Front']['original_filename'], $current['Back']['original_filename']]);
+        $this->assertNotContains('School ID', Document::missingTypes(1), 'front and back: the School ID is complete');
+    }
+
+    public function testTheForm138IsAFrontAndABackForEveryYearLevel(): void
+    {
+        Database::conn()->exec("UPDATE education_records SET year_level = '3rd Year' WHERE applicant_id = 1");
+        $r = $this->upload('Form 138 / Grades', self::fixture('grades.pdf', "%PDF-1.4\n%%EOF\n"), 'application/pdf', 'grades.pdf');
+        $this->assertSame(['success' => false, 'message' => 'Upload the front and the back of your Form 138 / Grades separately.'], $r);
+        foreach (['Front', 'Back'] as $side) {
+            $r = $this->upload('Form 138 / Grades', self::fixture("f138-$side.pdf", "%PDF-1.4\n%%EOF\n"), 'application/pdf', "f138-$side.pdf", $side);
+            $this->assertTrue($r['success'], json_encode($r));
+        }
+        $this->assertNotContains('Form 138 / Grades', Document::missingTypes(1));
     }
 
     public function testAValidPngIsStored(): void

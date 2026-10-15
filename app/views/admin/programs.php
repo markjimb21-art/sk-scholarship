@@ -28,7 +28,7 @@
         <?php foreach ($programs as $p):
           $acceptingNow = $openProgram && (int)$openProgram['id'] === (int)$p['id']; ?>
           <tr>
-            <td><div class="fw-semibold"><?= e($p['program_name']) ?></div><small class="text-muted">A.Y. <?= e($p['academic_year']) ?></small></td>
+            <td><div class="fw-semibold"><?= e($p['program_name']) ?></div></td>
             <td><small><?= e(fmt_date($p['application_start'])) ?> – <?= e(fmt_date($p['application_end'])) ?></small></td>
             <td><?= e(peso($p['amount_per_semester'])) ?></td>
             <td><small class="text-muted">
@@ -52,6 +52,17 @@
                 <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
                 <button class="btn btn-sm btn-outline-<?= $p['is_active'] ? 'warning' : 'success' ?>"><?= $p['is_active'] ? 'Close' : 'Open' ?></button>
               </form>
+              <?php if ((int)$p['application_count'] === 0): // nobody submitted: no records to keep (Program::delete) ?>
+                <?php $drafts = (int)$p['draft_count']; ?>
+                <form method="POST" action="<?= url('admin/program-delete') ?>" class="d-inline"
+                      data-confirm="<?= e('Delete "' . $p['program_name'] . '"? Its budgets, claim/renewal windows and interview schedules are deleted too'
+                          . ($drafts ? ", and the $drafts unfinished (Draft) application(s) on it, with their uploaded files — each applicant is told" : '')
+                          . '. This cannot be undone.') ?>">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+                  <button class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete program"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                </form>
+              <?php endif; ?>
             </td>
           </tr>
         <?php endforeach; ?>
@@ -70,30 +81,31 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div class="row g-3">
-          <div class="col-md-8">
+        <!-- align-items-end keeps the inputs in a row level when a label wraps (e.g. at A++ text size);
+             help text sits in its own full-width row so it never pushes an input up -->
+        <div class="row g-3 align-items-end">
+          <div class="col-12">
             <label class="form-label">Program name *</label>
             <input name="program_name" id="pName" class="form-control" maxlength="150" required>
           </div>
-          <div class="col-md-4">
-            <label class="form-label">Academic year *</label>
-            <input name="academic_year" id="pYear" class="form-control" placeholder="2026-2027" pattern="\d{4}-\d{4}" required>
-            <div class="form-text">Semester 1 of approved scholars is the 1st Semester of this year.</div>
-          </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label">Applications open *</label>
             <input type="date" name="application_start" id="pStart" class="form-control" required>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <label class="form-label">Applications close *</label>
             <input type="date" name="application_end" id="pEnd" class="form-control" required>
           </div>
-          <div class="col-md-2">
+          <div class="col-12 form-text mt-1" data-month="<?= ACADEMIC_YEAR_START_MONTH ?>" id="pYearInfo">
+            Academic year: <strong id="pYearShown">—</strong> <span id="pYearRule">(from the opening date: June–December → that year's A.Y.,
+            January–May → the A.Y. that began the year before). Semester 1 of approved scholars is its 1st Semester.</span>
+          </div>
+          <div class="col-md-3">
             <label class="form-label">Slots *</label>
             <input type="number" name="slots_available" id="pSlots" class="form-control" min="1" step="1" required>
           </div>
-          <div class="col-md-2">
-            <label class="form-label">₱ / semester *</label>
+          <div class="col-md-3">
+            <label class="form-label">₱ per semester *</label>
             <input type="number" name="amount_per_semester" id="pAmount" class="form-control" min="1" step="0.01" required>
           </div>
 
@@ -101,7 +113,6 @@
           <div class="col-md-4">
             <label class="form-label">Minimum GWA</label>
             <input type="number" name="min_gpa" id="pMinGpa" class="form-control" min="1" max="5" step="0.01" placeholder="e.g. 2.50">
-            <div class="form-text">1.00 is highest; applicants pass at this value or better.</div>
           </div>
           <div class="col-md-4">
             <label class="form-label">Maximum family income (₱/month)</label>
@@ -111,6 +122,7 @@
             <label class="form-label">Maximum age</label>
             <input type="number" name="max_age" id="pMaxAge" class="form-control" min="0" step="1">
           </div>
+          <div class="col-12 form-text mt-1">GWA: 1.00 is highest; applicants pass at this value or better.</div>
           <div class="col-12">
             <div class="form-check">
               <input type="checkbox" name="is_active" value="1" class="form-check-input" id="pActive">

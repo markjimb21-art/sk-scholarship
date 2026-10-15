@@ -30,15 +30,29 @@ final class User
         return $id ? (int)$id : null;
     }
 
-    /** Accounts page: search by name/e-mail and filter by role; at most SEARCH_LIMIT rows. */
+    /** Role shown on the Users page beyond the login roles: an approved applicant is a scholar (still the applicant login). */
+    public const SHOWN_ROLES = ['scholar', 'graduated'];
+
+    /**
+     * Accounts page: search by name/e-mail and filter by role; at most SEARCH_LIMIT rows. Each row has role_name (the login
+     * role) and shown_role: the login role, except an applicant with an Active scholarship is 'scholar' and one whose
+     * scholarship ended as Graduated is 'graduated'. The role filter uses shown_role.
+     */
     public static function search(string $q, string $role): array
     {
-        $sql = "SELECT u.id, u.full_name, u.email, u.contact_number, u.is_active, u.email_verified, u.last_login, u.created_at, r.role_name
-                FROM users u JOIN roles r ON r.id = u.role_id WHERE 1=1";
+        $scholar = "SELECT 1 FROM scholars s JOIN applicants ap ON ap.id = s.applicant_id WHERE ap.user_id = u.id";
+        $sql = "SELECT * FROM (
+                    SELECT u.id, u.full_name, u.email, u.contact_number, u.is_active, u.email_verified, u.last_login, u.created_at, r.role_name,
+                           CASE WHEN r.role_name <> 'applicant' THEN r.role_name
+                                WHEN EXISTS ($scholar AND s.status = 'Active') THEN 'scholar'
+                                WHEN EXISTS ($scholar AND s.status = 'Ended' AND s.end_reason = 'Graduated') THEN 'graduated'
+                                ELSE 'applicant' END AS shown_role
+                    FROM users u JOIN roles r ON r.id = u.role_id
+                ) x WHERE 1=1";
         $params = [];
-        if ($q !== '')  { $sql .= " AND (u.full_name LIKE :q1 OR u.email LIKE :q2)"; $params['q1'] = $params['q2'] = "%$q%"; }
-        if ($role !== '') { $sql .= " AND r.role_name = :role"; $params['role'] = $role; }
-        $stmt = Database::conn()->prepare($sql . " ORDER BY r.role_name, u.full_name LIMIT " . self::SEARCH_LIMIT);
+        if ($q !== '')  { $sql .= " AND (x.full_name LIKE :q1 OR x.email LIKE :q2)"; $params['q1'] = $params['q2'] = "%$q%"; }
+        if ($role !== '') { $sql .= " AND x.shown_role = :role"; $params['role'] = $role; }
+        $stmt = Database::conn()->prepare($sql . " ORDER BY x.role_name, x.full_name LIMIT " . self::SEARCH_LIMIT);
         $stmt->execute($params);
         return $stmt->fetchAll();
     }

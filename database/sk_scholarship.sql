@@ -263,6 +263,7 @@ CREATE TABLE `documents` (
   `invalidated_by` int(10) unsigned DEFAULT NULL,
   `invalidated_at` datetime DEFAULT NULL,
   `file_removed_at` datetime DEFAULT NULL COMMENT 'File deleted because it was flagged invalid; the row is kept',
+  `side` enum('Front','Back') DEFAULT NULL COMMENT 'Front/Back picture; NULL = one file with the whole document',
   PRIMARY KEY (`id`),
   KEY `idx_app` (`application_id`),
   KEY `idx_status` (`status`),
@@ -278,7 +279,7 @@ CREATE TABLE `documents` (
 
 LOCK TABLES `documents` WRITE;
 /*!40000 ALTER TABLE `documents` DISABLE KEYS */;
-INSERT INTO `documents` VALUES (1,1,'2x2 Photo','storage/documents/1/Profile_Picture_1789545482.jpg','Messenger_creation_CF0C390E-F22E-41DA-A137-B65DA075CC4A.jpeg',40547,'image/jpeg','Verified','2026-09-16 15:58:02','adfdf',1,NULL,NULL,NULL,NULL,NULL),(2,1,'Certificate of Residency','storage/documents/1/Certificate_of_Residency_1789568164.jpg','Screenshot_20250819-213241.jpg',672809,'image/jpeg','Verified','2026-09-16 22:16:04','',1,NULL,NULL,NULL,NULL,NULL),(3,1,'Form 138 / Grades','storage/documents/1/Form_138_1789568123.jpg','FB_IMG_1759373623430.jpg',32898,'image/jpeg','Verified','2026-09-16 22:15:23','',1,NULL,NULL,NULL,NULL,NULL),(4,1,'Enrollment Form','storage/documents/1/Enrollment_Form_1789568171.jpg','Messenger_creation_CF0C390E-F22E-41DA-A137-B65DA075CC4A.jpeg',40547,'image/jpeg','Verified','2026-09-16 22:16:11','',1,NULL,NULL,NULL,NULL,NULL),(5,1,'School ID','storage/documents/1/School_ID_1789568143.jpg','d727289d-ecd1-47e3-ae77-56572b46a9cd.jpg',167494,'image/jpeg','Verified','2026-09-16 22:15:43','',1,NULL,NULL,NULL,NULL,NULL),(43,10,'2x2 Photo','storage/documents/10/c4c20c3c49477f04a7fef07bfcbea3e9.png','1000067256.png',1510666,'image/png','Verified','2026-09-25 20:46:07',NULL,1,NULL,NULL,NULL,NULL,NULL),(44,10,'Certificate of Residency','storage/documents/10/297d1f241faec92b0af1cf32fa62d358.png','contact.png',113324,'image/png','Verified','2026-09-25 20:36:50',NULL,1,NULL,NULL,NULL,NULL,NULL),(45,10,'Form 138 / Grades','storage/documents/10/5912f4c4ca4a742d7cd604339b50393a.png','seo.png',325507,'image/png','Verified','2026-09-25 20:36:45',NULL,1,NULL,NULL,NULL,NULL,NULL),(46,10,'Enrollment Form','storage/documents/10/a11f8f9c09a131b74d448ce742ba2e36.png','responsive.png',302908,'image/png','Verified','2026-09-25 20:36:50',NULL,1,NULL,NULL,NULL,NULL,NULL),(47,10,'School ID','storage/documents/10/0e9e22fb96f2ee65c4decc222a1551ea.png','og-image.png',196222,'image/png','Verified','2026-09-25 20:36:48',NULL,1,NULL,NULL,NULL,NULL,NULL);
+INSERT INTO `documents` VALUES (1,1,'2x2 Photo','storage/documents/1/Profile_Picture_1789545482.jpg','Messenger_creation_CF0C390E-F22E-41DA-A137-B65DA075CC4A.jpeg',40547,'image/jpeg','Verified','2026-09-16 15:58:02','adfdf',1,NULL,NULL,NULL,NULL,NULL,NULL),(2,1,'Certificate of Residency','storage/documents/1/Certificate_of_Residency_1789568164.jpg','Screenshot_20250819-213241.jpg',672809,'image/jpeg','Verified','2026-09-16 22:16:04','',1,NULL,NULL,NULL,NULL,NULL,NULL),(3,1,'Form 138 / Grades','storage/documents/1/Form_138_1789568123.jpg','FB_IMG_1759373623430.jpg',32898,'image/jpeg','Verified','2026-09-16 22:15:23','',1,NULL,NULL,NULL,NULL,NULL,NULL),(4,1,'Enrollment Form','storage/documents/1/Enrollment_Form_1789568171.jpg','Messenger_creation_CF0C390E-F22E-41DA-A137-B65DA075CC4A.jpeg',40547,'image/jpeg','Verified','2026-09-16 22:16:11','',1,NULL,NULL,NULL,NULL,NULL,NULL),(5,1,'School ID','storage/documents/1/School_ID_1789568143.jpg','d727289d-ecd1-47e3-ae77-56572b46a9cd.jpg',167494,'image/jpeg','Verified','2026-09-16 22:15:43','',1,NULL,NULL,NULL,NULL,NULL,NULL),(43,10,'2x2 Photo','storage/documents/10/c4c20c3c49477f04a7fef07bfcbea3e9.png','1000067256.png',1510666,'image/png','Verified','2026-09-25 20:46:07',NULL,1,NULL,NULL,NULL,NULL,NULL,NULL),(44,10,'Certificate of Residency','storage/documents/10/297d1f241faec92b0af1cf32fa62d358.png','contact.png',113324,'image/png','Verified','2026-09-25 20:36:50',NULL,1,NULL,NULL,NULL,NULL,NULL,NULL),(45,10,'Form 138 / Grades','storage/documents/10/5912f4c4ca4a742d7cd604339b50393a.png','seo.png',325507,'image/png','Verified','2026-09-25 20:36:45',NULL,1,NULL,NULL,NULL,NULL,NULL,NULL),(46,10,'Enrollment Form','storage/documents/10/a11f8f9c09a131b74d448ce742ba2e36.png','responsive.png',302908,'image/png','Verified','2026-09-25 20:36:50',NULL,1,NULL,NULL,NULL,NULL,NULL,NULL),(47,10,'School ID','storage/documents/10/0e9e22fb96f2ee65c4decc222a1551ea.png','og-image.png',196222,'image/png','Verified','2026-09-25 20:36:48',NULL,1,NULL,NULL,NULL,NULL,NULL,NULL);
 /*!40000 ALTER TABLE `documents` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -509,7 +510,7 @@ CREATE TABLE `interview_schedules` (
   `end_time` time NOT NULL,
   `venue` varchar(200) NOT NULL,
   `max_slots` int(10) unsigned DEFAULT 30,
-  `status` enum('Open','Cancelled') NOT NULL DEFAULT 'Open',
+  `status` enum('Open','Closed','Cancelled') NOT NULL DEFAULT 'Open',
   `created_by` int(10) unsigned DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
@@ -641,6 +642,8 @@ CREATE TABLE `renewal_requests` (
   `reviewed_by` int(10) unsigned DEFAULT NULL,
   `reviewed_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `year_level` enum('1st Year','2nd Year','3rd Year','4th Year','5th Year','Other') DEFAULT NULL COMMENT 'Year level for the target semester',
+  `year_level_other` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_renewal_target` (`scholar_id`,`academic_year`,`semester`),
   UNIQUE KEY `uniq_renewal_from_term` (`from_term_id`),
@@ -658,7 +661,7 @@ CREATE TABLE `renewal_requests` (
 
 LOCK TABLES `renewal_requests` WRITE;
 /*!40000 ALTER TABLE `renewal_requests` DISABLE KEYS */;
-INSERT INTO `renewal_requests` VALUES (1,1,1,'2026-2027','2nd Semester','Approved',NULL,'2026-09-16 23:10:49',2,'2026-09-16 23:10:49','2026-09-16 15:10:49');
+INSERT INTO `renewal_requests` VALUES (1,1,1,'2026-2027','2nd Semester','Approved',NULL,'2026-09-16 23:10:49',2,'2026-09-16 23:10:49','2026-09-16 15:10:49',NULL,NULL);
 /*!40000 ALTER TABLE `renewal_requests` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -967,6 +970,7 @@ CREATE TABLE `term_documents` (
   `invalidated_by` int(10) unsigned DEFAULT NULL,
   `invalidated_at` datetime DEFAULT NULL,
   `file_removed_at` datetime DEFAULT NULL COMMENT 'File deleted because it was flagged invalid; the row is kept',
+  `side` enum('Front','Back') DEFAULT NULL COMMENT 'Front/Back picture; NULL = one file with the whole document',
   PRIMARY KEY (`id`),
   KEY `idx_term_doc` (`term_id`,`purpose`,`type`),
   KEY `idx_term_doc_current` (`type`,`is_current`),

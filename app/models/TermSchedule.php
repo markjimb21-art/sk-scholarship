@@ -104,6 +104,7 @@ final class TermSchedule
             $affected = self::affectedScholars($r);
             $r['affected_count'] = count($affected);
             $r['pending_count'] = count(array_filter($affected, static fn($a) => $a['pending']));
+            $r['submitted_count'] = $r['affected_count'] - $r['pending_count'];
             $r['state'] = self::state($r);
         }
         unset($r);
@@ -250,30 +251,30 @@ final class TermSchedule
         $old = $id ? self::find($id) : null;
         if ($id && !$old) return ['ok' => false, 'error' => 'Schedule not found.'];
 
-        if ($old) {
-            $purpose = $old['purpose'];
-            $programId = (int)$old['program_id'];
-            $year = $old['academic_year'];
-            $semester = $old['semester'];
+        $purpose = $old ? $old['purpose'] : (string)($data['purpose'] ?? '');
+        if (!in_array($purpose, self::PURPOSES, true)) return ['ok' => false, 'error' => 'Invalid schedule type.'];
+        // Program + A.Y. + semester: chosen for a new window, and changeable on an existing one only while nobody has
+        // submitted under it (after that it belongs to their record — close or cancel it instead).
+        if ($old && self::submittedCount($old) > 0) {
+            [$programId, $year, $semester] = [(int)$old['program_id'], $old['academic_year'], $old['semester']];
         } else {
-            $purpose = (string)($data['purpose'] ?? '');
-            $programId = (int)($data['program_id'] ?? 0);
-            $year = trim((string)($data['academic_year'] ?? ''));
-            $semester = (string)($data['semester'] ?? '');
-            if (!in_array($purpose, self::PURPOSES, true)) return ['ok' => false, 'error' => 'Invalid schedule type.'];
+            $programId = (int)($data['program_id'] ?? $old['program_id'] ?? 0);
+            $year = trim((string)($data['academic_year'] ?? $old['academic_year'] ?? ''));
+            $semester = (string)($data['semester'] ?? $old['semester'] ?? '');
             if (!Program::find($programId)) return ['ok' => false, 'error' => 'Choose a scholarship program.'];
             if (!preg_match('/^(\d{4})-(\d{4})$/', $year, $m) || (int)$m[2] !== (int)$m[1] + 1) {
                 return ['ok' => false, 'error' => 'Academic year must look like 2026-2027.'];
             }
             if (!in_array($semester, SEMESTERS, true)) return ['ok' => false, 'error' => 'Choose a semester.'];
         }
+        $targetChanged = $old && [(int)$old['program_id'], $old['academic_year'], $old['semester']] !== [$programId, $year, $semester];
 
         $opens = self::parseDateTime((string)($data['opens_at'] ?? ''));
         $deadline = self::parseDateTime((string)($data['submission_deadline'] ?? ''));
         if (!$opens) return ['ok' => false, 'error' => 'Enter when submission opens.'];
         if (!$deadline) return ['ok' => false, 'error' => 'Enter the submission deadline.'];
         if ($deadline <= $opens) return ['ok' => false, 'error' => 'The deadline must be after the opening date.'];
-        $deadlineChanged = !$old || $old['submission_deadline'] !== $deadline;
+        $deadlineChanged = !$old || $targetChanged || $old['submission_deadline'] !== $deadline;
         if ($deadlineChanged && $deadline <= date('Y-m-d H:i:s')) return ['ok' => false, 'error' => 'The deadline must be in the future.'];
 
         $planned = trim((string)($data['planned_date'] ?? ''));
@@ -297,12 +298,22 @@ final class TermSchedule
         $label = self::TITLES[$purpose] . " window {$year} {$semester}";
         if ($old) {
             $reset = $deadlineChanged ? ', deadline_reminder_sent_at = NULL' : '';
-            $pdo->prepare(
-                "UPDATE term_schedules SET opens_at = :opens_at, submission_deadline = :submission_deadline,
-                        planned_date = :planned_date, status = :status, notes = :notes$reset WHERE id = :id"
-            )->execute($values + ['id' => $id]);
-            AuditLog::write('term_schedule_updated', 'term_schedules', $id, "$label updated",
-                array_intersect_key($old, $values), $values);
+            $target = ['program_id' => $programId, 'academic_year' => $year, 'semester' => $semester];
+            try {
+                $pdo->prepare(
+                    "UPDATE term_schedules SET program_id = :program_id, academic_year = :academic_year, semester = :semester,
+                            opens_at = :opens_at, submission_deadline = :submission_deadline,
+                            planned_date = :planned_date, status = :status, notes = :notes$reset WHERE id = :id"
+                )->execute($values + $target + ['id' => $id]);
+            } catch (PDOException $e) {
+                if ((int)($e->errorInfo[1] ?? 0) === 1062) {
+                    return ['ok' => false, 'error' => 'A ' . lcfirst($label) . ' already exists for this program — edit that one instead.'];
+                }
+                throw $e;
+            }
+            AuditLog::write('term_schedule_updated', 'term_schedules', $id,
+                $targetChanged ? "$label updated (was {$old['academic_year']} {$old['semester']}, {$old['program_name']})" : "$label updated",
+                array_intersect_key($old, $values + $target), $values + $target);
         } else {
             try {
                 $pdo->prepare(
@@ -323,12 +334,47 @@ final class TermSchedule
         }
 
         $row = self::find($id);
+        if ($targetChanged) {
+            // A different semester (or program): like cancelling the old window and creating the new one.
+            $notified = $old['status'] !== 'Cancelled' ? self::notifyAffected($old, 'cancelled') : 0;
+            if ($status === 'Open') $notified += self::notifyAffected($row, 'created');
+            return ['ok' => true, 'id' => $id, 'notified' => $notified];
+        }
         $kind = null;
         if (!$old) $kind = 'created';
         elseif ($status === 'Cancelled' && $old['status'] !== 'Cancelled') $kind = 'cancelled';
         elseif ($status === 'Open' && ($deadlineChanged || $old['status'] !== 'Open')) $kind = 'changed';
         $notified = $kind ? self::notifyAffected($row, $kind) : 0;
         return ['ok' => true, 'id' => $id, 'notified' => $notified];
+    }
+
+    /** How many scholars already submitted under a window (affectedScholars minus the pending ones). */
+    public static function submittedCount(array $row): int
+    {
+        return count(array_filter(self::affectedScholars($row), static fn($a) => !$a['pending']));
+    }
+
+    /**
+     * Delete a window nobody has submitted under (wrong program or semester, or not needed). Scholars it was announced to
+     * are told it was cancelled, unless it already was. Audit-logged. After a submission the window belongs to the
+     * scholars' record (and the on-time figures), so it can only be closed or cancelled.
+     * Returns ['ok'=>true,'notified','purpose'] or ['ok'=>false,'error'].
+     */
+    public static function delete(int $id, int $adminId): array
+    {
+        $row = self::find($id);
+        if (!$row) return ['ok' => false, 'error' => 'Schedule not found.'];
+        $submitted = self::submittedCount($row);
+        if ($submitted > 0) {
+            return ['ok' => false, 'error' => "$submitted scholar(s) already submitted under this window, so it is kept. Set it to Closed or Cancelled instead."];
+        }
+        $notified = $row['status'] !== 'Cancelled' ? self::notifyAffected($row, 'cancelled') : 0;
+        Database::conn()->prepare('DELETE FROM term_schedules WHERE id = ?')->execute([$id]);
+        AuditLog::write('term_schedule_deleted', 'term_schedules', $id,
+            self::TITLES[$row['purpose']] . " window {$row['academic_year']} {$row['semester']} ({$row['program_name']}) deleted",
+            array_intersect_key($row, array_flip(['program_id', 'academic_year', 'semester', 'purpose', 'opens_at', 'submission_deadline', 'status'])),
+            ['by' => $adminId]);
+        return ['ok' => true, 'notified' => $notified, 'purpose' => $row['purpose']];
     }
 
     /**

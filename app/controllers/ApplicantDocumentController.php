@@ -32,18 +32,20 @@ final class ApplicantDocumentController
         }
 
         // A new version is added and the older one kept (Document::storeApplicationDocument — the one writer).
-        $stored = Document::storeApplicationDocument($app, $type, $_FILES['file'] ?? [], (int)Auth::user()['id']);
+        // side: 'Front' / 'Back' of a two-sided document, empty for one file.
+        $side = in_array($_POST['side'] ?? '', DOCUMENT_SIDES, true) ? $_POST['side'] : null;
+        $stored = Document::storeApplicationDocument($app, $type, $_FILES['file'] ?? [], (int)Auth::user()['id'], $side);
         if (!$stored['ok']) $fail($stored['error']);
         $docId = (int)$stored['id'];
 
         if ($isAjax) {
             json_response(['success' => true, 'document' => [
-                'id' => $docId, 'document_type' => $type, 'status' => 'Submitted', 'status_label' => 'Uploaded',
+                'id' => $docId, 'document_type' => $type, 'side' => $side, 'status' => 'Submitted', 'status_label' => 'Uploaded',
                 'original_filename' => $stored['original'], 'uploaded_at' => date('Y-m-d H:i:s'),
                 'view_url' => url('applicant/documents/view&id=' . $docId),
             ]]);
         }
-        flash('success', "$type uploaded.");
+        flash('success', $type . ($side ? ' (' . strtolower($side) . ')' : '') . ' uploaded.');
         redirect('applicant/application');
     }
 

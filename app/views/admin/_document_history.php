@@ -18,7 +18,7 @@ $versionCount = array_sum(array_map('count', $docHistory));
           <?php if (!$versionCount): ?><tr><td colspan="5" class="text-center text-muted py-3">No uploads yet.</td></tr><?php endif; ?>
           <?php foreach ($docHistory as $type => $versions): foreach ($versions as $v): ?>
             <tr class="<?= $v['is_current'] ? '' : 'text-muted' ?>">
-              <td><?= e($type) ?> <?= $v['is_current'] ? '<span class="badge bg-success ms-1">Current</span>' : '<span class="badge bg-light text-muted border ms-1">Older</span>' ?></td>
+              <td><?= e($type) ?><?= $v['side'] ? ' <span class="text-muted">· ' . e($v['side']) . '</span>' : '' ?> <?= $v['is_current'] ? '<span class="badge bg-success ms-1">Current</span>' : '<span class="badge bg-light text-muted border ms-1">Older</span>' ?></td>
               <td class="text-nowrap"><?= e(fmt_datetime($v['uploaded_at'])) ?>
                 <?php if ($v['superseded_at']): ?><div class="text-muted">replaced <?= e(fmt_date($v['superseded_at'])) ?></div><?php endif; ?></td>
               <td><?= e($v['uploaded_during']) ?> <span class="text-muted">· <?= e($v['context']) ?></span></td>

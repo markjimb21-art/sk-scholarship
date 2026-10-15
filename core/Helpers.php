@@ -51,9 +51,32 @@ function verify_csrf(): void {
     $token    = $_POST[CSRF_TOKEN_NAME] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
     // Both sides must be NON-EMPTY strings; an empty session token must never match an empty submitted token.
     if (!is_string($expected) || $expected === '' || !is_string($token) || $token === '' || !hash_equals($expected, $token)) {
-        http_response_code(419);
-        die('CSRF token mismatch.');
+        csrf_failed();
     }
+}
+
+/**
+ * The form's token no longer matches the session — usually the page was open too long, or the user signed in/out in
+ * another tab. Nothing is saved. A page script gets JSON it can show; a form goes back to the page it came from with a
+ * message and its fields kept (never passwords), so the user can simply submit again.
+ */
+function csrf_failed(): never {
+    $message = 'This page had expired (it was open for a long time, or you signed in or out in another tab), so nothing was saved. Please try again.';
+    $fromScript = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest' || isset($_SERVER['HTTP_X_CSRF_TOKEN']);
+    if ($fromScript) {
+        json_response(['success' => false, 'message' => 'Your session expired. Reload the page and try again.'], 403);
+    }
+    $_SESSION['_old'] = array_filter(
+        $_POST,
+        static fn($v, $k) => is_scalar($v) && $k !== CSRF_TOKEN_NAME && !str_contains(strtolower((string)$k), 'password'),
+        ARRAY_FILTER_USE_BOTH
+    );
+    flash('warning', $message);
+    // Back to the page the form was on (only within this app), else the home page.
+    $referer = (string)($_SERVER['HTTP_REFERER'] ?? '');
+    $back = str_starts_with($referer, BASE_URL . '/') ? $referer : BASE_URL . '/';
+    header('Location: ' . $back, true, 303);
+    exit;
 }
 
 /**

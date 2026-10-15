@@ -29,7 +29,7 @@ php bin/smoke_test.php                             # every route, signed in as e
 | unit | `PasswordRuleTest` | 8+ characters and 1 special character; the exact messages; Validator uses the same rule |
 | integration | `ApplicationStatusTest` | refused and stale status changes; approval blocked when the slots are full |
 | integration | `AnalyticsTest` | projected scholars, committed, projected need, surplus, extra fundable, attendance, no-show, scores, on-time rate, against numbers worked out by hand from the seed |
-| integration | `BudgetTest` | suggested budget = slots × amount per semester × 2 |
+| integration | `BudgetTest` | suggested budget = Active scholars × (amount per semester × 2) |
 | integration | `InterviewSuggestionsTest` | slot suggestions: existing schedules first, business hours, Mon–Sat, after the application period, no holidays, no other program's day, no overlaps |
 | integration | `ReminderScriptTest` | `bin/send_reminders.php` run for real: interview, deadline and daily-digest reminders each go out once; a second run sends nothing |
 | integration | `DocumentVersionsTest` | the "current document" across application and claim/renewal uploads; full history newest first |
