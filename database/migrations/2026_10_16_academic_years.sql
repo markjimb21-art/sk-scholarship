@@ -39,4 +39,6 @@ SET @pick := COALESCE((SELECT `label` FROM `academic_years` WHERE `label` = @tod
                       (SELECT MAX(`label`) FROM `academic_years`));
 UPDATE `academic_years` SET `is_current` = 1 WHERE `label` = @pick;
 
--- (stage 3 of plan 4 adds: drop scholarship_programs.academic_year)
+ALTER TABLE `scholarship_programs`
+  DROP INDEX `idx_year`,
+  DROP COLUMN `academic_year`;

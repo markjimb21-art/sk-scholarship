@@ -86,7 +86,7 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
             <label class="form-label">Program</label>
             <select name="program_id" id="schProgram" class="form-select" required>
               <option value="">Choose…</option>
-              <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>"><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option><?php endforeach; ?>
+              <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>"><?= e($p['label']) ?></option><?php endforeach; ?>
             </select>
           </div>
           <div class="row g-2 mb-2">

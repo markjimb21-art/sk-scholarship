@@ -179,7 +179,8 @@ final class AdminController
         $program = Program::fromRequest();
         $programs = Program::options();
         $slotsUsed = $program ? Program::slotsUsed((int)$program['id']) : 0;
-        $budget = $program ? Budget::forProgramYear((int)$program['id'], $program['academic_year']) : null;
+        $budgetYear = AcademicYear::currentLabel();   // the dashboard's budget figures are for the current academic year
+        $budget = $program && $budgetYear ? Budget::forProgramYear((int)$program['id'], $budgetYear) : null;
         $todayInterviews = self::canAccess('interviews') ? Interview::day($today) : null;
         $showBudget = self::canAccess('budget');
         if (!$showBudget) $budget = null;
@@ -191,7 +192,7 @@ final class AdminController
             'gwa'     => AnalyticsProfiles::scholarsByGwaBand((int)$program['id']),
         ] : null;
 
-        render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'todayInterviews', 'charts', 'showBudget')
+        render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'budgetYear', 'todayInterviews', 'charts', 'showBudget')
             + ['pageScripts' => [asset('js/sk-charts.js'), asset('js/pages/dashboard.js')]], 'Dashboard');
     }
 

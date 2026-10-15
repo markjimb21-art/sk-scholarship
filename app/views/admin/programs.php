@@ -96,10 +96,8 @@
             <label class="form-label">Applications close *</label>
             <input type="date" name="application_end" id="pEnd" class="form-control" required>
           </div>
-          <div class="col-12 form-text mt-1" data-month="<?= ACADEMIC_YEAR_START_MONTH ?>" id="pYearInfo">
-            Academic year: <strong id="pYearShown">—</strong> <span id="pYearRule">(from the opening date: June–December → that year's A.Y.,
-            January–May → the A.Y. that began the year before). Semester 1 of approved scholars is its 1st Semester.</span>
-          </div>
+          <div class="col-12 form-text mt-1">A program has no academic year: approved scholars start in the 1st Semester of the
+            current academic year (Releasing of budget → Academic years).</div>
           <div class="col-md-3">
             <label class="form-label">Slots *</label>
             <input type="number" name="slots_available" id="pSlots" class="form-control" min="1" step="1" required>

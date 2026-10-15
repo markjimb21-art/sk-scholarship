@@ -10,7 +10,7 @@ $pct = static fn($r) => $r === null ? 'no data' : number_format($r * 100, 1) . '
   <form method="GET" action="<?= url('admin/analytics') ?>" class="d-flex gap-2 align-items-end flex-wrap">
     <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" data-autosubmit>
       <?php foreach ($programs as $p): ?>
-        <option value="<?= (int)$p['id'] ?>" <?= $program && (int)$program['id'] === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option>
+        <option value="<?= (int)$p['id'] ?>" <?= $program && (int)$program['id'] === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['label']) ?></option>
       <?php endforeach; ?>
     </select></div>
     <?php if ($data): ?>

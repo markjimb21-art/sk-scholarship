@@ -9,8 +9,7 @@ final class Program
         return Database::conn()->query(
             "SELECT sp.*,
                     (SELECT COUNT(*) FROM applications a WHERE a.program_id = sp.id AND a.status <> 'Draft') AS application_count,
-                    (SELECT COUNT(*) FROM applications a WHERE a.program_id = sp.id AND a.status = 'Draft') AS draft_count,
-                    (SELECT COUNT(*) FROM scholars s WHERE s.program_id = sp.id) AS scholar_count
+                    (SELECT COUNT(*) FROM applications a WHERE a.program_id = sp.id AND a.status = 'Draft') AS draft_count
              FROM scholarship_programs sp
              ORDER BY sp.application_start DESC, sp.id DESC"
         )->fetchAll();
@@ -23,7 +22,7 @@ final class Program
     public static function options(): array
     {
         $rows = Database::conn()->query(
-            "SELECT id, program_name, academic_year, application_start, application_end FROM scholarship_programs ORDER BY application_start DESC, id DESC"
+            "SELECT id, program_name, application_start, application_end FROM scholarship_programs ORDER BY application_start DESC, id DESC"
         )->fetchAll();
         $names = array_count_values(array_column($rows, 'program_name'));
         foreach ($rows as &$r) {
@@ -114,10 +113,8 @@ final class Program
         $validDate = static fn(string $d): bool => ($t = DateTime::createFromFormat('Y-m-d', $d)) !== false && $t->format('Y-m-d') === $d;
         if (!$validDate($start) || !$validDate($end)) return ['ok' => false, 'error' => 'Application start and end dates are required.'];
         if ($end < $start) return ['ok' => false, 'error' => 'Application end date cannot be before the start date.'];
-        // The academic year follows the application start date — fixed once the program has scholars (their semesters use it).
         $old = $id ? self::find($id) : null;
         if ($id && !$old) return ['ok' => false, 'error' => 'Program not found.'];
-        $year = $old && self::hasScholars($id) ? $old['academic_year'] : self::academicYearFor($start);
 
         // Numbers: blank limit => NULL (no limit); anything given must be a number >= 0.
         $labels = ['amount_per_semester' => 'Amount per semester', 'slots_available' => 'Number of slots',
@@ -137,7 +134,6 @@ final class Program
 
         $row = [
             'program_name'        => $name,
-            'academic_year'       => $year,
             'amount_per_semester' => $n['amount_per_semester'],
             'min_gpa'             => $n['min_gpa'],
             'max_family_income'   => $n['max_family_income'],
@@ -155,7 +151,7 @@ final class Program
             }
             $set = implode(', ', array_map(static fn($k) => "$k = :$k", array_keys($row)));
             $pdo->prepare("UPDATE scholarship_programs SET $set WHERE id = :id")->execute($row + ['id' => $id]);
-            AuditLog::write('program_updated', 'scholarship_programs', $id, "Updated program \"$name\" ($year)", $old, $row);
+            AuditLog::write('program_updated', 'scholarship_programs', $id, "Updated program \"$name\"", $old, $row);
         } else {
             $cols = array_keys($row);
             $pdo->prepare(
@@ -163,29 +159,9 @@ final class Program
                  VALUES (:" . implode(', :', $cols) . ", :created_by)"
             )->execute($row + ['created_by' => $actorId]);
             $id = (int)$pdo->lastInsertId();
-            AuditLog::write('program_created', 'scholarship_programs', $id, "Created program \"$name\" ($year)", null, $row);
+            AuditLog::write('program_created', 'scholarship_programs', $id, "Created program \"$name\"", null, $row);
         }
         return ['ok' => true, 'id' => $id];
-    }
-
-    /**
-     * The academic year of a program, from its application start date: a start from ACADEMIC_YEAR_START_MONTH (June) to
-     * December is that year's A.Y. (2026-10-14 → 2026-2027); January–May belongs to the A.Y. that began the year before
-     * (2027-02-01 → 2026-2027). Also shown live in the program form (pages/programs.js — same rule).
-     */
-    public static function academicYearFor(string $startDate): string
-    {
-        $y = (int)substr($startDate, 0, 4);
-        if ((int)substr($startDate, 5, 2) < ACADEMIC_YEAR_START_MONTH) $y--;
-        return $y . '-' . ($y + 1);
-    }
-
-    /** Has this program made any scholar yet? (Its academic year is then fixed.) */
-    public static function hasScholars(int $id): bool
-    {
-        $stmt = Database::conn()->prepare("SELECT 1 FROM scholars WHERE program_id = ? LIMIT 1");
-        $stmt->execute([$id]);
-        return (bool)$stmt->fetchColumn();
     }
 
     /** Open <-> close. Returns the new state, or null if not found. */
@@ -245,8 +221,8 @@ final class Program
             }
             $pdo->prepare("DELETE FROM scholarship_programs WHERE id = ?")->execute([$id]);
             AuditLog::write('program_deleted', 'scholarship_programs', $id,
-                "Deleted program \"{$program['program_name']}\" (A.Y. {$program['academic_year']}; no submitted applications)",
-                ['program_name' => $program['program_name'], 'academic_year' => $program['academic_year']] + $removed, ['by' => $actorId]);
+                "Deleted program \"{$program['program_name']}\" (no submitted applications)",
+                ['program_name' => $program['program_name']] + $removed, ['by' => $actorId]);
         });
         foreach ($files as $rel) DocumentStorage::deleteFile($rel);   // only after the rows are gone
         foreach (array_filter($users) as $uid) {

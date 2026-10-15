@@ -61,7 +61,7 @@
   <form method="GET" action="<?= url('admin/dashboard') ?>">
     <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" data-autosubmit>
       <?php foreach ($programs as $p): ?>
-        <option value="<?= (int)$p['id'] ?>" <?= $program && (int)$program['id'] === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option>
+        <option value="<?= (int)$p['id'] ?>" <?= $program && (int)$program['id'] === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['label']) ?></option>
       <?php endforeach; ?>
     </select></div>
   </form>
@@ -85,7 +85,7 @@
   <?php if ($showBudget): ?>
   <div class="col-md-6">
     <div class="card border-0 shadow-sm h-100"><div class="card-body">
-      <div class="text-muted small">Budget remaining — <?= e($program['academic_year']) ?></div>
+      <div class="text-muted small">Budget remaining — <?= e($budgetYear ?? 'no current academic year') ?></div>
       <?php if ($budget): ?>
         <div class="fs-3 fw-bold <?= (float)$budget['remaining'] < (float)$budget['committed'] ? 'text-danger' : '' ?>"><?= e(peso($budget['remaining'])) ?></div>
         <div class="small text-muted">

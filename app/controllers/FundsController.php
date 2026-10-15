@@ -10,7 +10,7 @@ final class FundsController
     {
         $budgets = Budget::all();
         $programs = Program::options();
-        $years = Budget::academicYears();
+        $years = AcademicYear::options();
         $suggestions = [];
         foreach ($programs as $p) $suggestions[(int)$p['id']] = Budget::suggestedTotal((int)$p['id']);
         render('admin/budget', compact('budgets', 'programs', 'years', 'suggestions') + ['pageScripts' => [asset('js/pages/budget.js')]], 'Budget');
@@ -87,7 +87,7 @@ final class FundsController
         $history = Term::releaseHistory($filters);
         $historyTotal = array_sum(array_map(static fn($r) => (float)$r['amount'], $history));
         $programs = Program::options();
-        $years = Budget::academicYears();
+        $years = AcademicYear::options();
         render('admin/releases', compact('ready', 'history', 'historyTotal', 'filters', 'programs', 'years'), 'Releases');
     }
 
@@ -144,7 +144,7 @@ final class FundsController
         $needed = TermSchedule::needed($purpose);
         $missed = TermSchedule::missedDeadline($purpose);
         $programs = Program::options();
-        $years = TermSchedule::academicYearOptions();
+        $years = AcademicYear::options();
         render('admin/term_schedules', compact('purpose', 'schedules', 'needed', 'missed', 'programs', 'years') + ['pageScripts' => [asset('js/pages/term-schedules.js')]],
             $purpose === 'release' ? 'Claim schedule' : 'Renewal schedule');
     }

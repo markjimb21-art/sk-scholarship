@@ -43,20 +43,6 @@ final class Budget
     }
 
     /**
-     * Academic years offered in the budget form: every program's year, every year a semester exists for,
-     * and every year that already has a budget (scholars renew into later years).
-     */
-    public static function academicYears(): array
-    {
-        return Database::conn()->query(
-            "SELECT academic_year FROM scholarship_programs
-             UNION SELECT academic_year FROM scholar_terms
-             UNION SELECT academic_year FROM budgets
-             ORDER BY academic_year DESC"
-        )->fetchAll(PDO::FETCH_COLUMN);
-    }
-
-    /**
      * Suggested total budget for a program's academic year = number of Active scholars of the program × (amount per
      * semester × 2 semesters). Returns ['total','scholars','amount'], or null when the program is missing, has no
      * amount per semester, or has no Active scholar yet. A suggestion only: the budget form never fills it in without

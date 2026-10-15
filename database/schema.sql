@@ -75,10 +75,10 @@ CREATE TABLE courses (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- PROGRAMS (B1) ----------
+-- A standing scholarship: it has no academic year (scholars start in the current one, academic_years below).
 CREATE TABLE scholarship_programs (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     program_name VARCHAR(150) NOT NULL,
-    academic_year VARCHAR(20) NOT NULL,
     amount_per_semester DECIMAL(12,2) NOT NULL DEFAULT 0.00 COMMENT 'Cash released to each scholar per semester',
     min_gpa DECIMAL(4,2) NULL COMMENT 'Minimum GWA (1.00 highest - 5.00); NULL = no limit',
     max_family_income DECIMAL(12,2) NULL,
@@ -90,8 +90,7 @@ CREATE TABLE scholarship_programs (
     created_by INT UNSIGNED NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_active (is_active),
-    INDEX idx_year (academic_year)
+    INDEX idx_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- ACADEMIC YEARS (Releasing of budget → Academic years) ----------

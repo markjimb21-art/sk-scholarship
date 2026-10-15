@@ -814,7 +814,6 @@ DROP TABLE IF EXISTS `scholarship_programs`;
 CREATE TABLE `scholarship_programs` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `program_name` varchar(150) NOT NULL,
-  `academic_year` varchar(20) NOT NULL,
   `amount_per_semester` decimal(12,2) NOT NULL DEFAULT 0.00 COMMENT 'Cash released to each scholar per semester',
   `min_gpa` decimal(4,2) DEFAULT NULL,
   `max_family_income` decimal(12,2) DEFAULT NULL,
@@ -827,8 +826,7 @@ CREATE TABLE `scholarship_programs` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `idx_active` (`is_active`),
-  KEY `idx_year` (`academic_year`)
+  KEY `idx_active` (`is_active`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -838,7 +836,7 @@ CREATE TABLE `scholarship_programs` (
 
 LOCK TABLES `scholarship_programs` WRITE;
 /*!40000 ALTER TABLE `scholarship_programs` DISABLE KEYS */;
-INSERT INTO `scholarship_programs` VALUES (1,'SK College Scholarship Program 2026','2025-2026',0.00,2.50,25000.00,30,100,'2026-09-15','2026-11-14',1,1,'2026-09-15 05:45:02','2026-09-15 05:45:02');
+INSERT INTO `scholarship_programs` VALUES (1,'SK College Scholarship Program 2026',0.00,2.50,25000.00,30,100,'2026-09-15','2026-11-14',1,1,'2026-09-15 05:45:02','2026-09-15 05:45:02');
 /*!40000 ALTER TABLE `scholarship_programs` ENABLE KEYS */;
 UNLOCK TABLES;
 

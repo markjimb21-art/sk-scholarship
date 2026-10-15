@@ -14,7 +14,7 @@ $screening = Application::can('qualify', $app['status']);
       <span class="badge bg-<?= e(APP_STATUS_COLORS[$app['status']]) ?> ms-2"><?= e(Application::label($app['status'])) ?></span>
     </h4>
     <div class="text-muted small">
-      <code><?= e($app['application_code']) ?></code> · <?= e($app['program_name']) ?> (<?= e($app['academic_year']) ?>)
+      <code><?= e($app['application_code']) ?></code> · <?= e($app['program_name']) ?>
       · submitted <?= $app['submitted_at'] ? e(fmt_datetime($app['submitted_at'])) : '—' ?>
       <?php if ($scholar): ?> · Scholar <a href="<?= url('admin/scholar&id=' . (int)$scholar['id']) ?>"><?= e($scholar['scholar_code']) ?></a><?php endif; ?>
     </div>

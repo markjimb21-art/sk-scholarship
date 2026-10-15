@@ -194,9 +194,9 @@ final class Report
         [$active, $ended] = array_map('intval', $scholars->fetch(PDO::FETCH_NUM));
 
         $counts = AnalyticsFunnel::stageCounts($pid);
-        $ay = $program['academic_year'];
+        $ay = AcademicYear::currentLabel() ?? AcademicYear::labelFor(date('Y-m-d'));
         $rows = [
-            ['Academic year', $ay],
+            ['Academic year (current)', $ay],
             ['Application dates', $program['application_start'] . ' to ' . $program['application_end']],
             ['Applications submitted' . ($from || $to ? ' (in date range)' : ''), (int)$submitted->fetchColumn()],
         ];
@@ -219,14 +219,14 @@ final class Report
     /**
      * Report 9 — the analytics of docs/PROCESS.md §6 (5)–(7) for one program as rows: profile breakdowns (applicants,
      * approved, approval rate), academic performance (GWA, at-risk scholars, trend) and fund utilization for the
-     * program's academic year. Uses the same Analytics functions as the analytics page. Date filter: not applicable.
+     * current academic year. Uses the same Analytics functions as the analytics page. Date filter: not applicable.
      */
     private static function profileAcademic(?int $programId, ?string $from, ?string $to, string $title): array
     {
         $program = $programId ? Program::find($programId) : null;
         if (!$program) throw new InvalidArgumentException('Choose a program for the Profile and academic summary.');
         $pid = (int)$program['id'];
-        $ay = $program['academic_year'];
+        $ay = AcademicYear::currentLabel() ?? AcademicYear::labelFor(date('Y-m-d'));   // fund utilization: the current academic year
         $pct = static fn($r) => $r === null ? '—' : number_format($r * 100, 1) . '%';
         $gwa = static fn($v) => $v === null ? '—' : number_format((float)$v, 2);
         $rows = [];

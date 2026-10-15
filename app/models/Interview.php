@@ -15,7 +15,7 @@ final class Interview
     public static function schedule(int $id): ?array
     {
         $stmt = Database::conn()->prepare(
-            "SELECT s.*, sp.program_name, sp.academic_year,
+            "SELECT s.*, sp.program_name,
                     (SELECT COUNT(*) FROM interview_assignments ia WHERE ia.schedule_id = s.id) AS assigned_count
              FROM interview_schedules s
              JOIN scholarship_programs sp ON sp.id = s.program_id

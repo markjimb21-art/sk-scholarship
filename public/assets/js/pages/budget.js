@@ -30,8 +30,6 @@
     if (opt && opt.dataset.suggested) document.getElementById('budgetTotal').value = opt.dataset.suggested;
   });
   document.getElementById('budgetProgram').addEventListener('change', function () {
-    var y = document.getElementById('budgetYear'), opt = this.options[this.selectedIndex];
-    if (!y.value && opt && opt.dataset.year) y.value = opt.dataset.year;
     showBudgetSuggestion();
   });
 })();

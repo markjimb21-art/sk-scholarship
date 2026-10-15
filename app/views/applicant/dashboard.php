@@ -91,7 +91,7 @@ $steps = ['Apply', 'Screening', 'Interview', 'Final result', 'Claim cash', 'Rene
       <tbody>
         <?php foreach ($pastApplications as $pa): ?>
           <tr>
-            <td><?= e($pa['program_name']) ?><br><span class="text-muted"><?= e($pa['academic_year']) ?></span></td>
+            <td><?= e($pa['program_name']) ?></td>
             <td><code><?= e($pa['application_code']) ?></code></td>
             <td><?= $pa['submitted_at'] ? e(fmt_date($pa['submitted_at'])) : '—' ?></td>
             <td>

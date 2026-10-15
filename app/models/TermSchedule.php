@@ -446,15 +446,4 @@ final class TermSchedule
     {
         Database::conn()->prepare("UPDATE term_schedules SET deadline_reminder_sent_at = NULL WHERE id = ?")->execute([$id]);
     }
-
-    /** Academic years offered in the form: every known year plus the one after the latest (renewals go into it). */
-    public static function academicYearOptions(): array
-    {
-        $years = Budget::academicYears();
-        if ($years) {
-            [$a, $b] = array_map('intval', explode('-', $years[0]) + [0, 0]);
-            if ($a > 0) array_unshift($years, ($a + 1) . '-' . ($b + 1));
-        }
-        return array_values(array_unique($years));
-    }
 }
