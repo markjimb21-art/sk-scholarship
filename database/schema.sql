@@ -94,6 +94,20 @@ CREATE TABLE scholarship_programs (
     INDEX idx_year (academic_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ---------- ACADEMIC YEARS (Releasing of budget → Academic years) ----------
+-- Every academic-year list comes from here. Exactly one is current: new scholars start in its 1st Semester.
+CREATE TABLE academic_years (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    label VARCHAR(20) NOT NULL COMMENT 'YYYY-YYYY, second year = first + 1',
+    is_current TINYINT(1) NOT NULL DEFAULT 0,
+    current_flag TINYINT(1) GENERATED ALWAYS AS (IF(is_current = 1, 1, NULL)) STORED COMMENT 'At most one current year (UNIQUE)',
+    created_by INT UNSIGNED NULL COMMENT 'NULL = backfilled by the migration',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_ay_label (label),
+    UNIQUE KEY uniq_ay_current (current_flag),
+    CONSTRAINT fk_ay_created_by FOREIGN KEY (created_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ---------- APPLICANT PROFILE (A2) ----------
 CREATE TABLE applicants (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

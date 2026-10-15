@@ -69,6 +69,9 @@ INSERT INTO scholarship_programs (id, program_name, academic_year, amount_per_se
  (2, 'Other Test Program',       '2026-2027', 4000.00, NULL, NULL, NULL, 5,
      CURDATE() - INTERVAL 150 DAY, CURDATE() + INTERVAL 40 DAY, 1, 1);
 
+-- One academic year, the current one (new scholars start in its 1st Semester). Tests that need another create it.
+INSERT INTO academic_years (label, is_current, created_by) VALUES ('2026-2027', 1, 1);
+
 -- ---------- Applications of program 1, one per status ----------
 INSERT INTO applications (id, application_code, applicant_id, program_id, status, submitted_at, reviewed_at, reviewed_by,
                           qualified_at, decided_at, decided_by, decision_remarks, waitlisted_at,

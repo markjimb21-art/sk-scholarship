@@ -21,6 +21,38 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Table structure for table `academic_years`
+--
+
+DROP TABLE IF EXISTS `academic_years`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `academic_years` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `label` varchar(20) NOT NULL COMMENT 'YYYY-YYYY, second year = first + 1',
+  `is_current` tinyint(1) NOT NULL DEFAULT 0,
+  `current_flag` tinyint(1) GENERATED ALWAYS AS (if(`is_current` = 1,1,NULL)) STORED COMMENT 'At most one current year (UNIQUE)',
+  `created_by` int(10) unsigned DEFAULT NULL COMMENT 'NULL = backfilled by the migration',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_ay_label` (`label`),
+  UNIQUE KEY `uniq_ay_current` (`current_flag`),
+  KEY `fk_ay_created_by` (`created_by`),
+  CONSTRAINT `fk_ay_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `academic_years`
+--
+
+LOCK TABLES `academic_years` WRITE;
+/*!40000 ALTER TABLE `academic_years` DISABLE KEYS */;
+INSERT INTO `academic_years` (`id`, `label`, `is_current`, `created_by`, `created_at`) VALUES (1,'2025-2026',0,NULL,'2026-10-16 00:00:00'),(2,'2026-2027',1,NULL,'2026-10-16 00:00:00');
+/*!40000 ALTER TABLE `academic_years` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `applicants`
 --
 
