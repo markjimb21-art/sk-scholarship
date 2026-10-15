@@ -7,6 +7,11 @@ declare(strict_types=1);
  */
 final class TermScheduleEditDeleteTest extends DatabaseTestCase
 {
+    protected function setUp(): void
+    {
+        AcademicYear::create('2027-2028', false, false, 1);   // the seed has only 2026-2027
+    }
+
     protected function tearDown(): void
     {
         self::rebuild();
@@ -65,5 +70,15 @@ final class TermScheduleEditDeleteTest extends DatabaseTestCase
         $this->assertSame(['ok' => true, 'notified' => 1, 'purpose' => 'renewal'], TermSchedule::delete($id, 1), 'Scott is told it was cancelled');
         $this->assertNull(TermSchedule::find($id));
         $this->assertSame('term_schedule_deleted', self::value("SELECT action FROM audit_logs WHERE entity_type = 'term_schedules' AND entity_id = ? ORDER BY id DESC LIMIT 1", [$id]));
+    }
+
+    public function testAYearThatDoesNotExistIsRefused(): void
+    {
+        $r = TermSchedule::save(['purpose' => 'renewal', 'program_id' => 1, 'academic_year' => '2030-2031', 'semester' => '1st Semester'] + self::dates(), null, 1);
+        $this->assertSame(['ok' => false, 'error' => "Academic year 2030-2031 doesn't exist yet — create it under Releasing of budget → Academic years."], $r);
+        $id = self::newWindow();
+        $r = TermSchedule::save(['program_id' => 1, 'academic_year' => '2030-2031', 'semester' => '1st Semester', 'status' => 'Open'] + self::dates(), $id, 1);
+        $this->assertFalse($r['ok'], 'moving a window into a year that does not exist');
+        $this->assertSame('2027-2028', TermSchedule::find($id)['academic_year']);
     }
 }

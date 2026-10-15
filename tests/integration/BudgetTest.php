@@ -39,4 +39,16 @@ final class BudgetTest extends DatabaseTestCase
         $this->assertEqualsWithDelta(5000.0, Budget::actualReleased(1, '2026-2027'), 0.001);
         $this->assertEqualsWithDelta(0.0, Budget::actualReleased(1, '2027-2028'), 0.001);
     }
+
+    public function testABudgetNeedsAnExistingAcademicYear(): void
+    {
+        $r = Budget::save(['program_id' => 1, 'academic_year' => '2030-2031', 'total_budget' => '1000'], null);
+        $this->assertSame("Academic year 2030-2031 doesn't exist yet — create it under Releasing of budget → Academic years.", $r['error']);
+        AcademicYear::create('2030-2031', false, false, 1);
+        try {
+            $this->assertTrue(Budget::save(['program_id' => 1, 'academic_year' => '2030-2031', 'total_budget' => '1000'], null)['ok']);
+        } finally {
+            self::rebuild();
+        }
+    }
 }

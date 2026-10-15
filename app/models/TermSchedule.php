@@ -273,6 +273,8 @@ final class TermSchedule
             if (!in_array($semester, SEMESTERS, true)) return ['ok' => false, 'error' => 'Choose a semester.'];
         }
         $targetChanged = $old && [(int)$old['program_id'], $old['academic_year'], $old['semester']] !== [$programId, $year, $semester];
+        // A new window, or one moved to another semester, must be in an academic year that exists.
+        if ((!$old || $targetChanged) && ($err = AcademicYear::missingError($year))) return ['ok' => false, 'error' => $err];
 
         $opens = self::parseDateTime((string)($data['opens_at'] ?? ''));
         $deadline = self::parseDateTime((string)($data['submission_deadline'] ?? ''));
