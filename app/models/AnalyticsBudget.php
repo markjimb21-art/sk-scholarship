@@ -42,13 +42,13 @@ final class AnalyticsBudget
         return (int)floor($surplus / $perScholar);
     }
 
-    /** Released per semester for the program: [semester label => amount]. */
+    /** Released per semester for the program's semesters: [semester label => amount]. */
     public static function releasedBySemester(int $programId): array
     {
         $stmt = Database::conn()->prepare(
             "SELECT CONCAT(t.academic_year, ' ', t.semester) AS sem, SUM(r.amount) FROM scholarship_releases r
-             JOIN scholar_terms t ON t.id = r.term_id JOIN scholars s ON s.id = t.scholar_id
-             WHERE s.program_id = ? GROUP BY t.academic_year, t.semester ORDER BY t.academic_year, t.semester"
+             JOIN scholar_terms t ON t.id = r.term_id
+             WHERE t.program_id = ? GROUP BY t.academic_year, t.semester ORDER BY t.academic_year, t.semester"
         );
         $stmt->execute([$programId]);
         return array_map('floatval', $stmt->fetchAll(PDO::FETCH_KEY_PAIR));
@@ -58,7 +58,7 @@ final class AnalyticsBudget
     public static function releasedByMonth(int $programId, ?string $academicYear = null): array
     {
         $sql = "SELECT DATE_FORMAT(r.release_date, '%Y-%m') AS ym, SUM(r.amount) FROM scholarship_releases r
-                JOIN scholar_terms t ON t.id = r.term_id JOIN scholars s ON s.id = t.scholar_id WHERE s.program_id = ?";
+                JOIN scholar_terms t ON t.id = r.term_id WHERE t.program_id = ?";
         $params = [$programId];
         if ($academicYear) { $sql .= " AND t.academic_year = ?"; $params[] = $academicYear; }
         $stmt = Database::conn()->prepare($sql . " GROUP BY ym ORDER BY ym");
@@ -79,8 +79,8 @@ final class AnalyticsBudget
     {
         $stmt = Database::conn()->prepare(
             "SELECT COALESCE(SUM(r.amount), 0) AS total, COUNT(DISTINCT r.scholar_id) AS n FROM scholarship_releases r
-             JOIN scholar_terms t ON t.id = r.term_id JOIN scholars s ON s.id = t.scholar_id
-             WHERE s.program_id = ? AND t.academic_year = ?"
+             JOIN scholar_terms t ON t.id = r.term_id
+             WHERE t.program_id = ? AND t.academic_year = ?"
         );
         $stmt->execute([$programId, $academicYear]);
         $r = $stmt->fetch();

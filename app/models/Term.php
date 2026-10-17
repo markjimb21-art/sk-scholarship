@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 /**
  * Scholar semesters (scholar_terms) and their cash claims (A8 / B7 / B8).
- * One row per scholar per semester; claim_status follows CLAIM_TRANSITIONS only.
+ * One row per scholar per semester; claim_status follows CLAIM_TRANSITIONS only. A semester belongs to a program
+ * (program_id): its amount, budget, claim window and seat come from that program, which can differ from the scholar's
+ * origin program (origin_program_id) once they renewed into a later academic year's program.
  */
 final class Term
 {
@@ -57,13 +59,13 @@ final class Term
     public static function find(int $id): ?array
     {
         $stmt = Database::conn()->prepare(
-            "SELECT t.*, s.status AS scholar_status, s.scholar_code, s.program_id, s.applicant_id,
+            "SELECT t.*, s.status AS scholar_status, s.scholar_code, s.program_id AS origin_program_id, s.applicant_id,
                     sp.program_name, sp.amount_per_semester, sp.min_gpa,
                     u.id AS user_id, u.full_name, u.email,
                     r.id AS release_id, r.amount AS released_amount, r.release_date, r.payment_method, r.reference_number
              FROM scholar_terms t
              JOIN scholars s ON s.id = t.scholar_id
-             JOIN scholarship_programs sp ON sp.id = s.program_id
+             JOIN scholarship_programs sp ON sp.id = t.program_id
              JOIN applicants ap ON ap.id = s.applicant_id
              JOIN users u ON u.id = ap.user_id
              LEFT JOIN scholarship_releases r ON r.term_id = t.id
@@ -142,13 +144,13 @@ final class Term
                 FROM scholarship_releases r
                 JOIN scholar_terms t ON t.id = r.term_id
                 JOIN scholars s ON s.id = r.scholar_id
-                JOIN scholarship_programs sp ON sp.id = s.program_id
+                JOIN scholarship_programs sp ON sp.id = t.program_id
                 JOIN applicants ap ON ap.id = s.applicant_id
                 JOIN users u ON u.id = ap.user_id
                 LEFT JOIN users st ON st.id = r.staff_id
                 WHERE 1=1";
         $params = [];
-        if ($filters['program_id'] !== '')    { $sql .= " AND s.program_id = :pid"; $params['pid'] = (int)$filters['program_id']; }
+        if ($filters['program_id'] !== '')    { $sql .= " AND t.program_id = :pid"; $params['pid'] = (int)$filters['program_id']; }
         if ($filters['academic_year'] !== '') { $sql .= " AND t.academic_year = :ay"; $params['ay'] = $filters['academic_year']; }
         $stmt = Database::conn()->prepare($sql . " ORDER BY r.release_date DESC, r.id DESC LIMIT " . self::RELEASE_HISTORY_LIMIT);
         $stmt->execute($params);
@@ -158,17 +160,17 @@ final class Term
     /** Semesters with a given claim status (queues), oldest submission first. */
     public static function byClaimStatus(string $status, ?int $programId = null): array
     {
-        $sql = "SELECT t.*, s.scholar_code, s.status AS scholar_status, s.program_id, sp.program_name, sp.amount_per_semester, sp.min_gpa,
+        $sql = "SELECT t.*, s.scholar_code, s.status AS scholar_status, s.program_id AS origin_program_id, sp.program_name, sp.amount_per_semester, sp.min_gpa,
                        u.full_name, u.email,
-                       (SELECT b.total_budget - b.released FROM budgets b WHERE b.program_id = s.program_id AND b.academic_year = t.academic_year) AS budget_remaining
+                       (SELECT b.total_budget - b.released FROM budgets b WHERE b.program_id = t.program_id AND b.academic_year = t.academic_year) AS budget_remaining
                 FROM scholar_terms t
                 JOIN scholars s ON s.id = t.scholar_id
-                JOIN scholarship_programs sp ON sp.id = s.program_id
+                JOIN scholarship_programs sp ON sp.id = t.program_id
                 JOIN applicants ap ON ap.id = s.applicant_id
                 JOIN users u ON u.id = ap.user_id
                 WHERE t.claim_status = ?";
         $params = [$status];
-        if ($programId) { $sql .= " AND s.program_id = ?"; $params[] = $programId; }
+        if ($programId) { $sql .= " AND t.program_id = ?"; $params[] = $programId; }
         $stmt = Database::conn()->prepare($sql . " ORDER BY COALESCE(t.submitted_at, t.reviewed_at, t.created_at), t.id");
         $stmt->execute($params);
         return $stmt->fetchAll();

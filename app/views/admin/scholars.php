@@ -32,7 +32,8 @@
         <?php foreach ($rows as $r): [$sem, $claim] = array_pad(explode('|', (string)$r['current_term']), 2, ''); ?>
           <tr>
             <td><div class="fw-semibold"><?= e($r['full_name']) ?></div><code class="small"><?= e($r['scholar_code']) ?></code></td>
-            <td><small><?= e($r['program_name']) ?></small></td>
+            <td><small><?= e($r['program_name']) ?><?php if ($r['origin_program_name'] !== $r['program_name']): ?>
+              <br><span class="text-muted">from <?= e($r['origin_program_name']) ?></span><?php endif; ?></small></td>
             <td><?= e($sem ?: '—') ?><?php if ($claim): ?><br><span class="badge bg-<?= e(CLAIM_STATUS_COLORS[$claim] ?? 'secondary') ?>"><?= e($claim) ?></span><?php endif; ?></td>
             <td><?= e(peso($r['total_released'])) ?></td>
             <td><?php [$label, $color] = Scholar::statusBadge($r); ?><span class="badge bg-<?= e($color) ?>"><?= e($label) ?></span></td>

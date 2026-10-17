@@ -4,7 +4,8 @@
     <h4 class="fw-bold mb-0 mt-1"><?= e($scholar['full_name']) ?>
       <?php [$label, $color] = Scholar::statusBadge($scholar); ?><span class="badge bg-<?= e($color) ?> ms-1"><?= e($label) ?></span></h4>
     <p class="text-muted small mb-0">
-      <code><?= e($scholar['scholar_code']) ?></code> · <?= e($scholar['program_name']) ?> · approved <?= e(fmt_date($scholar['approval_date'])) ?>
+      <code><?= e($scholar['scholar_code']) ?></code> · current program <strong><?= e($scholar['program_name']) ?></strong>
+      · origin program <?= e($scholar['origin_program_name']) ?> (approved <?= e(fmt_date($scholar['approval_date'])) ?>)
       · application <a href="<?= url('admin/application&id=' . (int)$scholar['application_id']) ?>"><?= e($scholar['application_code']) ?></a>
       <?= $scholar['ended_at'] ? ' · ended ' . e(fmt_date($scholar['ended_at'])) : '' ?>
     </p>

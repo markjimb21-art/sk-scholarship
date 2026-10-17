@@ -8,15 +8,20 @@ declare(strict_types=1);
  */
 final class Report
 {
-    /** key => [title, description, program column, date column (null = date filter not applicable)] */
+    /**
+     * key => [title, description, program filter, date column (null = date filter not applicable)]. The program filter is
+     * a column compared with :pid, or a condition that uses :pid itself. Scholar reports filter on the SEMESTER's program
+     * (scholar_terms.program_id): a scholar belongs to every program they have a semester in (origin and renewals).
+     */
     public const CATALOG = [
         'applicant_list' => ['Applicant list by status', 'Every submitted application with its status, GWA and family income', 'a.program_id', 'a.submitted_at'],
         'interviews' => ['Interview schedule & attendance', 'Each schedule with the applicants assigned and their attendance', 's.program_id', 's.interview_date'],
         'ranking'    => ['Interview results / ranking', 'Rubric scores and ranking of interviewed applicants', 'a.program_id', 'ev.evaluated_at'],
-        'scholars'   => ['Scholar masterlist', 'Every scholar with status, semesters and total released', 's.program_id', 's.approval_date'],
-        'releases'   => ['Releases (disbursement)', 'Every cash release with amount, method and reference', 's.program_id', 'r.release_date'],
+        'scholars'   => ['Scholar masterlist', 'Every scholar with status, semesters and total released',
+                         'EXISTS (SELECT 1 FROM scholar_terms pt WHERE pt.scholar_id = s.id AND pt.program_id = :pid)', 's.approval_date'],
+        'releases'   => ['Releases (disbursement)', 'Every cash release with amount, method and reference', 't.program_id', 'r.release_date'],
         'budget'     => ['Budget utilization', 'Budget, released, remaining and committed per program and academic year', 'b.program_id', 'r.release_date'],
-        'claims'     => ['Claims & renewals status', 'Status of every semester claim and renewal request', 's.program_id', 'x.created_at'],
+        'claims'     => ['Claims & renewals status', 'Status of every semester claim and renewal request', 'x.program_id', 'x.created_at'],
         'summary'    => ['Program summary', 'One page of the key numbers of one program', 'a.program_id', 'a.submitted_at'],
         'profile_academic' => ['Profile and academic summary', 'Applicant profiles, academic performance (GWA, at-risk) and fund utilization of one program', 'a.program_id', null],
     ];
@@ -30,7 +35,7 @@ final class Report
         [$title, , $programCol, $dateCol] = self::CATALOG[$type];
         $params = array_filter(['pid' => $programId, 'df' => $from, 'dt' => $to], static fn($v) => $v !== null && $v !== '');
         $w = '';
-        if ($programId)          $w .= " AND $programCol = :pid";
+        if ($programId)          $w .= str_contains($programCol, ':pid') ? " AND $programCol" : " AND $programCol = :pid";
         if ($from && $dateCol)   $w .= " AND DATE($dateCol) >= :df";
         if ($to && $dateCol)     $w .= " AND DATE($dateCol) <= :dt";
 
@@ -79,12 +84,16 @@ final class Report
                 break;
 
             case 'scholars':
-                $sql = "SELECT s.scholar_code AS 'Scholar ID', u.full_name AS 'Name', u.email AS 'E-mail', sp.program_name AS 'Program',
+                // Origin program = the one that first approved the scholar; current = their latest semester's program.
+                $sql = "SELECT s.scholar_code AS 'Scholar ID', u.full_name AS 'Name', u.email AS 'E-mail', cp.program_name AS 'Current program',
+                               sp.program_name AS 'Origin program',
                                DATE(s.approval_date) AS 'Approved', s.status AS 'Status', COALESCE(s.end_reason, '') AS 'End reason',
                                (SELECT COUNT(*) FROM scholar_terms t WHERE t.scholar_id = s.id) AS 'Semesters',
                                (SELECT COALESCE(SUM(r.amount), 0) FROM scholarship_releases r WHERE r.scholar_id = s.id) AS 'Total released'
                         FROM scholars s
                         JOIN scholarship_programs sp ON sp.id = s.program_id
+                        JOIN scholarship_programs cp ON cp.id = COALESCE((SELECT ct.program_id FROM scholar_terms ct WHERE ct.scholar_id = s.id
+                                                                          ORDER BY ct.academic_year DESC, ct.semester DESC LIMIT 1), s.program_id)
                         JOIN applicants ap ON ap.id = s.applicant_id JOIN users u ON u.id = ap.user_id
                         WHERE 1=1 $w
                         ORDER BY s.status, u.full_name";
@@ -97,7 +106,7 @@ final class Report
                         FROM scholarship_releases r
                         JOIN scholar_terms t ON t.id = r.term_id
                         JOIN scholars s ON s.id = r.scholar_id
-                        JOIN scholarship_programs sp ON sp.id = s.program_id
+                        JOIN scholarship_programs sp ON sp.id = t.program_id
                         JOIN applicants ap ON ap.id = s.applicant_id JOIN users u ON u.id = ap.user_id
                         WHERE 1=1 $w
                         ORDER BY r.release_date, r.id";
@@ -109,8 +118,7 @@ final class Report
                 $dateJoin = ($from ? ' AND DATE(r.release_date) >= :df' : '') . ($to ? ' AND DATE(r.release_date) <= :dt' : '');
                 $sql = "SELECT sp.program_name AS 'Program', b.academic_year AS 'A.Y.', b.total_budget AS 'Total',
                                (SELECT COALESCE(SUM(r.amount), 0) FROM scholarship_releases r JOIN scholar_terms t ON t.id = r.term_id
-                                  JOIN scholars s ON s.id = t.scholar_id
-                                 WHERE s.program_id = b.program_id AND t.academic_year = b.academic_year $dateJoin) AS 'Released in range',
+                                 WHERE t.program_id = b.program_id AND t.academic_year = b.academic_year $dateJoin) AS 'Released in range',
                                b.released AS 'Released (all)', b.remaining AS 'Remaining',
                                ROUND(b.released / b.total_budget * 100, 1) AS 'Utilization %'
                         FROM budgets b JOIN scholarship_programs sp ON sp.id = b.program_id
@@ -122,17 +130,17 @@ final class Report
                 $sql = "SELECT x.kind AS 'Type', x.scholar_code AS 'Scholar ID', x.full_name AS 'Name', x.semester AS 'Semester',
                                x.status AS 'Status', DATE(x.submitted_at) AS 'Submitted', DATE(x.reviewed_at) AS 'Reviewed', COALESCE(x.remarks, '') AS 'Remarks'
                         FROM (
-                            SELECT 'Claim' AS kind, s.scholar_code, u.full_name, s.program_id, CONCAT(t.academic_year, ' ', t.semester) AS semester,
+                            SELECT 'Claim' AS kind, s.scholar_code, u.full_name, t.program_id, CONCAT(t.academic_year, ' ', t.semester) AS semester,
                                    t.claim_status AS status, t.submitted_at, t.reviewed_at, t.remarks, t.created_at
                             FROM scholar_terms t JOIN scholars s ON s.id = t.scholar_id
                             JOIN applicants ap ON ap.id = s.applicant_id JOIN users u ON u.id = ap.user_id
                             UNION ALL
-                            SELECT 'Renewal', s.scholar_code, u.full_name, s.program_id, CONCAT(rr.academic_year, ' ', rr.semester),
+                            SELECT 'Renewal', s.scholar_code, u.full_name, rr.program_id, CONCAT(rr.academic_year, ' ', rr.semester),
                                    rr.status, rr.submitted_at, rr.reviewed_at, rr.remarks, rr.created_at
                             FROM renewal_requests rr JOIN scholars s ON s.id = rr.scholar_id
                             JOIN applicants ap ON ap.id = s.applicant_id JOIN users u ON u.id = ap.user_id
                         ) x
-                        WHERE 1=1 " . str_replace('s.program_id', 'x.program_id', $w) . "
+                        WHERE 1=1 $w
                         ORDER BY x.kind, x.status, x.full_name";
                 break;
 
@@ -181,7 +189,7 @@ final class Report
 
         $submitted = $pdo->prepare("SELECT COUNT(*) FROM applications WHERE program_id = :pid AND submitted_at IS NOT NULL"
             . ($from ? ' AND DATE(submitted_at) >= :df' : '') . ($to ? ' AND DATE(submitted_at) <= :dt' : ''));
-        $released = $pdo->prepare("SELECT COALESCE(SUM(r.amount), 0) FROM scholarship_releases r JOIN scholars s ON s.id = r.scholar_id WHERE s.program_id = :pid"
+        $released = $pdo->prepare("SELECT COALESCE(SUM(r.amount), 0) FROM scholarship_releases r JOIN scholar_terms t ON t.id = r.term_id WHERE t.program_id = :pid"
             . ($from ? ' AND DATE(r.release_date) >= :df' : '') . ($to ? ' AND DATE(r.release_date) <= :dt' : ''));
         foreach ([$submitted, $released] as $st) {
             $st->bindValue(':pid', $pid, PDO::PARAM_INT);
@@ -189,7 +197,9 @@ final class Report
             if ($to)   $st->bindValue(':dt', $to);
             $st->execute();
         }
-        $scholars = $pdo->prepare("SELECT SUM(status = 'Active'), SUM(status = 'Ended') FROM scholars WHERE program_id = ?");
+        // Scholars of the program = everyone with a semester in it (new and returning).
+        $scholars = $pdo->prepare("SELECT SUM(s.status = 'Active'), SUM(s.status = 'Ended') FROM scholars s
+                                   WHERE EXISTS (SELECT 1 FROM scholar_terms t WHERE t.scholar_id = s.id AND t.program_id = ?)");
         $scholars->execute([$pid]);
         [$active, $ended] = array_map('intval', $scholars->fetch(PDO::FETCH_NUM));
 

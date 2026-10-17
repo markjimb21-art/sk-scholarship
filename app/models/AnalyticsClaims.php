@@ -23,14 +23,13 @@ final class AnalyticsClaims
     }
 
     /**
-     * Submitted claims of a program + A.Y. joined to their release window: claim_status other than Waiting for
-     * Requirements, submitted_at set, a term_schedules row (purpose release) for the same program + A.Y. + semester.
+     * Submitted claims of the program's semesters of an A.Y. joined to their release window: claim_status other than
+     * Waiting for Requirements, submitted_at set, a term_schedules row (purpose release) for the same program + A.Y. + semester.
      */
     private const SUBMITTED_WITH_WINDOW_SQL = "FROM scholar_terms t
-        JOIN scholars sc ON sc.id = t.scholar_id
-        JOIN term_schedules ts ON ts.program_id = sc.program_id AND ts.academic_year = t.academic_year
+        JOIN term_schedules ts ON ts.program_id = t.program_id AND ts.academic_year = t.academic_year
                               AND ts.semester = t.semester AND ts.purpose = 'release'
-        WHERE sc.program_id = ? AND t.academic_year = ?
+        WHERE t.program_id = ? AND t.academic_year = ?
           AND t.claim_status <> 'Waiting for Requirements' AND t.submitted_at IS NOT NULL";
 
     /**
@@ -46,9 +45,9 @@ final class AnalyticsClaims
         $stmt->execute([$programId, $academicYear]);
         $r = $stmt->fetch();
         $none = $pdo->prepare(
-            "SELECT COUNT(*) FROM scholar_terms t JOIN scholars sc ON sc.id = t.scholar_id
-             WHERE sc.program_id = ? AND t.academic_year = ? AND t.claim_status <> 'Waiting for Requirements' AND t.submitted_at IS NOT NULL
-               AND NOT EXISTS (SELECT 1 FROM term_schedules ts WHERE ts.program_id = sc.program_id AND ts.academic_year = t.academic_year
+            "SELECT COUNT(*) FROM scholar_terms t
+             WHERE t.program_id = ? AND t.academic_year = ? AND t.claim_status <> 'Waiting for Requirements' AND t.submitted_at IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM term_schedules ts WHERE ts.program_id = t.program_id AND ts.academic_year = t.academic_year
                                   AND ts.semester = t.semester AND ts.purpose = 'release')"
         );
         $none->execute([$programId, $academicYear]);

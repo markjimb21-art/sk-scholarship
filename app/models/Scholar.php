@@ -9,6 +9,13 @@ final class Scholar
 {
     private const LIST_LIMIT = 500;   // scholars page
 
+    /**
+     * SQL for scholar s's CURRENT program: the program of their latest semester (it changes when they renew into a later
+     * academic year's program). scholars.program_id is the ORIGIN program, the one that first approved them.
+     */
+    private const CURRENT_PROGRAM_SQL = "COALESCE((SELECT ct.program_id FROM scholar_terms ct WHERE ct.scholar_id = s.id
+                                                   ORDER BY ct.academic_year DESC, ct.semester DESC LIMIT 1), s.program_id)";
+
     /** Scholars page status filter => label. 'current' (the default) = Active and graduated scholars. */
     public const LIST_FILTERS = [
         'current' => 'Active and graduated', 'Active' => 'Active', 'Graduated' => 'Graduated',
@@ -23,14 +30,17 @@ final class Scholar
         return ['Ended — ' . $scholar['end_reason'], 'secondary'];
     }
 
+    /** program_id = the origin program (origin_program_name); program_name etc. = the current program (current_program_id). */
     public static function find(int $id): ?array
     {
         $stmt = Database::conn()->prepare(
-            "SELECT s.*, sp.program_name, sp.academic_year AS program_year, sp.amount_per_semester, sp.min_gpa,
+            "SELECT s.*, sp.id AS current_program_id, sp.program_name, sp.academic_year AS program_year, sp.amount_per_semester, sp.min_gpa,
+                    op.program_name AS origin_program_name,
                     u.id AS user_id, u.full_name, u.email, u.contact_number, a.application_code,
                     pi.date_of_birth, pi.height_cm, pi.weight_kg, pi.blood_type, pi.religion, pi.citizenship
              FROM scholars s
-             JOIN scholarship_programs sp ON sp.id = s.program_id
+             JOIN scholarship_programs sp ON sp.id = " . self::CURRENT_PROGRAM_SQL . "
+             JOIN scholarship_programs op ON op.id = s.program_id
              JOIN applicants ap ON ap.id = s.applicant_id
              JOIN applications a ON a.id = s.application_id
              JOIN users u ON u.id = ap.user_id
@@ -68,15 +78,20 @@ final class Scholar
         return (bool)$stmt->fetchColumn();
     }
 
-    /** Scholars list (filters: q, status, program_id) with their current semester and total released. */
+    /**
+     * Scholars list (filters: q, status, program_id = has a semester in that program) with their current program and
+     * semester, origin program and total released.
+     */
     public static function search(array $filters): array
     {
-        $sql = "SELECT s.id, s.scholar_code, s.status, s.end_reason, s.approval_date, sp.program_name, u.full_name, u.email,
+        $sql = "SELECT s.id, s.scholar_code, s.status, s.end_reason, s.approval_date, sp.program_name, op.program_name AS origin_program_name,
+                       u.full_name, u.email,
                        (SELECT CONCAT(t.academic_year, ' ', t.semester, '|', t.claim_status) FROM scholar_terms t
                          WHERE t.scholar_id = s.id ORDER BY t.academic_year DESC, t.semester DESC LIMIT 1) AS current_term,
                        (SELECT COALESCE(SUM(r.amount), 0) FROM scholarship_releases r WHERE r.scholar_id = s.id) AS total_released
                 FROM scholars s
-                JOIN scholarship_programs sp ON sp.id = s.program_id
+                JOIN scholarship_programs sp ON sp.id = " . self::CURRENT_PROGRAM_SQL . "
+                JOIN scholarship_programs op ON op.id = s.program_id
                 JOIN applicants ap ON ap.id = s.applicant_id
                 JOIN users u ON u.id = ap.user_id
                 WHERE 1=1";
@@ -88,7 +103,10 @@ final class Scholar
             'Ended'     => " AND s.status = 'Ended' AND NOT (s.end_reason <=> 'Graduated')",
             default     => '',   // 'all'
         };
-        if (!empty($filters['program_id'])) { $sql .= " AND s.program_id = :pid"; $params['pid'] = (int)$filters['program_id']; }
+        if (!empty($filters['program_id'])) {
+            $sql .= " AND EXISTS (SELECT 1 FROM scholar_terms pt WHERE pt.scholar_id = s.id AND pt.program_id = :pid)";
+            $params['pid'] = (int)$filters['program_id'];
+        }
         if (($filters['q'] ?? '') !== '') {
             $sql .= " AND (u.full_name LIKE :q1 OR s.scholar_code LIKE :q2 OR u.email LIKE :q3)";
             $params['q1'] = $params['q2'] = $params['q3'] = '%' . $filters['q'] . '%';

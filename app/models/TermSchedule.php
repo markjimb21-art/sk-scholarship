@@ -113,9 +113,9 @@ final class TermSchedule
 
     /**
      * Active scholars a window applies to, with 'pending' = hasn't submitted yet.
-     *   release: scholars of the program with a semester row for this A.Y. + semester (pending while the claim is
-     *            Waiting for Requirements or Resubmit);
-     *   renewal: scholars of the program whose semester BEFORE the target exists (pending while there is no renewal
+     *   release: the program's semesters of this A.Y. + semester (pending while the claim is Waiting for Requirements
+     *            or Resubmit);
+     *   renewal: scholars whose semester BEFORE the target is in the program (pending while there is no renewal
      *            request from it, or it is in Resubmit).
      */
     public static function affectedScholars(array $row): array
@@ -125,11 +125,11 @@ final class TermSchedule
             $stmt = $pdo->prepare(
                 "SELECT s.id AS scholar_id, s.scholar_code, u.id AS user_id, u.full_name, u.email, t.id AS term_id,
                         t.claim_status AS progress, t.claim_status IN ('Waiting for Requirements','Resubmit') AS pending
-                 FROM scholars s
-                 JOIN scholar_terms t ON t.scholar_id = s.id AND t.academic_year = ? AND t.semester = ?
+                 FROM scholar_terms t
+                 JOIN scholars s ON s.id = t.scholar_id
                  JOIN applicants ap ON ap.id = s.applicant_id
                  JOIN users u ON u.id = ap.user_id
-                 WHERE s.program_id = ? AND s.status = 'Active'
+                 WHERE t.academic_year = ? AND t.semester = ? AND t.program_id = ? AND s.status = 'Active'
                  ORDER BY u.full_name"
             );
             $stmt->execute([$row['academic_year'], $row['semester'], (int)$row['program_id']]);
@@ -139,12 +139,12 @@ final class TermSchedule
                 "SELECT s.id AS scholar_id, s.scholar_code, u.id AS user_id, u.full_name, u.email, t.id AS term_id,
                         COALESCE(rr.status, CONCAT('Claim: ', t.claim_status)) AS progress,
                         (rr.id IS NULL OR rr.status = 'Resubmit') AS pending
-                 FROM scholars s
-                 JOIN scholar_terms t ON t.scholar_id = s.id AND t.academic_year = ? AND t.semester = ?
+                 FROM scholar_terms t
+                 JOIN scholars s ON s.id = t.scholar_id
                  LEFT JOIN renewal_requests rr ON rr.from_term_id = t.id
                  JOIN applicants ap ON ap.id = s.applicant_id
                  JOIN users u ON u.id = ap.user_id
-                 WHERE s.program_id = ? AND s.status = 'Active'
+                 WHERE t.academic_year = ? AND t.semester = ? AND t.program_id = ? AND s.status = 'Active'
                  ORDER BY u.full_name"
             );
             $stmt->execute([$prev['academic_year'], $prev['semester'], (int)$row['program_id']]);
@@ -200,16 +200,16 @@ final class TermSchedule
         $need = [];
         if ($purpose === 'release') {
             $rows = $pdo->query(
-                "SELECT s.program_id, sp.program_name, t.academic_year, t.semester, COUNT(*) AS n
-                 FROM scholar_terms t JOIN scholars s ON s.id = t.scholar_id JOIN scholarship_programs sp ON sp.id = s.program_id
+                "SELECT t.program_id, sp.program_name, t.academic_year, t.semester, COUNT(*) AS n
+                 FROM scholar_terms t JOIN scholars s ON s.id = t.scholar_id JOIN scholarship_programs sp ON sp.id = t.program_id
                  WHERE s.status = 'Active' AND t.claim_status IN ('Waiting for Requirements','Resubmit')
-                 GROUP BY s.program_id, sp.program_name, t.academic_year, t.semester"
+                 GROUP BY t.program_id, sp.program_name, t.academic_year, t.semester"
             )->fetchAll();
             foreach ($rows as $r) $need[] = $r;
         } else {
             $rows = $pdo->query(
-                "SELECT s.program_id, sp.program_name, t.academic_year, t.semester
-                 FROM scholar_terms t JOIN scholars s ON s.id = t.scholar_id JOIN scholarship_programs sp ON sp.id = s.program_id
+                "SELECT t.program_id, sp.program_name, t.academic_year, t.semester
+                 FROM scholar_terms t JOIN scholars s ON s.id = t.scholar_id JOIN scholarship_programs sp ON sp.id = t.program_id
                  LEFT JOIN renewal_requests rr ON rr.from_term_id = t.id
                  WHERE s.status = 'Active' AND t.claim_status = 'Released' AND rr.id IS NULL
                    AND NOT EXISTS (SELECT 1 FROM scholar_terms later WHERE later.scholar_id = t.scholar_id

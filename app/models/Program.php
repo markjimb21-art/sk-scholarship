@@ -10,7 +10,7 @@ final class Program
             "SELECT sp.*,
                     (SELECT COUNT(*) FROM applications a WHERE a.program_id = sp.id AND a.status <> 'Draft') AS application_count,
                     (SELECT COUNT(*) FROM applications a WHERE a.program_id = sp.id) AS any_application_count,
-                    (SELECT COUNT(*) FROM scholars s WHERE s.program_id = sp.id) AS scholar_count
+                    (SELECT COUNT(DISTINCT t.scholar_id) FROM scholar_terms t WHERE t.program_id = sp.id) AS scholar_count
              FROM scholarship_programs sp
              ORDER BY sp.application_start DESC, sp.id DESC"
         )->fetchAll();
@@ -200,10 +200,10 @@ final class Program
         return $y . '-' . ($y + 1);
     }
 
-    /** Has this program made any scholar yet? (Its academic year is then fixed.) */
+    /** Does any scholar have a semester in this program (new or returning)? Its academic year is then fixed. */
     public static function hasScholars(int $id): bool
     {
-        $stmt = Database::conn()->prepare("SELECT 1 FROM scholars WHERE program_id = ? LIMIT 1");
+        $stmt = Database::conn()->prepare("SELECT 1 FROM scholar_terms WHERE program_id = ? LIMIT 1");
         $stmt->execute([$id]);
         return (bool)$stmt->fetchColumn();
     }
@@ -222,18 +222,25 @@ final class Program
     }
 
     /**
-     * Delete a program nobody applied to (not even a Draft) — so it has no applications or scholars, whose records are
-     * never deleted (docs/PROCESS.md "Data retention"). Its own setup goes with it: budgets, claim/renewal windows and
-     * interview schedules (empty, since there are no applications). Audit-logged. Returns ['ok'=>true] or ['ok'=>false,'error'].
+     * Delete a program nobody applied to (not even a Draft) and no scholar renewed into — so it has no applications,
+     * semesters or renewals, whose records are never deleted (docs/PROCESS.md "Data retention"). Its own setup goes with
+     * it: budgets, claim/renewal windows and interview schedules (empty, since there are no applications). Audit-logged.
+     * Returns ['ok'=>true] or ['ok'=>false,'error'].
      */
     public static function delete(int $id, int $actorId): array
     {
         $program = self::find($id);
         if (!$program) return ['ok' => false, 'error' => 'Program not found.'];
-        $stmt = Database::conn()->prepare("SELECT COUNT(*) FROM applications WHERE program_id = ?");
-        $stmt->execute([$id]);
-        if ((int)$stmt->fetchColumn() > 0) {
+        $count = static function (string $table) use ($id): int {
+            $stmt = Database::conn()->prepare("SELECT COUNT(*) FROM `$table` WHERE program_id = ?");
+            $stmt->execute([$id]);
+            return (int)$stmt->fetchColumn();
+        };
+        if ($count('applications') > 0) {
             return ['ok' => false, 'error' => "People have applied to \"{$program['program_name']}\", so it is kept with their records. Close it instead."];
+        }
+        if ($count('scholar_terms') > 0 || $count('renewal_requests') > 0) {
+            return ['ok' => false, 'error' => "Scholars renewed into \"{$program['program_name']}\", so it is kept with their records. Close it instead."];
         }
         Database::transaction(static function () use ($id, $program, $actorId): void {
             $pdo = Database::conn();

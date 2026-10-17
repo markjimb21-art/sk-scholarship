@@ -74,23 +74,22 @@ final class Budget
         return ['total' => round($scholars * $amount * SEMESTERS_PER_YEAR, 2), 'scholars' => $scholars, 'amount' => $amount];
     }
 
-    /** Sum of the actual releases for scholars of a program in an academic year. */
+    /** Sum of the actual releases for the program's semesters of an academic year (a semester's program pays for it). */
     public static function actualReleased(int $programId, string $academicYear): float
     {
         $stmt = Database::conn()->prepare(
             "SELECT COALESCE(SUM(r.amount), 0)
              FROM scholarship_releases r
              JOIN scholar_terms t ON t.id = r.term_id
-             JOIN scholars s ON s.id = t.scholar_id
-             WHERE s.program_id = ? AND t.academic_year = ?"
+             WHERE t.program_id = ? AND t.academic_year = ?"
         );
         $stmt->execute([$programId, $academicYear]);
         return (float)$stmt->fetchColumn();
     }
 
     /**
-     * Committed = Σ over Active scholars of the program of
-     *             (amount per semester × semesters of this A.Y. not yet released to them), SEMESTERS_PER_YEAR per A.Y.
+     * Committed = Σ over Active scholars with a semester of the program in this A.Y. of
+     *             (amount per semester × the program's semesters of this A.Y. not yet released to them), SEMESTERS_PER_YEAR per A.Y.
      */
     public static function committed(int $programId, string $academicYear): float
     {
@@ -98,13 +97,14 @@ final class Budget
             "SELECT sp.amount_per_semester,
                     COALESCE(SUM(GREATEST(0, " . SEMESTERS_PER_YEAR . " - (SELECT COUNT(*) FROM scholar_terms t
                                                    JOIN scholarship_releases r ON r.term_id = t.id
-                                                   WHERE t.scholar_id = s.id AND t.academic_year = ?))), 0) AS unreleased
+                                                   WHERE t.scholar_id = s.id AND t.program_id = sp.id AND t.academic_year = :ay_released))), 0) AS unreleased
              FROM scholarship_programs sp
-             LEFT JOIN scholars s ON s.program_id = sp.id AND s.status = 'Active'
-             WHERE sp.id = ?
+             LEFT JOIN scholars s ON s.status = 'Active'
+                  AND EXISTS (SELECT 1 FROM scholar_terms pt WHERE pt.scholar_id = s.id AND pt.program_id = sp.id AND pt.academic_year = :ay_term)
+             WHERE sp.id = :pid
              GROUP BY sp.id"
         );
-        $stmt->execute([$academicYear, $programId]);
+        $stmt->execute(['ay_released' => $academicYear, 'ay_term' => $academicYear, 'pid' => $programId]);
         $row = $stmt->fetch();
         return $row ? (float)$row['amount_per_semester'] * (int)$row['unreleased'] : 0.0;
     }

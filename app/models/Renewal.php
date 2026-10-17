@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 /**
  * Renewal requests (A9 / B9): made from the current semester once its cash was Released; approving one
- * opens the next semester. Documents are stored as term_documents (purpose 'renewal') of the FROM semester.
+ * opens the next semester in the program the renewal goes INTO (renewal_requests.program_id; program_name is that
+ * program's). Documents are stored as term_documents (purpose 'renewal') of the FROM semester.
  */
 final class Renewal
 {
@@ -27,7 +28,7 @@ final class Renewal
                     ft.academic_year AS from_academic_year, ft.semester AS from_semester, ft.gwa AS from_gwa
              FROM renewal_requests rr
              JOIN scholars s ON s.id = rr.scholar_id
-             JOIN scholarship_programs sp ON sp.id = s.program_id
+             JOIN scholarship_programs sp ON sp.id = rr.program_id
              JOIN applicants ap ON ap.id = s.applicant_id
              JOIN users u ON u.id = ap.user_id
              LEFT JOIN scholar_terms ft ON ft.id = rr.from_term_id
@@ -87,11 +88,11 @@ final class Renewal
     public static function byStatus(string $status): array
     {
         $stmt = Database::conn()->prepare(
-            "SELECT rr.*, s.scholar_code, s.status AS scholar_status, sp.program_name, u.full_name,
+            "SELECT rr.*, s.scholar_code, s.status AS scholar_status, s.program_id AS origin_program_id, sp.program_name, u.full_name,
                     ft.academic_year AS from_academic_year, ft.semester AS from_semester, ft.gwa AS from_gwa
              FROM renewal_requests rr
              JOIN scholars s ON s.id = rr.scholar_id
-             JOIN scholarship_programs sp ON sp.id = s.program_id
+             JOIN scholarship_programs sp ON sp.id = rr.program_id
              JOIN applicants ap ON ap.id = s.applicant_id
              JOIN users u ON u.id = ap.user_id
              LEFT JOIN scholar_terms ft ON ft.id = rr.from_term_id

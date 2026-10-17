@@ -82,13 +82,13 @@ final class AnalyticsProfiles
                 'scholars'   => ['avg' => $r['avg_sch'] !== null ? (float)$r['avg_sch'] : null, 'n' => (int)$r['n_sch']]];
     }
 
-    /** Recorded semester GWAs (scholar_terms.gwa, set when a claim is verified) of a program's scholars, oldest first. */
+    /** Recorded semester GWAs (scholar_terms.gwa, set when a claim is verified) of the program's semesters, oldest first. */
     private static function termGwas(int $programId, ?string $academicYear = null): array
     {
         $sql = "SELECT s.id AS scholar_id, s.scholar_code, s.status, u.full_name, t.academic_year, t.semester, t.gwa
                 FROM scholar_terms t JOIN scholars s ON s.id = t.scholar_id
                 JOIN applicants ap ON ap.id = s.applicant_id JOIN users u ON u.id = ap.user_id
-                WHERE s.program_id = ? AND t.gwa IS NOT NULL";
+                WHERE t.program_id = ? AND t.gwa IS NOT NULL";
         $params = [$programId];
         if ($academicYear) { $sql .= " AND t.academic_year = ?"; $params[] = $academicYear; }
         $stmt = Database::conn()->prepare($sql . " ORDER BY u.full_name, s.id, t.academic_year, t.semester");
@@ -170,14 +170,19 @@ final class AnalyticsProfiles
         return $out;
     }
 
-    /** Active scholars per GWA band (GWA_BANDS) using each scholar's latest recorded semester GWA, else the application GWA. */
+    /**
+     * Active scholars whose CURRENT program (their latest semester's) is this one, per GWA band (GWA_BANDS), using each
+     * scholar's latest recorded semester GWA, else the application GWA.
+     */
     public static function scholarsByGwaBand(int $programId): array
     {
         $stmt = Database::conn()->prepare(
             "SELECT COALESCE((SELECT t.gwa FROM scholar_terms t WHERE t.scholar_id = s.id AND t.gwa IS NOT NULL
                               ORDER BY t.academic_year DESC, t.semester DESC LIMIT 1),
                              (SELECT e.general_average FROM education_records e WHERE e.applicant_id = s.applicant_id ORDER BY e.id DESC LIMIT 1)) AS gwa
-             FROM scholars s WHERE s.program_id = ? AND s.status = 'Active'"
+             FROM scholars s
+             WHERE s.status = 'Active'
+               AND (SELECT ct.program_id FROM scholar_terms ct WHERE ct.scholar_id = s.id ORDER BY ct.academic_year DESC, ct.semester DESC LIMIT 1) = ?"
         );
         $stmt->execute([$programId]);
         $bands = array_fill_keys(array_merge(array_keys(GWA_BANDS), ['Not recorded']), 0);
