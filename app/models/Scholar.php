@@ -118,7 +118,8 @@ final class Scholar
 
     /**
      * B10 End the scholarship (Active -> Ended with a reason). An ended scholar can't claim or renew.
-     * Returns ['ok'=>true,'slot_freed'=>bool] — a slot is freed when it ended in the first semester (Program::slotsUsed).
+     * Returns ['ok'=>true,'slot_freed'=>bool,'program_id'] — the scholar's current program (of their latest semester);
+     * a slot of it is freed when they had only one semester in it (Program::seats).
      */
     public static function end(int $id, string $reason, int $adminId): array
     {
@@ -132,12 +133,12 @@ final class Scholar
         if ($stmt->rowCount() !== 1) return ['ok' => false, 'error' => 'This scholarship has already ended.'];
         AuditLog::write('scholarship_ended', 'scholars', $id, "Scholarship ended: $reason", ['status' => 'Active'], ['status' => 'Ended', 'end_reason' => $reason, 'by' => $adminId]);
 
-        $terms = Database::conn()->prepare("SELECT COUNT(*) FROM scholar_terms WHERE scholar_id = ?");
-        $terms->execute([$id]);
+        $terms = Database::conn()->prepare("SELECT COUNT(*) FROM scholar_terms WHERE scholar_id = ? AND program_id = ?");
+        $terms->execute([$id, (int)$scholar['current_program_id']]);
         Notification::send((int)$scholar['user_id'], 'Scholarship ended',
             "Your SK scholarship ({$scholar['program_name']}) has ended. Reason: $reason. Thank you for being an SK scholar.",
             'info', url('applicant/scholarship'), sendEmail: true);
-        return ['ok' => true, 'slot_freed' => (int)$terms->fetchColumn() <= 1, 'program_id' => (int)$scholar['program_id']];
+        return ['ok' => true, 'slot_freed' => (int)$terms->fetchColumn() <= 1, 'program_id' => (int)$scholar['current_program_id']];
     }
 
     /**

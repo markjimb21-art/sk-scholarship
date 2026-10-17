@@ -62,7 +62,7 @@
             <?php foreach ($programs as $p): $s = $suggestions[(int)$p['id']] ?? null; ?>
               <option value="<?= (int)$p['id'] ?>" data-year="<?= e($p['academic_year']) ?>"
                 <?php if ($s): ?>data-suggested="<?= e(number_format($s['total'], 2, '.', '')) ?>"
-                data-suggested-text="<?= e('Suggested total budget: ' . peso($s['total']) . ' (' . $s['scholars'] . ' active scholar' . ($s['scholars'] === 1 ? '' : 's') . ' × (' . peso($s['amount']) . '/semester × ' . SEMESTERS_PER_YEAR . ' semesters))') ?>"<?php endif; ?>><?= e($p['program_name']) ?></option>
+                data-suggested-text="<?= e('Suggested total budget: ' . peso($s['total']) . ' (' . $s['slots'] . ' slot' . ($s['slots'] === 1 ? '' : 's') . ' × (' . peso($s['amount']) . '/semester × ' . SEMESTERS_PER_YEAR . ' semesters))') ?>"<?php endif; ?>><?= e($p['program_name']) ?></option>
             <?php endforeach; ?>
           </select>
         </div>

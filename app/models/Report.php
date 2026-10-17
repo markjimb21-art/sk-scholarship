@@ -211,7 +211,7 @@ final class Report
             ['Applications submitted' . ($from || $to ? ' (in date range)' : ''), (int)$submitted->fetchColumn()],
         ];
         foreach ($counts as $stage => $n) $rows[] = ['Now ' . strtolower(APP_STATUS_LABELS[$stage]), $n];
-        $rows[] = ['Slots used / total', Program::slotsUsed($pid) . ' / ' . (int)$program['slots_available']];
+        $rows[] = ['Slots', Program::seatsLine(Program::seats($pid))];
         $rows[] = ['Scholars active / ended', "$active / $ended"];
         $rows[] = ['Amount per semester', peso($program['amount_per_semester'], 'No budget')];
         $rows[] = ['Cash released' . ($from || $to ? ' (in date range)' : ''), peso($released->fetchColumn(), 'No budget')];

@@ -133,7 +133,8 @@ final class FundsController
         if (!$req) not_found();
         $docs = $req['from_term_id'] ? TermDocument::forTerm((int)$req['from_term_id'], 'renewal') : [];
         $history = Term::forScholar((int)$req['scholar_id']);
-        render('admin/renewal_view', compact('req', 'docs', 'history'), 'Renewal · ' . $req['full_name']);
+        $seatWarning = Renewal::seatWarning($req);
+        render('admin/renewal_view', compact('req', 'docs', 'history', 'seatWarning'), 'Renewal · ' . $req['full_name']);
     }
 
     public function renewalDecide(): void
@@ -234,7 +235,7 @@ final class FundsController
         if (!$r['ok']) { flash('danger', $r['error']); redirect('admin/scholar&id=' . $id); }
         flash('warning', 'Scholarship ended. The scholar was notified.');
         if ($r['slot_freed'] && AdminController::canAccess('decisions')) {
-            flash('info', 'It ended during the first semester, so a slot opened. Promote the next waitlisted applicant on the Decisions page.');
+            flash('info', 'It ended during the scholar’s first semester in this program, so a slot opened. Promote the next waitlisted applicant on the Decisions page.');
             redirect('admin/decisions&program_id=' . $r['program_id']);
         }
         redirect('admin/scholar&id=' . $id);

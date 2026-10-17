@@ -1,4 +1,4 @@
-<?php $full = $slotsUsed >= $slots; ?>
+<?php $full = $seats && $seats['free'] <= 0; ?>
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
     <h4 class="fw-bold mb-0">Final Decisions</h4>
@@ -20,8 +20,9 @@
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-body d-flex align-items-center gap-4 flex-wrap">
     <div>
-      <div class="fs-3 fw-bold <?= $full ? 'text-danger' : 'text-success' ?>">Slots: <?= $slotsUsed ?> approved / <?= $slots ?> total</div>
-      <div class="small text-muted">Approved = scholars from this program, not counting scholars ended before a second semester opened.</div>
+      <div class="fs-4 fw-bold <?= $full ? 'text-danger' : 'text-success' ?>" data-seats-line><?= e(Program::seatsLine($seats)) ?></div>
+      <div class="small text-muted">The slots are shared by returning scholars (renewed into this academic year) and new ones. A renewal still
+        waiting for a decision holds a seat; a scholar ended in their first semester here frees theirs.</div>
     </div>
     <?php if ($full): ?><span class="badge bg-danger">Full — the server blocks further approvals</span><?php endif; ?>
   </div>

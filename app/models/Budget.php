@@ -57,21 +57,19 @@ final class Budget
     }
 
     /**
-     * Suggested total budget for a program's academic year = number of Active scholars of the program × (amount per
-     * semester × 2 semesters). Returns ['total','scholars','amount'], or null when the program is missing, has no
-     * amount per semester, or has no Active scholar yet. A suggestion only: the budget form never fills it in without
-     * the admin clicking "Use this".
+     * Suggested total budget for a program's academic year = its slots × (amount per semester × 2 semesters): every
+     * seat, returning or new, paid for both semesters (docs/CHANGE_PLAN_5.md §6.3). Works for a new program with no
+     * scholars yet. Returns ['total','slots','amount'], or null when the program is missing or has no amount per
+     * semester or no slots. A suggestion only: the budget form never fills it in without the admin clicking "Use this".
      */
     public static function suggestedTotal(int $programId): ?array
     {
         $program = Program::find($programId);
         if (!$program) return null;
-        $stmt = Database::conn()->prepare("SELECT COUNT(*) FROM scholars WHERE program_id = ? AND status = 'Active'");
-        $stmt->execute([$programId]);
-        $scholars = (int)$stmt->fetchColumn();
+        $slots = (int)$program['slots_available'];
         $amount = (float)$program['amount_per_semester'];
-        if ($scholars <= 0 || $amount <= 0) return null;
-        return ['total' => round($scholars * $amount * SEMESTERS_PER_YEAR, 2), 'scholars' => $scholars, 'amount' => $amount];
+        if ($slots <= 0 || $amount <= 0) return null;
+        return ['total' => round($slots * $amount * SEMESTERS_PER_YEAR, 2), 'slots' => $slots, 'amount' => $amount];
     }
 
     /** Sum of the actual releases for the program's semesters of an academic year (a semester's program pays for it). */

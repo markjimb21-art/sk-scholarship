@@ -74,18 +74,58 @@ final class Program
     }
 
     /**
-     * Slots used (B5 counter) = scholars created from this program, not counting scholars who were ended
-     * before a second semester was opened for them (their slot is free again). A graduated scholar keeps the slot.
+     * Seats of a program (decision D5, docs/CHANGE_PLAN_5.md §6). One program = one academic-year intake, shared by
+     * returning scholars and new ones. A scholar holds a seat in P when their first semester in P is a 1st Semester:
+     * opened by a renewal = returning, by an approval = new. A scholar ended with only one semester in P frees the
+     * seat; a graduated scholar keeps it. Renewal requests into P still Submitted / Resubmit (Active scholars without a
+     * semester in P yet) hold a seat until decided — also after the deadline; scholars who never submitted hold none.
+     * Returns ['slots','returning','new','pending','used' (returning + new),'free' (slots − returning − pending − new, ≥ 0)].
+     */
+    public static function seats(int $programId): array
+    {
+        $pdo = Database::conn();
+        $stmt = $pdo->prepare(
+            "SELECT COALESCE(SUM(ft.opened_via = 'renewal'), 0) AS returning_count, COALESCE(SUM(ft.opened_via = 'approval'), 0) AS new_count
+             FROM scholars s
+             JOIN scholar_terms ft ON ft.id = (SELECT x.id FROM scholar_terms x WHERE x.scholar_id = s.id AND x.program_id = :pid_first
+                                               ORDER BY x.academic_year, x.semester LIMIT 1)
+             WHERE ft.semester = '1st Semester'
+               AND NOT (s.status = 'Ended'
+                        AND (SELECT COUNT(*) FROM scholar_terms c WHERE c.scholar_id = s.id AND c.program_id = :pid_count) <= 1)"
+        );
+        $stmt->execute(['pid_first' => $programId, 'pid_count' => $programId]);
+        $held = $stmt->fetch();
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(DISTINCT rr.scholar_id) FROM renewal_requests rr JOIN scholars s ON s.id = rr.scholar_id
+             WHERE rr.program_id = :pid_rr AND rr.semester = '1st Semester' AND rr.status IN ('Submitted', 'Resubmit') AND s.status = 'Active'
+               AND NOT EXISTS (SELECT 1 FROM scholar_terms t WHERE t.scholar_id = rr.scholar_id AND t.program_id = :pid_term)"
+        );
+        $stmt->execute(['pid_rr' => $programId, 'pid_term' => $programId]);
+        $pending = (int)$stmt->fetchColumn();
+        $stmt = $pdo->prepare("SELECT slots_available FROM scholarship_programs WHERE id = ?");
+        $stmt->execute([$programId]);
+        $slots = (int)$stmt->fetchColumn();
+        $returning = (int)$held['returning_count'];
+        $new = (int)$held['new_count'];
+        return ['slots' => $slots, 'returning' => $returning, 'new' => $new, 'pending' => $pending,
+                'used' => $returning + $new, 'free' => max(0, $slots - $returning - $pending - $new)];
+    }
+
+    /** "Slots 300 · Returning 120 (+15 pending renewal) · New approved 140 · Free 25" (decisions, dashboard, programs). */
+    public static function seatsLine(array $seats): string
+    {
+        return "Slots {$seats['slots']} · Returning {$seats['returning']}"
+            . ($seats['pending'] ? " (+{$seats['pending']} pending renewal)" : '')
+            . " · New approved {$seats['new']} · Free {$seats['free']}";
+    }
+
+    /**
+     * Seats taken for good (B5 counter, the floor for lowering a program's slots) = returning + new scholars (seats()).
+     * Pending renewals are not included: they may still be refused.
      */
     public static function slotsUsed(int $programId): int
     {
-        $stmt = Database::conn()->prepare(
-            "SELECT COUNT(*) FROM scholars s
-             WHERE s.program_id = ?
-               AND NOT (s.status = 'Ended' AND (SELECT COUNT(*) FROM scholar_terms t WHERE t.scholar_id = s.id) <= 1)"
-        );
-        $stmt->execute([$programId]);
-        return (int)$stmt->fetchColumn();
+        return self::seats($programId)['used'];
     }
 
     /**
@@ -151,8 +191,9 @@ final class Program
         $pdo = Database::conn();
         try {
             if ($id) {
-                if ($n['slots_available'] < self::slotsUsed($id)) {
-                    return ['ok' => false, 'error' => 'Slots cannot be fewer than the ' . self::slotsUsed($id) . ' already used.'];
+                $seats = self::seats($id);
+                if ($n['slots_available'] < $seats['used']) {
+                    return ['ok' => false, 'error' => "Slots cannot be fewer than the {$seats['used']} already taken ({$seats['returning']} returning, {$seats['new']} new)."];
                 }
                 $set = implode(', ', array_map(static fn($k) => "$k = :$k", array_keys($row)));
                 $pdo->prepare("UPDATE scholarship_programs SET $set WHERE id = :id")->execute($row + ['id' => $id]);

@@ -10,12 +10,12 @@ final class AnalyticsBudget
         return Budget::committed($programId, $academicYear);
     }
 
-    /** Projected need = Committed + (projected scholars − current scholars) × amount per semester × 2. */
+    /** Projected need = Committed (the program's semesters) + (projected scholars − returning − new) × amount per semester × 2. */
     public static function projectedNeed(int $programId, string $academicYear): float
     {
         $program = Program::find($programId);
-        $newScholars = AnalyticsFunnel::projectedScholars($programId)['expected_new'];
-        return self::committed($programId, $academicYear) + $newScholars * (float)$program['amount_per_semester'] * SEMESTERS_PER_YEAR;
+        $notCommitted = AnalyticsFunnel::projectedScholars($programId)['not_committed'];
+        return self::committed($programId, $academicYear) + $notCommitted * (float)$program['amount_per_semester'] * SEMESTERS_PER_YEAR;
     }
 
     /** Remaining = total budget − released (null when there is no budget for the program + A.Y.). */

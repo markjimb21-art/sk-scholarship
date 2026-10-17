@@ -20,7 +20,7 @@
       <thead class="table-light">
         <tr>
           <th>Program</th><th>Application dates</th><th>Amount / semester</th><th>Eligibility rules</th>
-          <th>Slots used</th><th>Applications</th><th>Status</th><th class="text-end">Actions</th>
+          <th>Slots</th><th>Applications</th><th>Status</th><th class="text-end">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -36,7 +36,10 @@
               Income ≤ <?= (float)$p['max_family_income'] > 0 ? '₱' . e(number_format((float)$p['max_family_income'], 2)) : 'no limit' ?><br>
               GWA <?= (float)$p['min_gpa'] > 0 ? e(number_format((float)$p['min_gpa'], 2)) . ' or better' : 'no limit' ?>
             </small></td>
-            <td><?= (int)$p['slots_used'] ?> / <?= (int)$p['slots_available'] ?></td>
+            <td class="small"><?php $st = $p['seats']; // Program::seatsLine, one part per line ?>
+              <div class="text-nowrap fw-semibold">Slots <?= (int)$st['slots'] ?> · Free <?= (int)$st['free'] ?></div>
+              <div class="text-nowrap">Returning <?= (int)$st['returning'] ?><?= $st['pending'] ? ' (+' . (int)$st['pending'] . ' pending renewal)' : '' ?></div>
+              <div class="text-nowrap">New approved <?= (int)$st['new'] ?></div></td>
             <td><?= (int)$p['application_count'] ?></td>
             <td>
               <?php if ($acceptingNow): ?><span class="badge bg-success">Accepting applications</span>

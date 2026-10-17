@@ -1,31 +1,28 @@
 <?php
 declare(strict_types=1);
 
-/** Budget::suggestedTotal = number of Active scholars × (amount per semester × 2 semesters). */
+/**
+ * Budget::suggestedTotal = slots × (amount per semester × 2 semesters): every seat of the academic-year intake,
+ * returning or new, paid for both semesters (docs/CHANGE_PLAN_5.md §6.3; before plan 5 it counted Active scholars).
+ */
 final class BudgetTest extends DatabaseTestCase
 {
     public function testSuggestedTotal(): void
     {
-        // Program 1: 1 Active scholar (Scott) × (₱5,000 × 2) = ₱10,000.
-        $this->assertSame(['total' => 10000.0, 'scholars' => 1, 'amount' => 5000.0], Budget::suggestedTotal(1));
+        // Program 1: 3 slots × (₱5,000 × 2) = ₱30,000.
+        $this->assertSame(['total' => 30000.0, 'slots' => 3, 'amount' => 5000.0], Budget::suggestedTotal(1));
     }
 
-    public function testOnlyActiveScholarsCount(): void
+    public function testASuggestionForANewProgramWithNoScholars(): void
     {
-        Database::conn()->exec("INSERT INTO scholars (scholar_code, applicant_id, application_id, program_id, approval_date, status, end_reason, ended_at) VALUES
-            ('SCH-TEST-A2', 7, 7, 1, CURDATE(), 'Active', NULL, NULL),
-            ('SCH-TEST-GR', 6, 6, 1, CURDATE(), 'Ended', 'Graduated', NOW())");
-        try {
-            $this->assertSame(['total' => 20000.0, 'scholars' => 2, 'amount' => 5000.0], Budget::suggestedTotal(1), 'the graduate is not counted');
-        } finally {
-            self::rebuild();
-        }
+        $this->assertSame(0, (int)self::value('SELECT COUNT(*) FROM scholar_terms WHERE program_id = 2'), 'program 2 (2027-2028) has no scholars yet');
+        // 5 slots × (₱4,000 × 2) = ₱40,000.
+        $this->assertSame(['total' => 40000.0, 'slots' => 5, 'amount' => 4000.0], Budget::suggestedTotal(2));
     }
 
-    public function testNoSuggestionWithoutScholarsOrAmountOrProgram(): void
+    public function testNoSuggestionWithoutAmountOrProgram(): void
     {
         $this->assertNull(Budget::suggestedTotal(999));
-        $this->assertNull(Budget::suggestedTotal(2), 'program 2 has no scholars yet');
         Database::conn()->exec('UPDATE scholarship_programs SET amount_per_semester = 0 WHERE id = 1');
         try {
             $this->assertNull(Budget::suggestedTotal(1));

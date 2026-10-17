@@ -15,6 +15,9 @@
   <div class="col-lg-6">
     <div class="card border-0 shadow-sm h-100"><div class="card-body">
       <h6 class="fw-semibold">Decision</h6>
+      <?php if ($seatWarning && $req['scholar_status'] === 'Active'): ?>
+        <div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle"></i> <?= e($seatWarning) ?></div>
+      <?php endif; ?>
       <?php if ($canDecide && $req['scholar_status'] === 'Active'): ?>
         <form method="POST" action="<?= url('admin/renewals/decide') ?>" class="d-inline" data-confirm="Approve? This opens <?= e($req['academic_year'] . ' ' . $req['semester']) ?> for the scholar.">
           <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="decision" value="approve">

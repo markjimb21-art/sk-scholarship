@@ -47,6 +47,24 @@ final class Renewal
         return $stmt->fetchAll();
     }
 
+    /**
+     * Before approving (docs/CHANGE_PLAN_5.md §5): a warning when approving this renewal would put the program's
+     * returning + new scholars over its slots. Renewals are never blocked. Null when there is nothing to warn about,
+     * the request can't be approved, or the scholar already holds a seat in that program.
+     */
+    public static function seatWarning(array $req): ?string
+    {
+        if (!self::can('approve', $req['status']) || $req['semester'] !== '1st Semester') return null;
+        $stmt = Database::conn()->prepare("SELECT 1 FROM scholar_terms WHERE scholar_id = ? AND program_id = ? LIMIT 1");
+        $stmt->execute([(int)$req['scholar_id'], (int)$req['program_id']]);
+        if ($stmt->fetchColumn()) return null;
+        $s = Program::seats((int)$req['program_id']);
+        $after = $s['returning'] + $s['new'] + 1;
+        if ($after <= $s['slots']) return null;
+        return "Approving this renewal makes $after scholars in {$req['program_name']} for {$s['slots']} slots ("
+            . ($s['returning'] + 1) . " returning with this one, {$s['new']} new). Renewals are not blocked — decide knowing the slots are over.";
+    }
+
     /** The renewal request made from a semester, if any. */
     public static function forTerm(int $termId): ?array
     {

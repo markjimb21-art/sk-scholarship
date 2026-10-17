@@ -34,16 +34,17 @@ final class AnalyticsTest extends DatabaseTestCase
     }
 
     /**
-     * Projected scholars = slots used + Σ(count in stage × rate), capped at the slots.
-     *   = 1 + (1×0.5 + 1×0 + 1×0.5 + 1×0.5 + 1×1.0 + 1×0) = 1 + 2.5 = 3.5 → capped at 3 slots; expected new = 3 − 1 = 2.
+     * Projected scholars = returning (approved + pending) + new approved + Σ(count in stage × rate), capped at the slots.
+     *   = 0 + 0 + 1 + (1×0.5 + 1×0 + 1×0.5 + 1×0.5 + 1×1.0 + 1×0) = 1 + 2.5 = 3.5 → capped at 3 slots;
+     *   not yet committed = 3 − 0 returning − 1 new = 2.
      */
     public function testProjectedScholars(): void
     {
         $p = AnalyticsFunnel::projectedScholars(self::P);
-        $this->assertSame(1, $p['slots_used']);
+        $this->assertSame([0, 0, 1], [$p['seats']['returning'], $p['seats']['pending'], $p['seats']['new']], 'returning, pending, new');
         $this->assertEqualsWithDelta(3.5, $p['uncapped'], 1e-9);
         $this->assertEqualsWithDelta(3.0, $p['value'], 1e-9);
-        $this->assertEqualsWithDelta(2.0, $p['expected_new'], 1e-9);
+        $this->assertEqualsWithDelta(2.0, $p['not_committed'], 1e-9);
         $this->assertSame(2, AnalyticsFunnel::slotsRemaining(self::P));
         $this->assertSame(1, AnalyticsFunnel::waitlistedAvailable(self::P));
     }
@@ -54,7 +55,7 @@ final class AnalyticsTest extends DatabaseTestCase
         $this->assertEqualsWithDelta(5000.0, AnalyticsBudget::committed(self::P, self::AY), 0.001);
     }
 
-    /** Projected need = committed + expected new scholars × ₱5,000 × 2 = 5,000 + 2 × 10,000 = ₱25,000. */
+    /** Projected need = committed + (projected − returning − new) × ₱5,000 × 2 = 5,000 + 2 × 10,000 = ₱25,000. */
     public function testProjectedNeed(): void
     {
         $this->assertEqualsWithDelta(25000.0, AnalyticsBudget::projectedNeed(self::P, self::AY), 0.001);

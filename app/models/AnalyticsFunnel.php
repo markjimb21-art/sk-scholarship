@@ -90,27 +90,29 @@ final class AnalyticsFunnel
     }
 
     /**
-     * Projected scholars = slots used + Σ over open stages (count in stage × conversion rate), capped at the slots.
-     * A stage with no data (rate null) adds 0. Returns ['value','uncapped','expected_new','terms' => [stage => contribution]].
+     * Projected scholars = returning (approved + pending renewals) + new approved + Σ over open stages (count in stage ×
+     * conversion rate), capped at the slots — but never below the scholars already holding a seat (renewals are not
+     * blocked). A stage with no data (rate null) adds 0. Returns ['value','uncapped','seats' (Program::seats),
+     * 'not_committed' (projected − returning − new: pending renewals and expected approvals, who have no semester in
+     * the program yet), 'terms' => [stage => contribution]].
      */
     public static function projectedScholars(int $programId): array
     {
-        $program = Program::find($programId);
+        $seats = Program::seats($programId);
         $counts = self::stageCounts($programId);
         $rates = self::conversionRates($programId)['rates'];
-        $used = Program::slotsUsed($programId);
         $terms = [];
         foreach (self::OPEN_STAGES as $s) $terms[$s] = $counts[$s] * (float)($rates[$s]['rate'] ?? 0);
-        $uncapped = $used + array_sum($terms);
-        $value = min((float)$program['slots_available'], $uncapped);
-        return ['value' => $value, 'uncapped' => $uncapped, 'expected_new' => max(0.0, $value - $used), 'terms' => $terms, 'slots_used' => $used];
+        $uncapped = $seats['returning'] + $seats['pending'] + $seats['new'] + array_sum($terms);
+        $value = max((float)$seats['used'], min((float)$seats['slots'], $uncapped));
+        return ['value' => $value, 'uncapped' => $uncapped, 'seats' => $seats,
+                'not_committed' => max(0.0, $value - $seats['returning'] - $seats['new']), 'terms' => $terms];
     }
 
-    /** Slots remaining = slots − slots used. */
+    /** Slots remaining = slots − returning − pending renewals − new (Program::seats 'free'). */
     public static function slotsRemaining(int $programId): int
     {
-        $program = Program::find($programId);
-        return max(0, (int)$program['slots_available'] - Program::slotsUsed($programId));
+        return Program::seats($programId)['free'];
     }
 
     /** Waitlisted applicants available to fill open slots. */

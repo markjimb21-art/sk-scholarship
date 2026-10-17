@@ -187,19 +187,18 @@ final class InterviewController
         redirect('admin/interview-schedule&id=' . (int)$a['schedule_id']);
     }
 
-    /** B5 Ranking + slots counter + promote-next-waitlisted prompt. */
+    /** B5 Ranking + seats (returning, pending renewals, new, free — Program::seats) + promote-next-waitlisted prompt. */
     public function decisions(): void
     {
         $program = $this->programFromRequest();
         $programs = Program::options();
         $ranking = $program ? InterviewScore::ranking((int)$program['id']) : [];
-        $slots = (int)($program['slots_available'] ?? 0);
-        $slotsUsed = $program ? Program::slotsUsed((int)$program['id']) : 0;
+        $seats = $program ? Program::seats((int)$program['id']) : null;
         $nextWaitlisted = null;
         foreach ($ranking as $r) {
             if ($r['status'] === 'Waitlisted') { $nextWaitlisted = $r; break; }
         }
-        render('admin/decisions', compact('program', 'programs', 'ranking', 'slots', 'slotsUsed', 'nextWaitlisted') + ['pageScripts' => [asset('js/pages/decisions.js')]], 'Final Decisions');
+        render('admin/decisions', compact('program', 'programs', 'ranking', 'seats', 'nextWaitlisted') + ['pageScripts' => [asset('js/pages/decisions.js')]], 'Final Decisions');
     }
 
     /** Approve | Waitlist | Reject (reason). */

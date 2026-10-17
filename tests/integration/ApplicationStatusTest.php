@@ -50,7 +50,7 @@ final class ApplicationStatusTest extends DatabaseTestCase
         Database::conn()->exec('UPDATE scholarship_programs SET slots_available = 2 WHERE id = 1');   // now full: 2 of 2
         $r = Application::approve(7, 1);                     // Wes (Waitlisted)
         $this->assertFalse($r['ok']);
-        $this->assertSame('All 2 slots are filled (2 approved). Nobody else can be approved unless a slot opens.', $r['error']);
+        $this->assertSame('All 2 slots are taken: 0 returning, 2 new approved. Nobody else can be approved unless a slot opens.', $r['error']);
         $this->assertSame('Waitlisted', self::value('SELECT status FROM applications WHERE id = 7'), 'status unchanged');
         $this->assertSame(0, (int)self::value('SELECT COUNT(*) FROM scholars WHERE application_id = 7'), 'no scholar created');
     }

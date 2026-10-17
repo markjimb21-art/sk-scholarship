@@ -74,12 +74,14 @@
 <div class="row g-3">
   <div class="col-md-6">
     <div class="card border-0 shadow-sm h-100"><div class="card-body">
-      <div class="text-muted small">Slots used</div>
-      <div class="fs-3 fw-bold"><?= (int)$slotsUsed ?> / <?= (int)$program['slots_available'] ?></div>
+      <?php $taken = $seats['slots'] - $seats['free']; ?>
+      <div class="text-muted small">Slots — <?= e($program['academic_year']) ?></div>
+      <div class="fs-3 fw-bold"><?= (int)$taken ?> / <?= (int)$seats['slots'] ?> taken</div>
       <div class="progress my-2" style="height:8px">
-        <div class="progress-bar" style="width: <?= $program['slots_available'] > 0 ? min(100, round($slotsUsed / $program['slots_available'] * 100)) : 0 ?>%"></div>
+        <div class="progress-bar" style="width: <?= $seats['slots'] > 0 ? min(100, round($taken / $seats['slots'] * 100)) : 0 ?>%"></div>
       </div>
-      <div class="small text-muted">Scholars from this program, not counting scholars ended before a second semester opened.</div>
+      <div class="small"><?= e(Program::seatsLine($seats)) ?></div>
+      <div class="small text-muted">Shared by returning scholars and new ones; a renewal waiting for a decision holds a seat.</div>
     </div></div>
   </div>
   <?php if ($showBudget): ?>

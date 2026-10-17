@@ -420,20 +420,23 @@ final class Application
     }
 
     /**
-     * B5 Approve: blocked when the program's slots are used up (the program row is locked so two approvals
-     * can't take the last slot). Creates the scholar and opens Semester 1.
+     * B5 Approve: blocked when the program has no free seat — slots minus returning scholars, pending renewals and new
+     * scholars (Program::seats, decision D5). The program row is locked so two approvals can't take the last seat.
+     * Creates the scholar and opens Semester 1.
      */
     public static function approve(int $id, int $adminId): array
     {
         $app = self::find($id);
         if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
         $r = self::decide(function (PDO $pdo) use ($app, $adminId) {
-            $lock = $pdo->prepare("SELECT slots_available FROM scholarship_programs WHERE id = ? FOR UPDATE");
+            $lock = $pdo->prepare("SELECT id FROM scholarship_programs WHERE id = ? FOR UPDATE");
             $lock->execute([(int)$app['program_id']]);
-            $slots = (int)$lock->fetchColumn();
-            $used = Program::slotsUsed((int)$app['program_id']);
-            if ($used >= $slots) {
-                throw new DomainException("All $slots slots are filled ($used approved). Nobody else can be approved unless a slot opens.");
+            $lock->fetchColumn();
+            $seats = Program::seats((int)$app['program_id']);
+            if ($seats['free'] <= 0) {
+                throw new DomainException("All {$seats['slots']} slots are taken: {$seats['returning']} returning"
+                    . ($seats['pending'] ? " (+{$seats['pending']} pending renewal)" : '') . ", {$seats['new']} new approved."
+                    . ' Nobody else can be approved unless a slot opens.');
             }
             $now = date('Y-m-d H:i:s');
             self::changeStatus($app, 'approve', $adminId, ['decided_at' => $now, 'decided_by' => $adminId]);

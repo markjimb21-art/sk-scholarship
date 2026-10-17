@@ -173,7 +173,7 @@ final class AdminController
 
         $program = Program::fromRequest();
         $programs = Program::options();
-        $slotsUsed = $program ? Program::slotsUsed((int)$program['id']) : 0;
+        $seats = $program ? Program::seats((int)$program['id']) : null;
         $budget = $program ? Budget::forProgramYear((int)$program['id'], $program['academic_year']) : null;
         $todayInterviews = self::canAccess('interviews') ? Interview::day($today) : null;
         $showBudget = self::canAccess('budget');
@@ -186,7 +186,7 @@ final class AdminController
             'gwa'     => AnalyticsProfiles::scholarsByGwaBand((int)$program['id']),
         ] : null;
 
-        render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'todayInterviews', 'charts', 'showBudget')
+        render('admin/dashboard', compact('counters', 'program', 'programs', 'seats', 'budget', 'todayInterviews', 'charts', 'showBudget')
             + ['pageScripts' => [asset('js/sk-charts.js'), asset('js/pages/dashboard.js')]], 'Dashboard');
     }
 
@@ -224,7 +224,7 @@ final class AdminController
     public function programs(): void
     {
         $programs = Program::all();
-        foreach ($programs as &$p) $p['slots_used'] = Program::slotsUsed((int)$p['id']);
+        foreach ($programs as &$p) $p['seats'] = Program::seats((int)$p['id']);
         unset($p);
         $openProgram = Program::open();
         render('admin/programs', compact('programs', 'openProgram') + ['pageScripts' => [asset('js/pages/programs.js')]], 'Scholarship Programs');
