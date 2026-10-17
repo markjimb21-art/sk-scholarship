@@ -85,7 +85,7 @@ Controllers contain **no SQL**. They read input, call models, and either render 
 |---|---|
 | Applicants and applications | `Applicant` (profile sections), `Application` (status changes go through one transition map), `ApplicationEligibility` (pass/fail per program rule), `ApplicationSearch` (lists), `ApplicantJourney` (dashboard tracker), `RecordHistory` (old/new value of every changed field), `Document` + `DocumentStorage` (versioned uploads, private files), `Lookup` (puroks, schools, courses) |
 | Interviews | `Interview` (schedules), `InterviewSlots` (slot suggestions), `InterviewAssignment` (assign, no-show, reschedule, reminders), `InterviewScore` (rubric, ranking), `SlotRequest`, `Holiday` |
-| Scholars and money | `Program`, `Budget`, `Scholar`, `Term` (semesters, claims, releases), `TermDocument`, `TermSchedule` (claim/renewal windows), `Renewal` |
+| Scholars and money | `Program` (incl. seats: returning, pending, new, free), `ProgramSetup` (New program = program + budget + renewal window in one transaction), `Budget`, `Scholar`, `Term` (semesters, claims, releases; the 2nd Semester opens on the 1st's release), `TermDocument`, `TermSchedule` (claim/renewal windows), `Renewal` (incl. "Did not renew") |
 | Reporting | `Report` (every PDF/CSV report), `WorkQueues` (dashboard counters), and one class per analytics section: `AnalyticsFunnel`, `AnalyticsBudget`, `AnalyticsInterviews`, `AnalyticsClaims`, `AnalyticsProfiles` |
 | Accounts and settings | `User`, `Setting` |
 
@@ -93,6 +93,7 @@ Controllers contain **no SQL**. They read input, call models, and either render 
 - Which status can follow which: `Application`'s transition map (and `Term::CLAIM_TRANSITIONS` for claims).
 - Budget numbers: `Budget` and `AnalyticsBudget`.
 - Interview suggestions: `InterviewSlots`.
+- Seats of an academic-year intake: `Program::seats`. Which program a renewal goes into: `Renewal::window` (the program of the next A.Y.). Whether a claim needs the School ID: `Term::claimDocumentTypes` / `Document::schoolIdOnFile`.
 
 Each number on the analytics page comes from one small function, and its formula is printed under the number.
 
@@ -106,7 +107,7 @@ All 29 tables are created by `database/schema.sql`. Many classes read a table; t
 | `users` | Every account: name, e-mail, password hash, role, active flag, failed sign-ins / lockout, last sign-in | `User`; `Auth` (registration, sign-in) |
 | `email_otp_codes` | E-mail codes for sign-up and password reset: hashed code, expiry, attempts, resend cooldown | `Otp` |
 | `puroks`, `schools`, `courses` | Reference lists for the application form (address, autocomplete) | reference data (read by `Lookup`) |
-| `scholarship_programs` | Each program: academic year, application dates, slots, amount per semester, eligibility limits, open/closed | `Program` |
+| `scholarship_programs` | Each program = one academic-year intake (one per A.Y., `uniq_program_year`): academic year, application dates, slots shared by returning and new scholars, amount per semester, eligibility limits, open/closed | `Program`, `ProgramSetup` |
 | `applicants` | One row per applicant account, linking the user to the profile | `Applicant` (created by `Auth` at sign-up) |
 | `applicants_personal_information` | Form section I: name, birth date, address, contact, measurements, sex … | `Applicant` |
 | `education_records` | Form section II: school, year level, course, major, GWA, other scholarships | `Applicant` |
@@ -119,13 +120,13 @@ All 29 tables are created by `database/schema.sql`. Many classes read a table; t
 | `slot_requests` | An applicant's requested interview slot, until staff confirm or decline it | `SlotRequest` |
 | `holidays` | Dates never offered for interviews | `Holiday` |
 | `record_history` | Old and new value of every changed applicant field | `RecordHistory` |
-| `scholars` | Approved applicants: scholar code, program, Active or Ended (with the reason) | `Scholar` |
-| `scholar_terms` | One row per scholar per semester, with its claim status | `Term` |
+| `scholars` | Approved applicants: scholar code, **origin** program (the one that approved them; the current program is the one of their latest semester), Active or Ended (with the reason) | `Scholar` |
+| `scholar_terms` | One row per scholar per semester, with its claim status and its **program** (`program_id`: its budget, claim window and seat) and how it was opened (approval, renewal, or `continuation` = the 2nd Semester opened by the 1st's release) | `Term`, `Scholar`, `Renewal` |
 | `term_documents` | Claim and renewal documents of a semester, every version (front/back side of the School ID) | `TermDocument` |
-| `term_schedules` | Claim and renewal submission windows per program, academic year and semester | `TermSchedule` |
-| `renewal_requests` | A scholar's renewal from one semester into the next | `Renewal` |
+| `term_schedules` | Claim and renewal submission windows per program, academic year and semester (a renewal window goes into the 1st Semester of its program's A.Y.) | `TermSchedule`, `ProgramSetup` |
+| `renewal_requests` | A scholar's renewal from their 2nd Semester into the 1st Semester of the next A.Y., with the **program it goes into** (`program_id`) | `Renewal` |
 | `scholarship_releases` | Each cash release: amount, date, method, reference, staff member | `Term` |
-| `budgets` | Total budget per program and academic year; "released" is re-summed from the releases, remaining = total − released | `Budget` |
+| `budgets` | Total budget per program and academic year; "released" is re-summed from the releases of the program's semesters, remaining = total − released | `Budget`, `ProgramSetup` |
 | `notifications` | In-app notifications per user, read or unread | `core/Notification` |
 | `audit_logs` | Who did what and when, with old and new values | `core/AuditLog` |
 | `system_settings` | Settings: e-mail on/off, reminder hours, daily digest, suggestion window | `Setting` |
