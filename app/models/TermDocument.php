@@ -46,12 +46,13 @@ final class TermDocument
 
     /**
      * Every required document for $purpose is uploaded — both sides of a two-sided one (one file with the whole document
-     * also counts) — and none is waiting to be re-uploaded (Resubmit) or Invalid.
+     * also counts) — and none is waiting to be re-uploaded (Resubmit) or Invalid. $types: the required types (a claim
+     * with a School ID on file needs only the Grades, Term::claimDocumentTypes); default every type of the purpose.
      */
-    public static function ready(int $termId, string $purpose): bool
+    public static function ready(int $termId, string $purpose, ?array $types = null): bool
     {
         $docs = self::forTerm($termId, $purpose);
-        foreach (TERM_DOCUMENT_TYPES[$purpose] as $type) {
+        foreach ($types ?? TERM_DOCUMENT_TYPES[$purpose] as $type) {
             if (!Document::covers($docs[$type] ?? [], Document::sidesFor($type), ['Resubmit', 'Invalid'])) return false;
         }
         return true;
@@ -85,6 +86,9 @@ final class TermDocument
     public static function upload(array $term, string $purpose, string $type, array $file, ?string $side = null): array
     {
         if (!in_array($type, TERM_DOCUMENT_TYPES[$purpose] ?? [], true)) return ['ok' => false, 'error' => 'Invalid document type.'];
+        if ($purpose === 'claim' && !in_array($type, Term::claimDocumentTypes($term), true)) {
+            return ['ok' => false, 'error' => "Your School ID for {$term['academic_year']} is already on file — this claim needs only your college grades."];
+        }
         if (!in_array($side, Document::sidesFor($type), true)) {
             return ['ok' => false, 'error' => $side === null ? "Upload the front and the back of your $type separately." : 'Invalid side.'];
         }

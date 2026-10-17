@@ -101,8 +101,10 @@ final class ApplicantJourney
                             'tone' => in_array($window['state'], ['deadline_passed', 'closed', 'cancelled'], true) ? 'danger' : 'secondary',
                             'action' => null, 'next' => $window['message'], 'details' => []];
                 }
+                $what = in_array('School ID', Term::claimDocumentTypes($term), true) ? 'your School ID and Grades'
+                    : 'your college grades (your School ID for ' . $term['academic_year'] . ' is on file)';
                 return ['step' => 4, 'status' => "$sem — claim not submitted", 'tone' => 'primary', 'action' => $toScholarship,
-                        'next' => "Upload your School ID and Grades to claim your cash for $sem. " . $window['message'], 'details' => []];
+                        'next' => "Upload $what to claim your cash for $sem. " . $window['message'], 'details' => []];
             case 'Resubmit':
                 $window = Term::claimWindow($term);
                 return ['step' => 4, 'status' => "$sem — please re-upload", 'tone' => 'warning',
@@ -113,21 +115,30 @@ final class ApplicantJourney
                 return ['step' => 4, 'status' => "$sem — claim submitted", 'tone' => 'info', 'action' => null,
                         'next' => $wait('your documents are verified'), 'details' => []];
             case 'Verified':
-                return ['step' => 4, 'status' => "$sem — verified, waiting for release", 'tone' => 'info', 'action' => null,
-                        'next' => $wait('your cash is released'), 'details' => []];
+                if (!Renewal::appliesTo($term)) {
+                    return ['step' => 4, 'status' => "$sem — verified, waiting for release", 'tone' => 'info', 'action' => null,
+                            'next' => $wait('your cash is released'), 'details' => []];
+                }
+                break;   // a 2nd Semester: the renewal can be done now (decision D2)
         }
 
-        // Released: renewal for the next semester.
-        $next = Term::nextSemester($term['academic_year'], $term['semester']);
+        // A 2nd Semester claim Verified or Released (or a renewal already requested): renewal into the next A.Y.
+        // A 1st Semester release opens the 2nd Semester by itself (D3), so there is nothing to renew from it.
+        if (!Renewal::appliesTo($term)) {
+            return ['step' => 4, 'status' => "$sem — cash released", 'tone' => 'success', 'action' => null,
+                    'next' => $wait('your next semester opens'), 'details' => []];
+        }
+        $next = $renewal ? ['academic_year' => $renewal['academic_year'], 'semester' => $renewal['semester']]
+                         : Term::nextSemester($term['academic_year'], $term['semester']);
         $nextSem = "{$next['academic_year']} {$next['semester']}";
-        $released = peso($term['released_amount']) . ' on '
-            . fmt_long_date((string)$term['release_date']) . ' (' . $term['payment_method']
-            . ($term['reference_number'] ? ', ref. ' . $term['reference_number'] : '') . ')';
-        $details = ["Released for $sem" => $released];
+        $details = $term['claim_status'] === 'Released'
+            ? ["Released for $sem" => peso($term['released_amount']) . ' on ' . fmt_long_date((string)$term['release_date'])
+                . ' (' . $term['payment_method'] . ($term['reference_number'] ? ', ref. ' . $term['reference_number'] : '') . ')']
+            : ["Claim for $sem" => 'Verified — waiting for release; we will e-mail you when your cash is released.'];
         if (!$renewal || $renewal['status'] === 'Resubmit') {
             $window = Renewal::window($term, $renewal);
             if (!$renewal) {
-                return ['step' => 5, 'status' => "$sem — cash released", 'tone' => 'success',
+                return ['step' => 5, 'status' => "$sem — " . ($term['claim_status'] === 'Released' ? 'cash released' : 'claim verified'), 'tone' => 'success',
                         'action' => $window['can_upload'] ? $toScholarship : null,
                         'next' => $window['can_upload']
                             ? "Renew for $nextSem: upload your updated Enrollment Form and School ID. " . $window['message']

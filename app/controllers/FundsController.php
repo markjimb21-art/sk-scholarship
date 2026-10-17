@@ -48,7 +48,13 @@ final class FundsController
         if (!$term) not_found();
         $docs = TermDocument::forTerm((int)$term['id'], 'claim');
         $history = Term::forScholar((int)$term['scholar_id']);
-        render('admin/claim_view', compact('term', 'docs', 'history') + ['pageScripts' => [asset('js/pages/claim-view.js')]], 'Claim · ' . $term['full_name']);
+        $types = Term::claimDocumentsToShow($term, $docs);
+        $resubmitTypes = Term::claimDocumentTypes($term);
+        // School ID once per A.Y. (D4): when the claim doesn't ask for it, the one on file is shown read-only.
+        $schoolIdOnFile = in_array('School ID', $types, true) ? null
+            : Document::schoolIdOnFile((int)$term['applicant_id'], $term['academic_year'], (int)$term['id']);
+        render('admin/claim_view', compact('term', 'docs', 'history', 'types', 'resubmitTypes', 'schoolIdOnFile')
+            + ['pageScripts' => [asset('js/pages/claim-view.js')]], 'Claim · ' . $term['full_name']);
     }
 
     public function claimDecide(): void
@@ -95,7 +101,9 @@ final class FundsController
     {
         require_post('admin/releases');
         $r = Term::release(post_int('term_id'), $_POST, admin_id());
-        flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? 'Cash released. The scholar was notified.' : $r['error']);
+        flash($r['ok'] ? 'success' : 'danger', $r['ok']
+            ? 'Cash released. ' . ($r['second_semester_opened'] ? 'The scholar’s 2nd Semester is now open (no renewal needed); they were notified.' : 'The scholar was notified.')
+            : $r['error']);
         redirect('admin/releases');
     }
 
@@ -105,7 +113,18 @@ final class FundsController
     {
         $rows = Renewal::byStatus('Submitted');
         $missed = TermSchedule::missedDeadline('renewal');
-        render('admin/renewals', compact('rows', 'missed'), 'Renewals');
+        $didNotRenew = Renewal::didNotRenew();
+        render('admin/renewals', compact('rows', 'missed', 'didNotRenew'), 'Renewals');
+    }
+
+    /** "End all as Did not renew" (Renewal::endDidNotRenew): the scholars listed on the page, each re-checked first. */
+    public function renewalsEndDidNotRenew(): void
+    {
+        require_post('admin/renewals');
+        $r = Renewal::endDidNotRenew((array)($_POST['scholar_ids'] ?? []), admin_id());
+        flash($r['ended'] ? 'success' : 'info', ($r['ended'] ? "{$r['ended']} scholarship(s) ended as Did not renew; each scholar was notified." : 'No scholarship was ended.')
+            . ($r['skipped'] ? " {$r['skipped']} skipped: they submitted a renewal or changed since the list was shown." : ''));
+        redirect('admin/renewals');
     }
 
     public function renewalView(): void

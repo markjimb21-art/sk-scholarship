@@ -34,7 +34,7 @@
         <?php foreach ($terms as $t): ?>
           <tr>
             <td class="fw-semibold"><?= e($t['academic_year'] . ' ' . $t['semester']) ?></td>
-            <td><?= e($t['opened_via'] === 'approval' ? 'Approval' : 'Renewal') ?></td>
+            <td><?= e(TERM_OPENED_VIA_LABELS[$t['opened_via']] ?? $t['opened_via']) ?></td>
             <td><span class="badge bg-<?= e(CLAIM_STATUS_COLORS[$t['claim_status']]) ?>"><?= e($t['claim_status']) ?></span></td>
             <td><?= $t['gwa'] !== null ? e(number_format((float)$t['gwa'], 2)) : '—' ?></td>
             <td><?= $t['released_amount'] !== null

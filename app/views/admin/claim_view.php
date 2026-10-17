@@ -9,7 +9,26 @@ $minGwa = $term['min_gpa'] !== null ? (float)$term['min_gpa'] : 0.0;
     · <span class="badge bg-<?= e(CLAIM_STATUS_COLORS[$term['claim_status']]) ?>"><?= e($term['claim_status']) ?></span></p>
 </div>
 
-<?php $types = TERM_DOCUMENT_TYPES['claim']; require VIEW_PATH . '/admin/_term_documents.php'; ?>
+<?php require VIEW_PATH . '/admin/_term_documents.php'; ?>
+
+<?php if ($schoolIdOnFile): ?>
+  <div class="card border-0 shadow-sm mt-3"><div class="card-body">
+    <div class="d-flex justify-content-between mb-1 flex-wrap gap-2">
+      <strong>School ID on file for <?= e($term['academic_year']) ?></strong>
+      <span class="badge bg-light text-muted border">Read-only · not part of this claim</span>
+    </div>
+    <p class="small text-muted mb-2">The School ID is asked once per academic year, so this claim needs only the college grades. Shown for reference.</p>
+    <div class="row g-2">
+      <?php foreach ($schoolIdOnFile as $k => $d): ?>
+        <div class="<?= count($schoolIdOnFile) > 1 ? 'col-6 col-md-3' : 'col-12 col-md-6' ?>">
+          <?php $f = $d; $src = $d['admin_url']; $sideLabel = $k; $imgHeight = 160; $invalidBack = null;
+            require VIEW_PATH . '/admin/_document_file.php'; ?>
+          <div class="small text-muted">From the <?= e(strtolower($d['uploaded_during'])) ?> · <?= e($d['context']) ?></div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  </div></div>
+<?php endif; ?>
 
 <div class="row g-3 mt-1">
   <div class="col-lg-6">
@@ -55,7 +74,7 @@ $minGwa = $term['min_gpa'] !== null ? (float)$term['min_gpa'] : 0.0;
       <div class="modal-header"><h5 class="modal-title">Ask for a re-upload</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
       <div class="modal-body">
         <p class="small mb-1">Documents to re-upload:</p>
-        <?php foreach (TERM_DOCUMENT_TYPES['claim'] as $t): ?>
+        <?php foreach ($resubmitTypes as $t): ?>
           <div class="form-check"><input class="form-check-input" type="checkbox" name="types[]" value="<?= e($t) ?>" id="rt<?= md5($t) ?>" checked><label class="form-check-label" for="rt<?= md5($t) ?>"><?= e(TermDocument::label($t)) ?></label></div>
         <?php endforeach; ?>
         <div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="invalid" value="1" id="markInvalid">

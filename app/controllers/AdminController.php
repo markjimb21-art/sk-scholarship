@@ -102,6 +102,7 @@ final class AdminController
         'renewals'                  => ['FundsController', 'renewals', self::FUNDS],
         'renewals/view'             => ['FundsController', 'renewalView', self::FUNDS],
         'renewals/decide'           => ['FundsController', 'renewalDecide', self::FUNDS],
+        'renewals/end-did-not-renew' => ['FundsController', 'renewalsEndDidNotRenew', self::FUNDS],
         // Claim (release) and renewal submission windows
         'release-schedule'          => ['FundsController', 'releaseSchedule', self::FUNDS],
         'renewal-schedule'          => ['FundsController', 'renewalSchedule', self::FUNDS],

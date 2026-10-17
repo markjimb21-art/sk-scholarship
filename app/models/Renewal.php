@@ -2,9 +2,10 @@
 declare(strict_types=1);
 
 /**
- * Renewal requests (A9 / B9): made from the current semester once its cash was Released; approving one
- * opens the next semester in the program the renewal goes INTO (renewal_requests.program_id; program_name is that
- * program's). Documents are stored as term_documents (purpose 'renewal') of the FROM semester.
+ * Renewal requests (A9 / B9): once a year, from a 2nd Semester whose claim is Verified or Released, into the 1st Semester
+ * of the next academic year; approving one opens that semester in the program the renewal goes INTO
+ * (renewal_requests.program_id = the owner of the renewal window; program_name is that program's). No screening, no
+ * interview. Documents are stored as term_documents (purpose 'renewal') of the FROM semester.
  */
 final class Renewal
 {
@@ -56,12 +57,23 @@ final class Renewal
     }
 
     /**
-     * May the scholar upload renewal documents / submit a renewal from this semester?
-     * Active scholar, this is the current semester, its cash was Released, and no request is pending/approved.
+     * Does a renewal apply to this semester (the renewal part of My Scholarship is shown)? Renewal is once a year
+     * (decision D3): from a 2nd Semester whose claim is Verified or Released (D2) — or a request already made from it
+     * (also one made the old way, into a 2nd Semester).
+     */
+    public static function appliesTo(array $term): bool
+    {
+        if (self::forTerm((int)$term['id'])) return true;
+        return $term['semester'] === '2nd Semester' && in_array($term['claim_status'], ['Verified', 'Released'], true);
+    }
+
+    /**
+     * May the scholar upload renewal documents / submit a renewal from this semester? Active scholar, this is the current
+     * semester, a renewal applies to it (appliesTo), no request is pending/approved, and the window allows it.
      */
     public static function editable(array $term): bool
     {
-        if ($term['scholar_status'] !== 'Active' || $term['claim_status'] !== 'Released' || !Term::isCurrent($term)) return false;
+        if ($term['scholar_status'] !== 'Active' || !self::appliesTo($term) || !Term::isCurrent($term)) return false;
         $req = self::forTerm((int)$term['id']);
         return self::can('submit', $req['status'] ?? null) && self::window($term, $req)['can_upload'];
     }
@@ -69,12 +81,21 @@ final class Renewal
     /**
      * The renewal window (term_schedules, purpose 'renewal') for the semester AFTER $term:
      * ['schedule','state','can_upload','message'] like Term::claimWindow(). $req = the renewal from $term, if known.
+     * A request keeps the window it went to (its program). Otherwise the window is the one of the program of the next
+     * academic year (one program per A.Y., decision D1); while that year has no program or no window yet, a window made the
+     * old way on the scholar's own program for that semester is used (decision D8).
      */
     public static function window(array $term, ?array $req = null): array
     {
         $req ??= self::forTerm((int)$term['id']);
-        $next = Term::nextSemester($term['academic_year'], $term['semester']);
-        $schedule = TermSchedule::forSemester((int)$term['program_id'], $next['academic_year'], $next['semester'], 'renewal');
+        if ($req) {
+            $schedule = TermSchedule::forSemester((int)$req['program_id'], $req['academic_year'], $req['semester'], 'renewal');
+        } else {
+            $next = Term::nextSemester($term['academic_year'], $term['semester']);
+            $program = Program::forAcademicYear($next['academic_year']);
+            $schedule = $program ? TermSchedule::forSemester((int)$program['id'], $next['academic_year'], $next['semester'], 'renewal') : null;
+            $schedule ??= TermSchedule::forSemester((int)$term['program_id'], $next['academic_year'], $next['semester'], 'renewal');
+        }
         $resubmit = ($req['status'] ?? null) === 'Resubmit';
         return [
             'schedule'   => $schedule,
@@ -82,6 +103,46 @@ final class Renewal
             'can_upload' => TermSchedule::allowsUpload($schedule, $resubmit),
             'message'    => TermSchedule::describeForScholar($schedule, 'renewal', $resubmit),
         ];
+    }
+
+    /**
+     * "Did not renew" (Renewals page): after a renewal window's deadline (window not Cancelled), the Active scholars it was
+     * for who never submitted a renewal. Decision D7: 'end' = those whose latest semester is the 2nd Semester of the
+     * previous A.Y. with its claim Verified or Released (they could have renewed, D2) — the bulk button ends these;
+     * 'wait' = still in an earlier semester or with that claim not verified yet, listed apart and never ended in bulk.
+     * One row per scholar (TermSchedule::affectedScholars row + 'schedule').
+     */
+    public static function didNotRenew(): array
+    {
+        $out = ['end' => [], 'wait' => []];
+        foreach (TermSchedule::missedDeadline('renewal') as $m) {
+            if ($m['schedule']['semester'] !== '1st Semester' || ($m['has_request'] ?? true)) continue;   // Resubmit = in progress
+            $prev = Term::previousSemester($m['schedule']['academic_year'], '1st Semester');
+            $could = $m['latest_year'] === $prev['academic_year'] && $m['latest_semester'] === $prev['semester']
+                && in_array($m['latest_claim'], ['Verified', 'Released'], true);
+            $out[$could ? 'end' : 'wait'][(int)$m['scholar_id']] ??= $m;
+        }
+        return ['end' => array_values($out['end']), 'wait' => array_values($out['wait'])];
+    }
+
+    /**
+     * "End all as Did not renew": ends each scholar of $scholarIds (the list the admin saw) who is still in
+     * didNotRenew()['end'] right now, through Scholar::end — the same notification and audit entry as ending one by one.
+     * Anyone who submitted a renewal (or moved on) in the meantime is skipped. Returns ['ended' => n, 'skipped' => n].
+     */
+    public static function endDidNotRenew(array $scholarIds, int $adminId): array
+    {
+        $still = array_column(self::didNotRenew()['end'], null, 'scholar_id');
+        $ended = $skipped = 0;
+        foreach (array_unique(array_map('intval', $scholarIds)) as $id) {
+            $m = $still[$id] ?? null;
+            $latest = $m ? Term::current($id) : null;
+            if (!$m || !$latest || (int)$latest['id'] !== (int)$m['term_id'] || self::forTerm((int)$m['term_id'])) { $skipped++; continue; }
+            Scholar::end($id, 'Did not renew', $adminId)['ok'] ? $ended++ : $skipped++;
+        }
+        AuditLog::write('renewal_did_not_renew', 'scholars', null, "End all as Did not renew: $ended ended, $skipped skipped",
+            null, ['scholar_ids' => array_values(array_unique(array_map('intval', $scholarIds))), 'by' => $adminId]);
+        return ['ended' => $ended, 'skipped' => $skipped];
     }
 
     /** Renewal requests with a status (B9 queue), oldest first. */
@@ -208,11 +269,12 @@ final class Renewal
             $target = ['academic_year' => $req['academic_year'], 'semester' => $req['semester']];
         } else {
             $target = Term::nextSemester($term['academic_year'], $term['semester']);
+            $intoProgram = (int)self::window($term)['schedule']['program_id'];   // the renewal goes into the window's program
             try {
                 $pdo->prepare(
                     "INSERT INTO renewal_requests (scholar_id, program_id, from_term_id, academic_year, semester, status, submitted_at, year_level, year_level_other)
                      VALUES (?, ?, ?, ?, ?, 'Submitted', ?, ?, ?)"
-                )->execute([(int)$term['scholar_id'], (int)$term['program_id'], (int)$term['id'], $target['academic_year'], $target['semester'], $now, $yearLevel, $yearLevelOther ?: null]);
+                )->execute([(int)$term['scholar_id'], $intoProgram, (int)$term['id'], $target['academic_year'], $target['semester'], $now, $yearLevel, $yearLevelOther ?: null]);
             } catch (PDOException $e) {
                 if ((int)($e->errorInfo[1] ?? 0) === 1062) return ['ok' => false, 'error' => 'A renewal for that semester already exists.'];
                 throw $e;

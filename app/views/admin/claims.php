@@ -1,6 +1,6 @@
 <div class="mb-3">
   <h4 class="fw-bold mb-0">Claims to verify</h4>
-  <p class="text-muted small mb-0"><?= count($rows) ?> semester claim(s) submitted, oldest first. Check the School ID and Grades, record the GWA, then verify or ask for a re-upload.</p>
+  <p class="text-muted small mb-0"><?= count($rows) ?> semester claim(s) submitted, oldest first. Check the Grades (and the School ID when the claim includes one — it is asked once per academic year), record the GWA, then verify or ask for a re-upload.</p>
 </div>
 <div class="card border-0 shadow-sm">
   <div class="table-responsive">

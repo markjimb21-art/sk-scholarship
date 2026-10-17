@@ -67,7 +67,7 @@ const ACADEMIC_YEAR_START_MONTH = 6;
 
 // Semester claim (scholar_terms.claim_status) => label shown to the scholar.
 const CLAIM_STATUS_LABELS = [
-    'Waiting for Requirements' => 'Upload your School ID and Grades',
+    'Waiting for Requirements' => 'Upload your claim documents',
     'Submitted'                => 'Submitted — waiting for verification',
     'Resubmit'                 => 'Please re-upload',
     'Verified'                 => 'Verified — waiting for release',
@@ -77,6 +77,9 @@ const CLAIM_STATUS_COLORS = [
     'Waiting for Requirements' => 'secondary', 'Submitted' => 'info', 'Resubmit' => 'warning',
     'Verified' => 'primary', 'Released' => 'success',
 ];
+// How a semester was opened (scholar_terms.opened_via) => label. 'continuation' = the 2nd Semester that opens by itself
+// when the 1st Semester is released (scholars renew once per academic year).
+const TERM_OPENED_VIA_LABELS = ['approval' => 'Approval', 'renewal' => 'Renewal', 'continuation' => 'Automatic (after the 1st Semester)'];
 
 // Bootstrap colour per claim/renewal document status (term_documents.status).
 const TERM_DOC_STATUS_COLORS = ['Submitted' => 'info', 'Resubmit' => 'warning', 'Verified' => 'success', 'Invalid' => 'danger'];

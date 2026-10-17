@@ -13,8 +13,11 @@ final class TermSchedule
 {
     public const PURPOSES = ['release', 'renewal'];
     public const STATUSES = ['Open', 'Closed', 'Cancelled'];
-    /** Documents a scholar submits in each window (wording used in notifications). */
-    public const DOCUMENTS = ['release' => 'Grades and School ID', 'renewal' => 'Enrollment Form and School ID'];
+    /**
+     * Documents a scholar submits in each window (wording used in notifications). A claim asks for the School ID only
+     * when this A.Y.'s is not on file (decision D4), so the claim wording stays general; My Scholarship lists them.
+     */
+    public const DOCUMENTS = ['release' => 'claim documents', 'renewal' => 'Enrollment Form and School ID'];
     public const TITLES = ['release' => 'Claim', 'renewal' => 'Renewal'];
     /** Window states shown to scholars and admins. */
     public const STATE_LABELS = [
@@ -115,12 +118,46 @@ final class TermSchedule
      * Active scholars a window applies to, with 'pending' = hasn't submitted yet.
      *   release: the program's semesters of this A.Y. + semester (pending while the claim is Waiting for Requirements
      *            or Resubmit);
-     *   renewal: scholars whose semester BEFORE the target is in the program (pending while there is no renewal
-     *            request from it, or it is in Resubmit).
+     *   renewal into a 1st Semester (once a year, decisions D1–D3): everyone who renewed into it through this program,
+     *            plus the Active scholars without a request whose latest semester is in the previous A.Y. (pending while
+     *            there is no request, or it is in Resubmit). On a window made the old way on another year's program
+     *            (D8), only that program's scholars. Renewal rows also carry has_request and the latest semester
+     *            (latest_year, latest_semester, latest_claim) for "Did not renew" (Renewal::didNotRenew);
+     *   renewal into a 2nd Semester (only windows made before D3): scholars whose 1st Semester is in the program and
+     *            who sent a renewal from it (pending while it is in Resubmit).
      */
     public static function affectedScholars(array $row): array
     {
         $pdo = Database::conn();
+        if ($row['purpose'] === 'renewal' && $row['semester'] === '1st Semester') {
+            $program = Program::find((int)$row['program_id']);
+            $legacy = !$program || $program['academic_year'] !== $row['academic_year'];
+            $stmt = $pdo->prepare(
+                "SELECT s.id AS scholar_id, s.scholar_code, u.id AS user_id, u.full_name, u.email,
+                        COALESCE(rr.from_term_id, lt.id) AS term_id,
+                        COALESCE(rr.status, CONCAT('Claim: ', lt.claim_status)) AS progress,
+                        (rr.id IS NULL OR rr.status = 'Resubmit') AS pending, (rr.id IS NOT NULL) AS has_request,
+                        lt.academic_year AS latest_year, lt.semester AS latest_semester, lt.claim_status AS latest_claim
+                 FROM scholars s
+                 JOIN scholar_terms lt ON lt.id = (SELECT x.id FROM scholar_terms x WHERE x.scholar_id = s.id
+                                                   ORDER BY x.academic_year DESC, x.semester DESC LIMIT 1)
+                 LEFT JOIN renewal_requests rr ON rr.scholar_id = s.id AND rr.program_id = :pid
+                                              AND rr.academic_year = :ay AND rr.semester = :sem
+                 JOIN applicants ap ON ap.id = s.applicant_id
+                 JOIN users u ON u.id = ap.user_id
+                 WHERE s.status = 'Active'
+                   AND (rr.id IS NOT NULL OR (lt.academic_year = :prev_ay" . ($legacy ? ' AND lt.program_id = :own_pid' : '') . "))
+                 ORDER BY u.full_name"
+            );
+            $params = ['pid' => (int)$row['program_id'], 'ay' => $row['academic_year'], 'sem' => $row['semester'],
+                       'prev_ay' => Term::previousSemester($row['academic_year'], '1st Semester')['academic_year']];
+            if ($legacy) $params['own_pid'] = (int)$row['program_id'];
+            $stmt->execute($params);
+            $rows = $stmt->fetchAll();
+            foreach ($rows as &$r) { $r['pending'] = (bool)$r['pending']; $r['has_request'] = (bool)$r['has_request']; }
+            unset($r);
+            return $rows;
+        }
         if ($row['purpose'] === 'release') {
             $stmt = $pdo->prepare(
                 "SELECT s.id AS scholar_id, s.scholar_code, u.id AS user_id, u.full_name, u.email, t.id AS term_id,
@@ -134,14 +171,15 @@ final class TermSchedule
             );
             $stmt->execute([$row['academic_year'], $row['semester'], (int)$row['program_id']]);
         } else {
+            // A renewal window into a 2nd Semester (made before plan 5): since the 1st Semester release opens the 2nd by
+            // itself (decision D3), it only concerns the scholars who sent a renewal into it.
             $prev = Term::previousSemester($row['academic_year'], $row['semester']);
             $stmt = $pdo->prepare(
                 "SELECT s.id AS scholar_id, s.scholar_code, u.id AS user_id, u.full_name, u.email, t.id AS term_id,
-                        COALESCE(rr.status, CONCAT('Claim: ', t.claim_status)) AS progress,
-                        (rr.id IS NULL OR rr.status = 'Resubmit') AS pending
+                        rr.status AS progress, rr.status = 'Resubmit' AS pending
                  FROM scholar_terms t
                  JOIN scholars s ON s.id = t.scholar_id
-                 LEFT JOIN renewal_requests rr ON rr.from_term_id = t.id
+                 JOIN renewal_requests rr ON rr.from_term_id = t.id
                  JOIN applicants ap ON ap.id = s.applicant_id
                  JOIN users u ON u.id = ap.user_id
                  WHERE t.academic_year = ? AND t.semester = ? AND t.program_id = ? AND s.status = 'Active'
@@ -190,14 +228,15 @@ final class TermSchedule
     }
 
     /**
-     * Semesters that need a window and don't have one yet: [['program_id','program_name','academic_year','semester','count']].
+     * Semesters that need a window and don't have one yet: [['program_id','program_name','academic_year','semester','n']].
      *   release: Active scholars' semesters still Waiting for Requirements / Resubmit;
-     *   renewal: the semester after an Active scholar's current, Released semester with no renewal request yet.
+     *   renewal: the 1st Semester of the next A.Y. for Active scholars whose current semester is a 2nd Semester with the
+     *            claim Verified or Released and no renewal request yet, on the program of that A.Y. (program_id null =
+     *            that A.Y. has no program yet — create it first). Renewal::window's lookup decides "has a window".
      */
     public static function needed(string $purpose): array
     {
         $pdo = Database::conn();
-        $need = [];
         if ($purpose === 'release') {
             $rows = $pdo->query(
                 "SELECT t.program_id, sp.program_name, t.academic_year, t.semester, COUNT(*) AS n
@@ -205,29 +244,27 @@ final class TermSchedule
                  WHERE s.status = 'Active' AND t.claim_status IN ('Waiting for Requirements','Resubmit')
                  GROUP BY t.program_id, sp.program_name, t.academic_year, t.semester"
             )->fetchAll();
-            foreach ($rows as $r) $need[] = $r;
-        } else {
-            $rows = $pdo->query(
-                "SELECT t.program_id, sp.program_name, t.academic_year, t.semester
-                 FROM scholar_terms t JOIN scholars s ON s.id = t.scholar_id JOIN scholarship_programs sp ON sp.id = t.program_id
-                 LEFT JOIN renewal_requests rr ON rr.from_term_id = t.id
-                 WHERE s.status = 'Active' AND t.claim_status = 'Released' AND rr.id IS NULL
-                   AND NOT EXISTS (SELECT 1 FROM scholar_terms later WHERE later.scholar_id = t.scholar_id
-                                   AND (later.academic_year > t.academic_year
-                                        OR (later.academic_year = t.academic_year AND later.semester > t.semester)))"
-            )->fetchAll();
-            $grouped = [];
-            foreach ($rows as $r) {
-                $next = Term::nextSemester($r['academic_year'], $r['semester']);
-                $key = $r['program_id'] . '|' . $next['academic_year'] . '|' . $next['semester'];
-                $grouped[$key] ??= ['program_id' => $r['program_id'], 'program_name' => $r['program_name'],
-                                    'academic_year' => $next['academic_year'], 'semester' => $next['semester'], 'n' => 0];
-                $grouped[$key]['n']++;
-            }
-            $need = array_values($grouped);
+            return array_values(array_filter($rows, static fn($n) =>
+                !self::forSemester((int)$n['program_id'], $n['academic_year'], $n['semester'], 'release')));
         }
-        return array_values(array_filter($need, static fn($n) =>
-            !self::forSemester((int)$n['program_id'], $n['academic_year'], $n['semester'], $purpose)));
+        $terms = $pdo->query(
+            "SELECT t.* FROM scholar_terms t JOIN scholars s ON s.id = t.scholar_id
+             LEFT JOIN renewal_requests rr ON rr.from_term_id = t.id
+             WHERE s.status = 'Active' AND t.semester = '2nd Semester' AND t.claim_status IN ('Verified','Released') AND rr.id IS NULL
+               AND NOT EXISTS (SELECT 1 FROM scholar_terms later WHERE later.scholar_id = t.scholar_id
+                               AND (later.academic_year > t.academic_year
+                                    OR (later.academic_year = t.academic_year AND later.semester > t.semester)))"
+        )->fetchAll();
+        $grouped = [];
+        foreach ($terms as $t) {
+            if (Renewal::window($t)['schedule']) continue;
+            $next = Term::nextSemester($t['academic_year'], $t['semester']);
+            $program = Program::forAcademicYear($next['academic_year']);
+            $grouped[$next['academic_year']] ??= ['program_id' => $program['id'] ?? null, 'program_name' => $program['program_name'] ?? null,
+                                                 'academic_year' => $next['academic_year'], 'semester' => $next['semester'], 'n' => 0];
+            $grouped[$next['academic_year']]['n']++;
+        }
+        return array_values($grouped);
     }
 
     /** Accepts the datetime-local format (Y-m-d\TH:i) and Y-m-d H:i[:s]. Returns 'Y-m-d H:i:s' or null. */
@@ -261,7 +298,14 @@ final class TermSchedule
             $programId = (int)($data['program_id'] ?? $old['program_id'] ?? 0);
             $year = trim((string)($data['academic_year'] ?? $old['academic_year'] ?? ''));
             $semester = (string)($data['semester'] ?? $old['semester'] ?? '');
-            if (!Program::find($programId)) return ['ok' => false, 'error' => 'Choose a scholarship program.'];
+            $program = Program::find($programId);
+            if (!$program) return ['ok' => false, 'error' => 'Choose a scholarship program.'];
+            if ($purpose === 'renewal') {
+                // Renewal is once a year, into the 1st Semester of the program's own academic year (decisions D1, D3).
+                // A window made the old way keeps its target while its program stays the same (D8).
+                [$year, $semester] = $old && (int)$old['program_id'] === $programId
+                    ? [$old['academic_year'], $old['semester']] : [$program['academic_year'], '1st Semester'];
+            }
             if (!preg_match('/^(\d{4})-(\d{4})$/', $year, $m) || (int)$m[2] !== (int)$m[1] + 1) {
                 return ['ok' => false, 'error' => 'Academic year must look like 2026-2027.'];
             }

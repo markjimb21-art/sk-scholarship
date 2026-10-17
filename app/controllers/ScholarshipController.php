@@ -1,7 +1,10 @@
 <?php
 declare(strict_types=1);
 
-/** A7–A9 My Scholarship: the semesters, the cash claim (School ID + Grades) and the renewal (Enrollment Form + School ID). */
+/**
+ * A7–A9 My Scholarship: the semesters, the cash claim (School ID + Grades; only the Grades when this A.Y.'s School ID is
+ * on file) and the renewal into the next academic year (Enrollment Form + School ID).
+ */
 final class ScholarshipController
 {
     public function scholarship(): void
@@ -15,11 +18,18 @@ final class ScholarshipController
         $renewal = $term ? Renewal::forTerm((int)$term['id']) : null;
         $nextSemester = $term ? Term::nextSemester($term['academic_year'], $term['semester']) : null;
         $claimWindow = $term ? Term::claimWindow($term) : null;
-        $renewalWindow = $term && $term['claim_status'] === 'Released' ? Renewal::window($term, $renewal) : null;
+        // School ID once per A.Y. (D4): with a current one of this A.Y. on file the claim asks only for the grades.
+        $claimTypes = $term ? Term::claimDocumentsToShow($term, $claimDocs) : [];
+        $schoolIdOnFile = $term && !in_array('School ID', $claimTypes, true)
+            ? Document::schoolIdOnFile((int)$applicant['id'], $term['academic_year'], (int)$term['id']) : null;
+        // Renewal only from a 2nd Semester whose claim is Verified or Released (D2, D3), or one already requested.
+        $showRenewal = $term && $scholar['status'] === 'Active' && Renewal::appliesTo($term);
+        $renewalWindow = $showRenewal ? Renewal::window($term, $renewal) : null;
         $education = Applicant::education((int)$applicant['id']) ?? [];   // year level on file (pre-fills the renewal)
 
         render('applicant/scholarship', compact('applicant', 'scholar', 'terms', 'term', 'claimDocs', 'renewalDocs', 'renewal',
-            'nextSemester', 'claimWindow', 'renewalWindow', 'education') + ['pageScripts' => [asset('js/pages/term-documents.js')]], 'My Scholarship');
+            'nextSemester', 'claimWindow', 'claimTypes', 'schoolIdOnFile', 'showRenewal', 'renewalWindow', 'education')
+            + ['pageScripts' => [asset('js/pages/term-documents.js')]], 'My Scholarship');
     }
 
     /** The current semester of the logged-in scholar, only if $_POST['term_id'] is theirs. */
@@ -46,7 +56,8 @@ final class ScholarshipController
 
         if ($isAjax) {
             if (!$result['ok']) json_response(['success' => false, 'message' => $result['error']], 400);
-            json_response(['success' => true, 'message' => "$what saved.", 'ready' => TermDocument::ready((int)$term['id'], $purpose),
+            json_response(['success' => true, 'message' => "$what saved.", 'ready' => TermDocument::ready((int)$term['id'], $purpose,
+                $purpose === 'claim' ? Term::claimDocumentTypes($term) : null),
                 'document' => [
                     'id' => $result['id'], 'type' => $type, 'side' => $side, 'status_label' => 'Uploaded',
                     'original_filename' => $result['original'], 'uploaded_at' => fmt_datetime(date('Y-m-d H:i:s')),

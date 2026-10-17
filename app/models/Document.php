@@ -218,7 +218,8 @@ final class Document
      * Every version of one document type for an applicant, from the application(s) and from claims/renewals,
      * newest first. Each row: source_table, id, type, side (null = one file), original_filename, mime_type, uploaded_at,
      * status, is_current, superseded_at, uploaded_during (Application | Claim | Renewal), context (application code or
-     * semester), admin_url (where an admin opens it).
+     * semester), academic_year (the A.Y. it was uploaded for: the application's program, the semester claimed, or the
+     * A.Y. renewed into), term_id + purpose (claim/renewal uploads), admin_url and applicant_url (where each opens it).
      */
     public static function history(int $applicantId, string $type): array
     {
@@ -236,22 +237,46 @@ final class Document
         return self::ordered($set);
     }
 
+    /**
+     * The School ID "on file" for an academic year (decision D4: the School ID is asked once per A.Y.): the applicant's
+     * current School ID when it is complete (Front and Back, or one file with both), no part of it is Invalid or waiting
+     * for a re-upload, and every part was uploaded for that A.Y. (application, renewal or another claim of that year).
+     * Uploads made for the claim of $exceptTermId don't count — that claim asks for the School ID itself, so it can be
+     * re-uploaded there. Returns side key => row (as current()), or null.
+     */
+    public static function schoolIdOnFile(int $applicantId, string $academicYear, ?int $exceptTermId = null): ?array
+    {
+        $set = self::current($applicantId, 'School ID');
+        foreach ($set as $r) {
+            if ($r['academic_year'] !== $academicYear) return null;
+            if ($exceptTermId !== null && $r['purpose'] === 'claim' && (int)$r['term_id'] === $exceptTermId) return null;
+        }
+        return $set && self::covers($set, self::sidesFor('School ID'), ['Invalid', 'Resubmit']) ? $set : null;
+    }
+
     private static function versions(int $applicantId, string $type, bool $currentOnly): array
     {
+        // The A.Y. a renewal upload is for: the renewal's target, or (before it is submitted) the semester after its own.
+        $nextYear = "CONCAT(CAST(SUBSTRING_INDEX(t.academic_year, '-', 1) AS UNSIGNED) + 1, '-', CAST(SUBSTRING_INDEX(t.academic_year, '-', -1) AS UNSIGNED) + 1)";
         $stmt = Database::conn()->prepare(
             "SELECT * FROM (
                 SELECT 'documents' AS source_table, d.id, CAST(d.document_type AS CHAR(40)) AS type, CAST(d.side AS CHAR(5)) AS side,
-                       d.original_filename,
+                       d.original_filename, d.file_path,
                        d.mime_type, d.uploaded_at, CAST(d.status AS CHAR(20)) AS status, d.is_current, d.superseded_at, d.invalid_reason,
-                       'Application' AS uploaded_during, a.application_code AS context
+                       'Application' AS uploaded_during, a.application_code AS context,
+                       CAST(sp.academic_year AS CHAR(20)) AS academic_year, NULL AS term_id, NULL AS purpose
                 FROM documents d JOIN applications a ON a.id = d.application_id
+                JOIN scholarship_programs sp ON sp.id = a.program_id
                 WHERE a.applicant_id = :applicant_doc AND d.document_type = :type_doc AND d.file_path <> ''
                 UNION ALL
-                SELECT 'term_documents', td.id, CAST(td.type AS CHAR(40)), CAST(td.side AS CHAR(5)), td.original_filename,
+                SELECT 'term_documents', td.id, CAST(td.type AS CHAR(40)), CAST(td.side AS CHAR(5)), td.original_filename, td.file_path,
                        td.mime_type, td.uploaded_at, CAST(td.status AS CHAR(20)), td.is_current, td.superseded_at, td.invalid_reason,
                        IF(td.purpose = 'claim', 'Claim', 'Renewal'),
                        IF(td.purpose = 'claim', CONCAT(t.academic_year, ' ', t.semester),
-                          CONCAT('for ', COALESCE(CONCAT(rr.academic_year, ' ', rr.semester), 'the next semester')))
+                          CONCAT('for ', COALESCE(CONCAT(rr.academic_year, ' ', rr.semester), 'the next semester'))),
+                       CAST(IF(td.purpose = 'claim', t.academic_year,
+                               COALESCE(rr.academic_year, IF(t.semester = '2nd Semester', $nextYear, t.academic_year))) AS CHAR(20)),
+                       td.term_id, CAST(td.purpose AS CHAR(10))
                 FROM term_documents td
                 JOIN scholar_terms t ON t.id = td.term_id
                 JOIN scholars s ON s.id = t.scholar_id
@@ -264,6 +289,7 @@ final class Document
         $rows = $stmt->fetchAll();
         foreach ($rows as &$r) {
             $r['admin_url'] = url(($r['source_table'] === 'documents' ? 'admin/documents/view&id=' : 'admin/term-documents/view&id=') . (int)$r['id']);
+            $r['applicant_url'] = url(($r['source_table'] === 'documents' ? 'applicant/documents/view&id=' : 'applicant/term-documents/view&id=') . (int)$r['id']);
         }
         unset($r);
         return $rows;

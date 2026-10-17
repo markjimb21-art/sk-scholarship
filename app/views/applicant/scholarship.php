@@ -113,15 +113,30 @@ $docCard = static function (string $purpose, string $type, array $set, bool $can
           <?php endif; ?>
         </div>
       <?php endif; ?>
-      <p class="text-muted small">Upload the front and back of your School ID and your college grades for <?= e($sem) ?>
-        (PDF, JPG or PNG, max <?= e(MAX_FILE_SIZE_TEXT) ?> each). Each file is <strong>saved as soon as you choose it</strong>; then submit.</p>
-      <?php foreach (TERM_DOCUMENT_TYPES['claim'] as $type) $docCard('claim', $type, $claimDocs[$type] ?? [], $claimEditable, (int)$term['id']); ?>
+      <?php if (in_array('School ID', $claimTypes, true)): ?>
+        <p class="text-muted small">Upload the front and back of your School ID and your college grades for <?= e($sem) ?>
+          (PDF, JPG or PNG, max <?= e(MAX_FILE_SIZE_TEXT) ?> each). Each file is <strong>saved as soon as you choose it</strong>; then submit.</p>
+      <?php else: ?>
+        <p class="text-muted small">Upload your college grades for <?= e($sem) ?> (PDF, JPG or PNG, max <?= e(MAX_FILE_SIZE_TEXT) ?>).
+          The file is <strong>saved as soon as you choose it</strong>; then submit.</p>
+      <?php endif; ?>
+      <?php if ($schoolIdOnFile): ?>
+        <div class="border rounded p-3 mb-2 bg-light">
+          <strong>School ID</strong> <span class="badge bg-success-subtle text-success border">On file for <?= e($term['academic_year']) ?></span>
+          <div class="small text-muted mb-1">You give your School ID once per academic year, so this claim needs only your grades.</div>
+          <?php foreach ($schoolIdOnFile as $k => $d): ?>
+            <div class="small"><?= $k !== '' ? e($k) . ': ' : '' ?><a href="<?= e($d['applicant_url']) ?>" target="_blank" rel="noopener"><?= e($d['original_filename']) ?></a>
+              · <?= e(fmt_date($d['uploaded_at'])) ?></div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+      <?php foreach ($claimTypes as $type) $docCard('claim', $type, $claimDocs[$type] ?? [], $claimEditable, (int)$term['id']); ?>
 
       <?php if ($claimEditable): ?>
         <form method="POST" action="<?= url('applicant/claim/submit') ?>" class="mt-3">
           <?= csrf_field() ?>
           <input type="hidden" name="term_id" value="<?= (int)$term['id'] ?>">
-          <button class="btn btn-success" data-term-submit="claim" <?= TermDocument::ready((int)$term['id'], 'claim') ? '' : 'disabled title="Upload every file first."' ?>>
+          <button class="btn btn-success" data-term-submit="claim" <?= TermDocument::ready((int)$term['id'], 'claim', $claimTypes) ? '' : 'disabled title="Upload every file first."' ?>>
             <i class="bi bi-send-check"></i> Submit claim
           </button>
         </form>
@@ -132,9 +147,9 @@ $docCard = static function (string $purpose, string $type, array $set, bool $can
   </div>
 </div>
 
-<!-- A9: RENEWAL FOR THE NEXT SEMESTER (after the current semester was released) -->
-<?php if ($term['claim_status'] === 'Released' && $scholar['status'] === 'Active'):
-  $nextSem = $nextSemester['academic_year'] . ' ' . $nextSemester['semester']; ?>
+<!-- A9: RENEWAL INTO THE NEXT ACADEMIC YEAR (once the 2nd Semester claim is Verified or Released) -->
+<?php if ($showRenewal):
+  $nextSem = $renewal ? $renewal['academic_year'] . ' ' . $renewal['semester'] : $nextSemester['academic_year'] . ' ' . $nextSemester['semester']; ?>
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body p-4">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
@@ -204,7 +219,7 @@ $docCard = static function (string $purpose, string $type, array $set, bool $can
         <?php foreach ($terms as $t): ?>
           <tr>
             <td><?= e($t['academic_year'] . ' ' . $t['semester']) ?></td>
-            <td><?= e($t['opened_via'] === 'approval' ? 'Approval' : 'Renewal') ?></td>
+            <td><?= e(TERM_OPENED_VIA_LABELS[$t['opened_via']] ?? $t['opened_via']) ?></td>
             <td><span class="badge bg-<?= e(CLAIM_STATUS_COLORS[$t['claim_status']]) ?>"><?= e($t['claim_status']) ?></span></td>
             <td><?= $t['gwa'] !== null ? e(number_format((float)$t['gwa'], 2)) : '—' ?></td>
             <td><?= $t['released_amount'] !== null

@@ -122,12 +122,36 @@ final class Term
         return $window['can_upload'] ? null : $window['message'];
     }
 
-    /** A8: submit the claim once School ID + Grades are uploaded. */
+    /**
+     * The documents this claim needs (decision D4: the School ID once per academic year): only the Grades when a School
+     * ID for this A.Y. is on file (Document::schoolIdOnFile — from the application, the renewal or an earlier claim of
+     * the year), otherwise the School ID and the Grades.
+     */
+    public static function claimDocumentTypes(array $term): array
+    {
+        return Document::schoolIdOnFile((int)$term['applicant_id'], $term['academic_year'], (int)$term['id'])
+            ? ['Grades'] : TERM_DOCUMENT_TYPES['claim'];
+    }
+
+    /**
+     * The claim documents to SHOW: what it needs while it can still change; once Verified or Released, what was submitted
+     * with it (a later renewal may have replaced the School ID on file since).
+     */
+    public static function claimDocumentsToShow(array $term, array $docs): array
+    {
+        if (!in_array($term['claim_status'], ['Verified', 'Released'], true)) return self::claimDocumentTypes($term);
+        return array_values(array_filter(TERM_DOCUMENT_TYPES['claim'], static fn($t) => $t === 'Grades' || isset($docs[$t])));
+    }
+
+    /** A8: submit the claim once its documents (claimDocumentTypes) are uploaded. */
     public static function submitClaim(array $term, int $userId): array
     {
         if (!self::claimEditable($term)) return ['ok' => false, 'error' => self::closedReason($term, 'claim') ?? 'This claim can’t be submitted right now.'];
-        if (!TermDocument::ready((int)$term['id'], 'claim')) {
-            return ['ok' => false, 'error' => 'Upload your School ID (front and back) and your college grades first.'];
+        $types = self::claimDocumentTypes($term);
+        if (!TermDocument::ready((int)$term['id'], 'claim', $types)) {
+            return ['ok' => false, 'error' => $types === ['Grades']
+                ? 'Upload your college grades first.'
+                : 'Upload your School ID (front and back) and your college grades first.'];
         }
         self::changeClaimStatus($term, 'submit', $userId, ['submitted_at' => date('Y-m-d H:i:s')]);
         Notification::adminEvent('Claim submitted', "{$term['full_name']} ({$term['scholar_code']}) — {$term['academic_year']} {$term['semester']} claim is waiting for verification.",
@@ -204,7 +228,7 @@ final class Term
             return ['ok' => false, 'error' => $e->getMessage()];
         }
         self::notifyScholar($term, 'Claim verified',
-            "Your School ID and Grades for {$term['academic_year']} {$term['semester']} were verified. We will e-mail you when your cash is released.", 'success');
+            "Your claim documents for {$term['academic_year']} {$term['semester']} were verified. We will e-mail you when your cash is released.", 'success');
         return ['ok' => true];
     }
 
@@ -215,7 +239,8 @@ final class Term
         if (!$term) return ['ok' => false, 'error' => 'Semester not found.'];
         $remarks = trim($remarks);
         if ($remarks === '') return ['ok' => false, 'error' => 'Write what the scholar must re-upload.'];
-        $types = array_values(array_intersect($types, TERM_DOCUMENT_TYPES['claim'])) ?: TERM_DOCUMENT_TYPES['claim'];
+        $required = self::claimDocumentTypes($term);   // a School ID on file isn't part of this claim
+        $types = array_values(array_intersect($types, $required)) ?: $required;
         $pdo = Database::conn();
         try {
             $pdo->beginTransaction();
@@ -266,6 +291,7 @@ final class Term
             Budget::syncReleased((int)$term['program_id'], $term['academic_year']);
             AuditLog::write('scholarship_released', 'scholarship_releases', $releaseId,
                 "Released ₱" . number_format((float)$amount, 2) . " to {$term['scholar_code']} for {$term['academic_year']} {$term['semester']}");
+            $secondId = self::openSecondSemester($term);
             $pdo->commit();
         } catch (DomainException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
@@ -275,11 +301,33 @@ final class Term
             if ((int)($e->errorInfo[1] ?? 0) === 1062) return ['ok' => false, 'error' => 'This semester was already released.'];
             throw $e;
         }
-        self::notifyScholar($term, 'Cash released',
+        $next = $secondId
+            ? "\nYour {$term['academic_year']} 2nd Semester is now open. To claim it on My Scholarship: "
+              . TermSchedule::describeForScholar(TermSchedule::forSemester((int)$term['program_id'], $term['academic_year'], '2nd Semester', 'release'), 'release')
+            : ($term['semester'] === '2nd Semester' ? "\nNext: renew for the next academic year on My Scholarship when the SK office opens the renewal." : '');
+        self::notifyScholar($term, $secondId ? 'Cash released — 2nd Semester open' : 'Cash released',
             peso($amount) . " for {$term['academic_year']} {$term['semester']} was released on "
-            . fmt_long_date($date) . " via $method" . ($reference ? " (reference no. $reference)" : '') . '.'
-            . "\nYou can now renew for the next semester on My Scholarship.", 'success');
-        return ['ok' => true];
+            . fmt_long_date($date) . " via $method" . ($reference ? " (reference no. $reference)" : '') . '.' . $next, 'success');
+        return ['ok' => true, 'second_semester_opened' => $secondId !== null];
+    }
+
+    /**
+     * Decision D3: no renewal between the two semesters of an academic year. When a 1st Semester's cash is released, the
+     * 2nd Semester of the same program and A.Y. opens by itself (opened_via 'continuation') — for an Active scholar whose
+     * latest semester it is. Call inside the release transaction. Returns the new semester's id, or null.
+     */
+    private static function openSecondSemester(array $term): ?int
+    {
+        if ($term['semester'] !== '1st Semester' || $term['scholar_status'] !== 'Active' || !self::isCurrent($term)) return null;
+        $pdo = Database::conn();
+        $pdo->prepare(
+            "INSERT INTO scholar_terms (scholar_id, program_id, academic_year, semester, opened_via, claim_status)
+             VALUES (?, ?, ?, '2nd Semester', 'continuation', 'Waiting for Requirements')"
+        )->execute([(int)$term['scholar_id'], (int)$term['program_id'], $term['academic_year']]);
+        $id = (int)$pdo->lastInsertId();
+        AuditLog::write('term_opened', 'scholar_terms', $id,
+            "Opened {$term['academic_year']} 2nd Semester for {$term['scholar_code']} (1st Semester released)");
+        return $id;
     }
 
     /**

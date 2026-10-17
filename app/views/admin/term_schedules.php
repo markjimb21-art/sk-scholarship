@@ -11,8 +11,8 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
     <h4 class="fw-bold mb-0"><?= $isRelease ? 'Claim schedule' : 'Renewal schedule' ?></h4>
     <p class="text-muted small mb-0">
       <?= $isRelease
-        ? 'Scholars can upload their Grades and School ID for a semester only while its claim window is open.'
-        : 'Scholars can upload their Enrollment Form and School ID for the next semester only while its renewal window is open.' ?>
+        ? 'Scholars can upload their Grades (and their School ID, once per academic year) for a semester only while its claim window is open.'
+        : 'Scholars renew once a year, into the 1st Semester of the next academic year: they upload their Enrollment Form and School ID while its renewal window is open.' ?>
       Creating a window e-mails every scholar it applies to; a reminder goes out <?= TERM_SCHEDULE_REMINDER_HOURS ?> hours before the deadline.
     </p>
   </div>
@@ -24,9 +24,14 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
     <strong>These semesters have scholars waiting but no <?= $isRelease ? 'claim' : 'renewal' ?> window yet:</strong>
     <ul class="mb-0 mt-1">
       <?php foreach ($needed as $n): ?>
-        <li><?= e($n['program_name'] . ' — ' . $n['academic_year'] . ' ' . $n['semester']) ?> (<?= (int)$n['n'] ?> scholar(s))
-          <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-bs-toggle="modal" data-bs-target="#scheduleModal"
-                  data-schedule-prefill="<?= e(js_json(['program_id' => (int)$n['program_id'], 'academic_year' => $n['academic_year'], 'semester' => $n['semester']])) ?>">Create window</button></li>
+        <?php if ($n['program_id'] === null): // renewal into an A.Y. that has no program yet (TermSchedule::needed) ?>
+          <li><?= e($n['academic_year'] . ' ' . $n['semester']) ?> (<?= (int)$n['n'] ?> scholar(s)) — create the <?= e($n['academic_year']) ?> program first
+            <?php if (AdminController::canAccess('programs')): ?><a href="<?= url('admin/programs') ?>">Programs</a><?php endif; ?></li>
+        <?php else: ?>
+          <li><?= e($n['program_name'] . ' — ' . $n['academic_year'] . ' ' . $n['semester']) ?> (<?= (int)$n['n'] ?> scholar(s))
+            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-bs-toggle="modal" data-bs-target="#scheduleModal"
+                    data-schedule-prefill="<?= e(js_json(['program_id' => (int)$n['program_id'], 'academic_year' => $n['academic_year'], 'semester' => $n['semester']])) ?>">Create window</button></li>
+        <?php endif; ?>
       <?php endforeach; ?>
     </ul>
   </div>
@@ -89,7 +94,7 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
               <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>"><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option><?php endforeach; ?>
             </select>
           </div>
-          <div class="row g-2 mb-2">
+          <div class="row g-2 mb-2<?= $isRelease ? '' : ' d-none' ?>"><?php // renewal: set by TermSchedule::save from the program ?>
             <div class="col-7">
               <label class="form-label"><?= $isRelease ? 'Academic year' : 'Renewal into academic year' ?></label>
               <select name="academic_year" id="schYear" class="form-select" required>
@@ -103,7 +108,8 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
               </select>
             </div>
           </div>
-          <?php if (!$isRelease): ?><div class="form-text mb-2">The semester scholars are renewing <em>into</em> (the one after their current semester).</div><?php endif; ?>
+          <?php if (!$isRelease): ?><div class="form-text mb-2">Scholars renew <em>into</em> the 1st Semester of the program’s academic year
+            (e.g. the 2027-2028 program takes the renewals into 2027-2028 1st Semester), so choose the program of the year they renew into.</div><?php endif; ?>
         </div>
         <div id="schFixedText" class="mb-2 d-none"><div class="fw-semibold" id="schFixedName"></div>
           <div class="form-text">Program and semester can't change: scholars already submitted under this window. Close or cancel it instead.</div></div>
