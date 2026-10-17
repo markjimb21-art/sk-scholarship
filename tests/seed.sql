@@ -60,13 +60,14 @@ INSERT INTO family_background (applicant_id, father_income, mother_income, total
  (6,7000,7000,14000,5),(7,15000,5000,20000,4),(8,8000,2000,10000,6),(9,20000,8000,28000,3);
 
 -- ---------- Programs ----------
--- 1 = the open test program (3 slots, ₱5,000 per semester). 2 = another active program, only used to block a day for
--- the interview suggestions (it started earlier, so program 1 stays "the open program" and the default on admin pages).
+-- 1 = the open test program (3 slots, ₱5,000 per semester). 2 = another active program, used to block a day for the
+-- interview suggestions (it started earlier, so program 1 stays "the open program" and the default on admin pages). One
+-- program per academic year (uniq_program_year), so program 2 is the next year's intake, 2027-2028: renewals go into it.
 INSERT INTO scholarship_programs (id, program_name, academic_year, amount_per_semester, min_gpa, max_family_income, max_age,
                                   slots_available, application_start, application_end, is_active, created_by) VALUES
  (1, 'EduKabataan Test Program', '2026-2027', 5000.00, 2.50, 30000.00, 30, 3,
      CURDATE() - INTERVAL 120 DAY, CURDATE() + INTERVAL 10 DAY, 1, 1),
- (2, 'Other Test Program',       '2026-2027', 4000.00, NULL, NULL, NULL, 5,
+ (2, 'Other Test Program',       '2027-2028', 4000.00, NULL, NULL, NULL, 5,
      CURDATE() - INTERVAL 150 DAY, CURDATE() + INTERVAL 40 DAY, 1, 1);
 
 -- ---------- Applications of program 1, one per status ----------
@@ -139,15 +140,15 @@ INSERT INTO scholars (id, scholar_code, applicant_id, application_id, program_id
  (1, 'SCH-TEST-0001', 8, 8, 1, CURDATE() - INTERVAL 80 DAY, 'Active');
 
 -- 1st semester: claimed on time and released. 2nd semester (opened by renewal): claim submitted late, not yet released.
-INSERT INTO scholar_terms (id, scholar_id, academic_year, semester, opened_via, claim_status, gwa, submitted_at, reviewed_by, reviewed_at) VALUES
- (1, 1, '2026-2027', '1st Semester', 'approval', 'Released',  1.80, NOW() - INTERVAL 50 DAY, 3, NOW() - INTERVAL 47 DAY),
- (2, 1, '2026-2027', '2nd Semester', 'renewal',  'Submitted', NULL, NOW() - INTERVAL 5 DAY,  NULL, NULL);
+INSERT INTO scholar_terms (id, scholar_id, program_id, academic_year, semester, opened_via, claim_status, gwa, submitted_at, reviewed_by, reviewed_at) VALUES
+ (1, 1, 1, '2026-2027', '1st Semester', 'approval', 'Released',  1.80, NOW() - INTERVAL 50 DAY, 3, NOW() - INTERVAL 47 DAY),
+ (2, 1, 1, '2026-2027', '2nd Semester', 'renewal',  'Submitted', NULL, NOW() - INTERVAL 5 DAY,  NULL, NULL);
 
 INSERT INTO scholarship_releases (release_code, scholar_id, term_id, amount, release_date, payment_method, staff_id) VALUES
  ('REL-TEST-0001', 1, 1, 5000.00, CURDATE() - INTERVAL 45 DAY, 'Cash', 3);
 
-INSERT INTO renewal_requests (scholar_id, from_term_id, academic_year, semester, status, submitted_at, reviewed_by, reviewed_at) VALUES
- (1, 1, '2026-2027', '2nd Semester', 'Approved', NOW() - INTERVAL 40 DAY, 3, NOW() - INTERVAL 35 DAY);
+INSERT INTO renewal_requests (scholar_id, program_id, from_term_id, academic_year, semester, status, submitted_at, reviewed_by, reviewed_at) VALUES
+ (1, 1, 1, '2026-2027', '2nd Semester', 'Approved', NOW() - INTERVAL 40 DAY, 3, NOW() - INTERVAL 35 DAY);
 
 -- Claim/renewal windows. Release window of the 1st semester: closed, Scott submitted inside it (on time).
 -- Release window of the 2nd semester: still Open, deadline passed 10 days ago; Scott submitted 5 days ago (late).

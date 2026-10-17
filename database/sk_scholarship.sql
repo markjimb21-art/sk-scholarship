@@ -644,12 +644,15 @@ CREATE TABLE `renewal_requests` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `year_level` enum('1st Year','2nd Year','3rd Year','4th Year','5th Year','Other') DEFAULT NULL COMMENT 'Year level for the target semester',
   `year_level_other` varchar(50) DEFAULT NULL,
+  `program_id` int(10) unsigned NOT NULL COMMENT 'Program the renewal goes INTO (owner of the renewal window)',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_renewal_target` (`scholar_id`,`academic_year`,`semester`),
   UNIQUE KEY `uniq_renewal_from_term` (`from_term_id`),
   KEY `idx_renewal_status` (`status`),
   KEY `fk_renewals_reviewed_by` (`reviewed_by`),
+  KEY `idx_renewals_program` (`program_id`,`status`),
   CONSTRAINT `fk_renewals_from_term` FOREIGN KEY (`from_term_id`) REFERENCES `scholar_terms` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_renewals_program` FOREIGN KEY (`program_id`) REFERENCES `scholarship_programs` (`id`),
   CONSTRAINT `fk_renewals_reviewed_by` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_renewals_scholar` FOREIGN KEY (`scholar_id`) REFERENCES `scholars` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -661,7 +664,7 @@ CREATE TABLE `renewal_requests` (
 
 LOCK TABLES `renewal_requests` WRITE;
 /*!40000 ALTER TABLE `renewal_requests` DISABLE KEYS */;
-INSERT INTO `renewal_requests` VALUES (1,1,1,'2026-2027','2nd Semester','Approved',NULL,'2026-09-16 23:10:49',2,'2026-09-16 23:10:49','2026-09-16 15:10:49',NULL,NULL);
+INSERT INTO `renewal_requests` VALUES (1,1,1,'2026-2027','2nd Semester','Approved',NULL,'2026-09-16 23:10:49',2,'2026-09-16 23:10:49','2026-09-16 15:10:49',NULL,NULL,1);
 /*!40000 ALTER TABLE `renewal_requests` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -704,7 +707,7 @@ CREATE TABLE `scholar_terms` (
   `scholar_id` int(10) unsigned NOT NULL,
   `academic_year` varchar(20) NOT NULL,
   `semester` enum('1st Semester','2nd Semester') NOT NULL,
-  `opened_via` enum('approval','renewal') NOT NULL,
+  `opened_via` enum('approval','renewal','continuation') NOT NULL COMMENT 'continuation = 2nd Semester opened by the 1st Semester release',
   `claim_status` enum('Waiting for Requirements','Submitted','Resubmit','Verified','Released') NOT NULL DEFAULT 'Waiting for Requirements',
   `gwa` decimal(4,2) DEFAULT NULL COMMENT 'GWA read from the Grades by the admin when verifying the claim',
   `remarks` text DEFAULT NULL COMMENT 'Admin remarks when asking to resubmit',
@@ -712,10 +715,13 @@ CREATE TABLE `scholar_terms` (
   `reviewed_by` int(10) unsigned DEFAULT NULL,
   `reviewed_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `program_id` int(10) unsigned NOT NULL COMMENT 'Program this semester belongs to: its budget, claim windows and seat',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_term` (`scholar_id`,`academic_year`,`semester`),
   KEY `idx_claim_status` (`claim_status`),
   KEY `fk_terms_reviewed_by` (`reviewed_by`),
+  KEY `idx_terms_program_year` (`program_id`,`academic_year`),
+  CONSTRAINT `fk_terms_program` FOREIGN KEY (`program_id`) REFERENCES `scholarship_programs` (`id`),
   CONSTRAINT `fk_terms_reviewed_by` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`),
   CONSTRAINT `fk_terms_scholar` FOREIGN KEY (`scholar_id`) REFERENCES `scholars` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -727,7 +733,7 @@ CREATE TABLE `scholar_terms` (
 
 LOCK TABLES `scholar_terms` WRITE;
 /*!40000 ALTER TABLE `scholar_terms` DISABLE KEYS */;
-INSERT INTO `scholar_terms` VALUES (1,1,'2025-2026','1st Semester','approval','Released',1.00,NULL,'2026-09-16 23:08:40',NULL,'2026-09-16 23:08:40','2026-09-16 15:08:40'),(3,1,'2026-2027','2nd Semester','renewal','Waiting for Requirements',NULL,NULL,NULL,NULL,NULL,'2026-09-16 15:10:49');
+INSERT INTO `scholar_terms` VALUES (1,1,'2025-2026','1st Semester','approval','Released',1.00,NULL,'2026-09-16 23:08:40',NULL,'2026-09-16 23:08:40','2026-09-16 15:08:40',1),(3,1,'2026-2027','2nd Semester','renewal','Waiting for Requirements',NULL,NULL,NULL,NULL,NULL,'2026-09-16 15:10:49',1);
 /*!40000 ALTER TABLE `scholar_terms` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -743,7 +749,7 @@ CREATE TABLE `scholars` (
   `scholar_code` varchar(30) NOT NULL,
   `applicant_id` int(10) unsigned NOT NULL,
   `application_id` int(10) unsigned NOT NULL,
-  `program_id` int(10) unsigned NOT NULL,
+  `program_id` int(10) unsigned NOT NULL COMMENT 'Origin program: the one that first approved the scholar. Current program = program of the latest semester',
   `approval_date` date NOT NULL,
   `status` enum('Active','Ended') NOT NULL DEFAULT 'Active',
   `end_reason` enum('Graduated','Dropped out','Failed grade requirement','Did not renew') DEFAULT NULL,
@@ -795,6 +801,7 @@ CREATE TABLE `scholarship_programs` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_program_year` (`academic_year`),
   KEY `idx_active` (`is_active`),
   KEY `idx_year` (`academic_year`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

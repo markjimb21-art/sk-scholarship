@@ -22,7 +22,7 @@ final class Renewal
     public static function find(int $id): ?array
     {
         $stmt = Database::conn()->prepare(
-            "SELECT rr.*, s.scholar_code, s.status AS scholar_status, s.program_id,
+            "SELECT rr.*, s.scholar_code, s.status AS scholar_status, s.program_id AS origin_program_id,
                     sp.program_name, u.id AS user_id, u.full_name, u.email,
                     ft.academic_year AS from_academic_year, ft.semester AS from_semester, ft.gwa AS from_gwa
              FROM renewal_requests rr
@@ -128,10 +128,11 @@ final class Renewal
         try {
             $pdo->beginTransaction();
             self::changeStatus($req, 'approve', $adminId, ['remarks' => null, 'reviewed_by' => $adminId, 'reviewed_at' => date('Y-m-d H:i:s')]);
+            // The new semester belongs to the program the renewal went into.
             $pdo->prepare(
-                "INSERT INTO scholar_terms (scholar_id, academic_year, semester, opened_via, claim_status)
-                 VALUES (?, ?, ?, 'renewal', 'Waiting for Requirements')"
-            )->execute([(int)$req['scholar_id'], $req['academic_year'], $req['semester']]);
+                "INSERT INTO scholar_terms (scholar_id, program_id, academic_year, semester, opened_via, claim_status)
+                 VALUES (?, ?, ?, ?, 'renewal', 'Waiting for Requirements')"
+            )->execute([(int)$req['scholar_id'], (int)$req['program_id'], $req['academic_year'], $req['semester']]);
             AuditLog::write('term_opened', 'scholar_terms', (int)$pdo->lastInsertId(),
                 "Opened {$req['academic_year']} {$req['semester']} for {$req['scholar_code']} (renewal approved)");
             if ($req['from_term_id']) {
@@ -208,9 +209,9 @@ final class Renewal
             $target = Term::nextSemester($term['academic_year'], $term['semester']);
             try {
                 $pdo->prepare(
-                    "INSERT INTO renewal_requests (scholar_id, from_term_id, academic_year, semester, status, submitted_at, year_level, year_level_other)
-                     VALUES (?, ?, ?, ?, 'Submitted', ?, ?, ?)"
-                )->execute([(int)$term['scholar_id'], (int)$term['id'], $target['academic_year'], $target['semester'], $now, $yearLevel, $yearLevelOther ?: null]);
+                    "INSERT INTO renewal_requests (scholar_id, program_id, from_term_id, academic_year, semester, status, submitted_at, year_level, year_level_other)
+                     VALUES (?, ?, ?, ?, ?, 'Submitted', ?, ?, ?)"
+                )->execute([(int)$term['scholar_id'], (int)$term['program_id'], (int)$term['id'], $target['academic_year'], $target['semester'], $now, $yearLevel, $yearLevelOther ?: null]);
             } catch (PDOException $e) {
                 if ((int)($e->errorInfo[1] ?? 0) === 1062) return ['ok' => false, 'error' => 'A renewal for that semester already exists.'];
                 throw $e;

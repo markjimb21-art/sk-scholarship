@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * B1: a program's academic year is typed in the form (pre-filled from the application start date); left blank it follows
- * the start date. Fixed once the program has scholars.
+ * the start date. Fixed once the program has scholars. One program per academic year (D1, plan 5).
  */
 final class ProgramYearTest extends DatabaseTestCase
 {
@@ -35,8 +35,19 @@ final class ProgramYearTest extends DatabaseTestCase
 
     public function testABlankYearFollowsTheDates(): void
     {
-        $r = Program::save(self::form('2027-07-01', '2027-07-31') + ['academic_year' => ''], null, 1);
-        $this->assertSame('2027-2028', Program::find($r['id'])['academic_year']);
+        // 2028: the seed's program 2 holds 2027-2028 (one program per A.Y.).
+        $r = Program::save(self::form('2028-07-01', '2028-07-31') + ['academic_year' => ''], null, 1);
+        $this->assertSame('2028-2029', Program::find($r['id'])['academic_year']);
+    }
+
+    public function testASecondProgramForAnAcademicYearIsRefused(): void
+    {
+        $r = Program::save(self::form('2027-07-01', '2027-07-31') + ['academic_year' => '2027-2028'], null, 1);
+        $this->assertFalse($r['ok']);
+        $this->assertStringStartsWith('A.Y. 2027-2028 already has a program ("Other Test Program")', $r['error']);
+        $this->assertSame(2, (int)self::value("SELECT COUNT(*) FROM scholarship_programs"), 'nothing was added');
+        // Saving the program that holds the year again is fine.
+        $this->assertTrue(Program::save(self::form('2027-07-01', '2027-07-31') + ['academic_year' => '2027-2028'], 2, 1)['ok']);
     }
 
     public function testABadlyWrittenYearIsRefused(): void

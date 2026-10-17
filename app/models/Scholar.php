@@ -136,9 +136,9 @@ final class Scholar
         $scholarId = (int)$pdo->lastInsertId();
 
         $pdo->prepare(
-            "INSERT INTO scholar_terms (scholar_id, academic_year, semester, opened_via, claim_status)
-             VALUES (?, ?, '1st Semester', 'approval', 'Waiting for Requirements')"
-        )->execute([$scholarId, $app['academic_year']]);
+            "INSERT INTO scholar_terms (scholar_id, program_id, academic_year, semester, opened_via, claim_status)
+             VALUES (?, ?, ?, '1st Semester', 'approval', 'Waiting for Requirements')"
+        )->execute([$scholarId, (int)$app['program_id'], $app['academic_year']]);
         $termId = (int)$pdo->lastInsertId();
 
         AuditLog::write('scholar_created', 'scholars', $scholarId,

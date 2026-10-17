@@ -114,6 +114,10 @@ final class Program
                 return ['ok' => false, 'error' => 'Academic year must look like 2026-2027 (the second year is the first + 1).'];
             }
         }
+        // One program per academic year (uniq_program_year): a renewal into a year must know which program it goes into.
+        if ($other = self::forAcademicYear($year)) {
+            if ((int)$other['id'] !== (int)$id) return ['ok' => false, 'error' => self::yearTakenMessage($year, $other['program_name'])];
+        }
 
         // Numbers: blank limit => NULL (no limit); anything given must be a number >= 0.
         $labels = ['amount_per_semester' => 'Amount per semester', 'slots_available' => 'Number of slots',
@@ -145,23 +149,43 @@ final class Program
         ];
 
         $pdo = Database::conn();
-        if ($id) {
-            if ($n['slots_available'] < self::slotsUsed($id)) {
-                return ['ok' => false, 'error' => 'Slots cannot be fewer than the ' . self::slotsUsed($id) . ' already used.'];
+        try {
+            if ($id) {
+                if ($n['slots_available'] < self::slotsUsed($id)) {
+                    return ['ok' => false, 'error' => 'Slots cannot be fewer than the ' . self::slotsUsed($id) . ' already used.'];
+                }
+                $set = implode(', ', array_map(static fn($k) => "$k = :$k", array_keys($row)));
+                $pdo->prepare("UPDATE scholarship_programs SET $set WHERE id = :id")->execute($row + ['id' => $id]);
+                AuditLog::write('program_updated', 'scholarship_programs', $id, "Updated program \"$name\" ($year)", $old, $row);
+            } else {
+                $cols = array_keys($row);
+                $pdo->prepare(
+                    "INSERT INTO scholarship_programs (" . implode(', ', $cols) . ", created_by)
+                     VALUES (:" . implode(', :', $cols) . ", :created_by)"
+                )->execute($row + ['created_by' => $actorId]);
+                $id = (int)$pdo->lastInsertId();
+                AuditLog::write('program_created', 'scholarship_programs', $id, "Created program \"$name\" ($year)", null, $row);
             }
-            $set = implode(', ', array_map(static fn($k) => "$k = :$k", array_keys($row)));
-            $pdo->prepare("UPDATE scholarship_programs SET $set WHERE id = :id")->execute($row + ['id' => $id]);
-            AuditLog::write('program_updated', 'scholarship_programs', $id, "Updated program \"$name\" ($year)", $old, $row);
-        } else {
-            $cols = array_keys($row);
-            $pdo->prepare(
-                "INSERT INTO scholarship_programs (" . implode(', ', $cols) . ", created_by)
-                 VALUES (:" . implode(', :', $cols) . ", :created_by)"
-            )->execute($row + ['created_by' => $actorId]);
-            $id = (int)$pdo->lastInsertId();
-            AuditLog::write('program_created', 'scholarship_programs', $id, "Created program \"$name\" ($year)", null, $row);
+        } catch (PDOException $e) {
+            // Another save took the year in the meantime.
+            if ((int)($e->errorInfo[1] ?? 0) === 1062) return ['ok' => false, 'error' => self::yearTakenMessage($year, null)];
+            throw $e;
         }
         return ['ok' => true, 'id' => $id];
+    }
+
+    /** The program of an academic year (at most one, uniq_program_year), or null. */
+    public static function forAcademicYear(string $academicYear): ?array
+    {
+        $stmt = Database::conn()->prepare("SELECT * FROM scholarship_programs WHERE academic_year = ? LIMIT 1");
+        $stmt->execute([$academicYear]);
+        return $stmt->fetch() ?: null;
+    }
+
+    private static function yearTakenMessage(string $year, ?string $programName): string
+    {
+        return "A.Y. $year already has a program" . ($programName !== null ? " (\"$programName\")" : '')
+            . '. There is one program per academic year, so returning scholars know which one they renew into — edit that program instead.';
     }
 
     /**

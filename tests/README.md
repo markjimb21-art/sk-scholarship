@@ -29,6 +29,8 @@ php bin/smoke_test.php                             # every route, signed in as e
 | unit | `PasswordRuleTest` | 8+ characters and 1 special character; the exact messages; Validator uses the same rule |
 | integration | `ApplicationStatusTest` | refused and stale status changes; approval blocked when the slots are full |
 | integration | `AnalyticsTest` | projected scholars, committed, projected need, surplus, extra fundable, attendance, no-show, scores, on-time rate, against numbers worked out by hand from the seed |
+| integration | `TermProgramMigrationTest` | `2026_10_18_term_program.sql` run on the old table shape: semesters and renewals get the scholar's program, NOT NULL + foreign keys, the 2nd Semester opened only for an Active scholar stuck after a Released 1st Semester, one program per academic year |
+| integration | `TermProgramTest` | a semester belongs to a program: Semester 1 in the application's program; a renewal's semester in the program it went into (not the origin) |
 | integration | `BudgetTest` | suggested budget = Active scholars × (amount per semester × 2) |
 | integration | `InterviewSuggestionsTest` | slot suggestions: existing schedules first, business hours, Mon–Sat, after the application period, no holidays, no other program's day, no overlaps |
 | integration | `ReminderScriptTest` | `bin/send_reminders.php` run for real: interview, deadline and daily-digest reminders each go out once; a second run sends nothing |

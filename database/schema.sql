@@ -91,7 +91,8 @@ CREATE TABLE scholarship_programs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_active (is_active),
-    INDEX idx_year (academic_year)
+    INDEX idx_year (academic_year),
+    UNIQUE KEY uniq_program_year (academic_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------- APPLICANT PROFILE (A2) ----------
@@ -324,7 +325,7 @@ CREATE TABLE scholars (
     scholar_code VARCHAR(30) UNIQUE NOT NULL,
     applicant_id INT UNSIGNED NOT NULL,
     application_id INT UNSIGNED NOT NULL UNIQUE,
-    program_id INT UNSIGNED NOT NULL,
+    program_id INT UNSIGNED NOT NULL COMMENT 'Origin program: the one that first approved the scholar. Current program = program of the latest semester',
     approval_date DATE NOT NULL,
     status ENUM('Active','Ended') NOT NULL DEFAULT 'Active',
     end_reason ENUM('Graduated','Dropped out','Failed grade requirement','Did not renew') NULL,
@@ -342,7 +343,7 @@ CREATE TABLE scholar_terms (
     scholar_id INT UNSIGNED NOT NULL,
     academic_year VARCHAR(20) NOT NULL,
     semester ENUM('1st Semester','2nd Semester') NOT NULL,
-    opened_via ENUM('approval','renewal') NOT NULL,
+    opened_via ENUM('approval','renewal','continuation') NOT NULL COMMENT 'continuation = 2nd Semester opened by the 1st Semester release',
     claim_status ENUM('Waiting for Requirements','Submitted','Resubmit','Verified','Released') NOT NULL DEFAULT 'Waiting for Requirements',
     gwa DECIMAL(4,2) NULL COMMENT 'GWA read from the Grades by the admin when verifying the claim',
     remarks TEXT NULL COMMENT 'Admin remarks when asking to resubmit',
@@ -350,10 +351,13 @@ CREATE TABLE scholar_terms (
     reviewed_by INT UNSIGNED NULL,
     reviewed_at DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    program_id INT UNSIGNED NOT NULL COMMENT 'Program this semester belongs to: its budget, claim windows and seat',
     UNIQUE KEY uniq_term (scholar_id, academic_year, semester),
     INDEX idx_claim_status (claim_status),
+    INDEX idx_terms_program_year (program_id, academic_year),
     CONSTRAINT fk_terms_scholar FOREIGN KEY (scholar_id) REFERENCES scholars(id) ON DELETE CASCADE,
-    CONSTRAINT fk_terms_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES users(id)
+    CONSTRAINT fk_terms_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES users(id),
+    CONSTRAINT fk_terms_program FOREIGN KEY (program_id) REFERENCES scholarship_programs(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE term_documents (
@@ -416,12 +420,15 @@ CREATE TABLE renewal_requests (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     year_level ENUM('1st Year','2nd Year','3rd Year','4th Year','5th Year','Other') NULL DEFAULT NULL COMMENT 'Year level for the target semester',
     year_level_other VARCHAR(50) NULL DEFAULT NULL,
+    program_id INT UNSIGNED NOT NULL COMMENT 'Program the renewal goes INTO (owner of the renewal window)',
     UNIQUE KEY uniq_renewal_from_term (from_term_id),
     UNIQUE KEY uniq_renewal_target (scholar_id, academic_year, semester),
     INDEX idx_renewal_status (status),
+    INDEX idx_renewals_program (program_id, status),
     CONSTRAINT fk_renewals_scholar FOREIGN KEY (scholar_id) REFERENCES scholars(id) ON DELETE CASCADE,
     CONSTRAINT fk_renewals_from_term FOREIGN KEY (from_term_id) REFERENCES scholar_terms(id) ON DELETE CASCADE,
-    CONSTRAINT fk_renewals_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES users(id)
+    CONSTRAINT fk_renewals_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES users(id),
+    CONSTRAINT fk_renewals_program FOREIGN KEY (program_id) REFERENCES scholarship_programs(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- One release per semester (term_id unique).
