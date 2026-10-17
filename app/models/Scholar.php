@@ -26,7 +26,7 @@ final class Scholar
     public static function find(int $id): ?array
     {
         $stmt = Database::conn()->prepare(
-            "SELECT s.*, sp.program_name, sp.amount_per_semester, sp.min_gpa,
+            "SELECT s.*, sp.program_name, sp.academic_year AS program_year, sp.amount_per_semester, sp.min_gpa,
                     u.id AS user_id, u.full_name, u.email, u.contact_number, a.application_code,
                     pi.date_of_birth, pi.height_cm, pi.weight_kg, pi.blood_type, pi.religion, pi.citizenship
              FROM scholars s
@@ -100,8 +100,7 @@ final class Scholar
 
     /**
      * B10 End the scholarship (Active -> Ended with a reason). An ended scholar can't claim or renew.
-     * Returns ['ok'=>true,'slot_freed'=>bool] — a slot is freed when the scholar graduated or it ended in the first
-     * semester (Program::slotsUsed).
+     * Returns ['ok'=>true,'slot_freed'=>bool] — a slot is freed when it ended in the first semester (Program::slotsUsed).
      */
     public static function end(int $id, string $reason, int $adminId): array
     {
@@ -120,15 +119,14 @@ final class Scholar
         Notification::send((int)$scholar['user_id'], 'Scholarship ended',
             "Your SK scholarship ({$scholar['program_name']}) has ended. Reason: $reason. Thank you for being an SK scholar.",
             'info', url('applicant/scholarship'), sendEmail: true);
-        return ['ok' => true, 'slot_freed' => $reason === 'Graduated' || (int)$terms->fetchColumn() <= 1, 'program_id' => (int)$scholar['program_id']];
+        return ['ok' => true, 'slot_freed' => (int)$terms->fetchColumn() <= 1, 'program_id' => (int)$scholar['program_id']];
     }
 
     /**
-     * A7: create the scholar for an approved application and open Semester 1: the 1st Semester of $academicYear, the
-     * current academic year (decision D3 as changed by docs/CHANGE_PLAN_4.md). Call inside the approval transaction.
-     * Returns the new scholar id.
+     * A7: create the scholar for an approved application and open Semester 1 (1st Semester of the program's
+     * academic year, decision D3). Call inside the approval transaction. Returns the new scholar id.
      */
-    public static function createFromApplication(array $app, string $academicYear, int $actorId): int
+    public static function createFromApplication(array $app, int $actorId): int
     {
         $pdo = Database::conn();
         $pdo->prepare(
@@ -140,11 +138,11 @@ final class Scholar
         $pdo->prepare(
             "INSERT INTO scholar_terms (scholar_id, academic_year, semester, opened_via, claim_status)
              VALUES (?, ?, '1st Semester', 'approval', 'Waiting for Requirements')"
-        )->execute([$scholarId, $academicYear]);
+        )->execute([$scholarId, $app['academic_year']]);
         $termId = (int)$pdo->lastInsertId();
 
         AuditLog::write('scholar_created', 'scholars', $scholarId,
-            "Scholar created from application {$app['application_code']}; opened $academicYear 1st Semester",
+            "Scholar created from application {$app['application_code']}; opened {$app['academic_year']} 1st Semester",
             null, ['application_id' => (int)$app['id'], 'term_id' => $termId, 'by' => $actorId]);
         return $scholarId;
     }

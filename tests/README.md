@@ -27,11 +27,9 @@ php bin/smoke_test.php                             # every route, signed in as e
 | unit | `FormatHelpersTest` | `peso()` and `fmt_date()`/`fmt_datetime()`/`fmt_long_date()` give exactly what the copies they replaced gave |
 | unit | `RequestHelpersTest` | `get_int()`, `post_str()`, `get_id()`, `post_bool()`… and `paginate()` give what the expressions they replaced gave |
 | unit | `PasswordRuleTest` | 8+ characters and 1 special character; the exact messages; Validator uses the same rule |
-| integration | `ApplicationStatusTest` | refused and stale status changes; approval opens Semester 1 in the current academic year; blocked when the slots are full or there is no current year |
+| integration | `ApplicationStatusTest` | refused and stale status changes; approval blocked when the slots are full |
 | integration | `AnalyticsTest` | projected scholars, committed, projected need, surplus, extra fundable, attendance, no-show, scores, on-time rate, against numbers worked out by hand from the seed |
-| integration | `BudgetTest` | suggested budget = Active scholars × (amount per semester × 2); a budget needs an existing academic year |
-| integration | `AcademicYearTest` | label format, unique, exactly one current, suggestNext / June rule, delete only an unused non-current year, creating a year makes budgets for programs with Active scholars (skips existing ones), the renewal needed-list knows a missing year |
-| integration | `AcademicYearBackfillTest` | the `2026_10_16_academic_years.sql` migration run on the old shape: every year in use created, today's year (else the latest) current, the database refuses a second current year |
+| integration | `BudgetTest` | suggested budget = Active scholars × (amount per semester × 2) |
 | integration | `InterviewSuggestionsTest` | slot suggestions: existing schedules first, business hours, Mon–Sat, after the application period, no holidays, no other program's day, no overlaps |
 | integration | `ReminderScriptTest` | `bin/send_reminders.php` run for real: interview, deadline and daily-digest reminders each go out once; a second run sends nothing |
 | integration | `DocumentVersionsTest` | the "current document" across application and claim/renewal uploads; full history newest first |

@@ -9,29 +9,19 @@ final class Program
         return Database::conn()->query(
             "SELECT sp.*,
                     (SELECT COUNT(*) FROM applications a WHERE a.program_id = sp.id AND a.status <> 'Draft') AS application_count,
-                    (SELECT COUNT(*) FROM applications a WHERE a.program_id = sp.id AND a.status = 'Draft') AS draft_count
+                    (SELECT COUNT(*) FROM applications a WHERE a.program_id = sp.id) AS any_application_count,
+                    (SELECT COUNT(*) FROM scholars s WHERE s.program_id = sp.id) AS scholar_count
              FROM scholarship_programs sp
              ORDER BY sp.application_start DESC, sp.id DESC"
         )->fetchAll();
     }
 
-    /**
-     * Programs for pickers, newest first: id, program_name, application dates and 'label' — the name, plus the
-     * application dates when two programs share a name (so they can be told apart).
-     */
+    /** id + name + A.Y. for program pickers, newest first. */
     public static function options(): array
     {
-        $rows = Database::conn()->query(
-            "SELECT id, program_name, application_start, application_end FROM scholarship_programs ORDER BY application_start DESC, id DESC"
+        return Database::conn()->query(
+            "SELECT id, program_name, academic_year FROM scholarship_programs ORDER BY application_start DESC, id DESC"
         )->fetchAll();
-        $names = array_count_values(array_column($rows, 'program_name'));
-        foreach ($rows as &$r) {
-            $r['label'] = $names[$r['program_name']] > 1
-                ? $r['program_name'] . ' · ' . fmt_date($r['application_start']) . ' – ' . fmt_date($r['application_end'])
-                : $r['program_name'];
-        }
-        unset($r);
-        return $rows;
     }
 
     public static function find(int $id): ?array
@@ -84,15 +74,14 @@ final class Program
     }
 
     /**
-     * Slots used (B5 counter) = scholars created from this program, not counting graduated scholars or scholars who
-     * were ended before a second semester was opened for them (their slot is free again).
+     * Slots used (B5 counter) = scholars created from this program, not counting scholars who were ended
+     * before a second semester was opened for them (their slot is free again). A graduated scholar keeps the slot.
      */
     public static function slotsUsed(int $programId): int
     {
         $stmt = Database::conn()->prepare(
             "SELECT COUNT(*) FROM scholars s
              WHERE s.program_id = ?
-               AND NOT (s.status = 'Ended' AND s.end_reason = 'Graduated')
                AND NOT (s.status = 'Ended' AND (SELECT COUNT(*) FROM scholar_terms t WHERE t.scholar_id = s.id) <= 1)"
         );
         $stmt->execute([$programId]);
@@ -113,8 +102,18 @@ final class Program
         $validDate = static fn(string $d): bool => ($t = DateTime::createFromFormat('Y-m-d', $d)) !== false && $t->format('Y-m-d') === $d;
         if (!$validDate($start) || !$validDate($end)) return ['ok' => false, 'error' => 'Application start and end dates are required.'];
         if ($end < $start) return ['ok' => false, 'error' => 'Application end date cannot be before the start date.'];
+        // The academic year is typed (the form pre-fills it from the opening date, academicYearFor); left blank it follows
+        // the opening date. Fixed once the program has scholars: their semesters use it.
         $old = $id ? self::find($id) : null;
         if ($id && !$old) return ['ok' => false, 'error' => 'Program not found.'];
+        if ($old && self::hasScholars($id)) {
+            $year = $old['academic_year'];
+        } else {
+            $year = trim((string)($data['academic_year'] ?? '')) ?: self::academicYearFor($start);
+            if (!preg_match('/^(\d{4})-(\d{4})$/', $year, $m) || (int)$m[2] !== (int)$m[1] + 1) {
+                return ['ok' => false, 'error' => 'Academic year must look like 2026-2027 (the second year is the first + 1).'];
+            }
+        }
 
         // Numbers: blank limit => NULL (no limit); anything given must be a number >= 0.
         $labels = ['amount_per_semester' => 'Amount per semester', 'slots_available' => 'Number of slots',
@@ -134,6 +133,7 @@ final class Program
 
         $row = [
             'program_name'        => $name,
+            'academic_year'       => $year,
             'amount_per_semester' => $n['amount_per_semester'],
             'min_gpa'             => $n['min_gpa'],
             'max_family_income'   => $n['max_family_income'],
@@ -151,7 +151,7 @@ final class Program
             }
             $set = implode(', ', array_map(static fn($k) => "$k = :$k", array_keys($row)));
             $pdo->prepare("UPDATE scholarship_programs SET $set WHERE id = :id")->execute($row + ['id' => $id]);
-            AuditLog::write('program_updated', 'scholarship_programs', $id, "Updated program \"$name\"", $old, $row);
+            AuditLog::write('program_updated', 'scholarship_programs', $id, "Updated program \"$name\" ($year)", $old, $row);
         } else {
             $cols = array_keys($row);
             $pdo->prepare(
@@ -159,9 +159,29 @@ final class Program
                  VALUES (:" . implode(', :', $cols) . ", :created_by)"
             )->execute($row + ['created_by' => $actorId]);
             $id = (int)$pdo->lastInsertId();
-            AuditLog::write('program_created', 'scholarship_programs', $id, "Created program \"$name\"", null, $row);
+            AuditLog::write('program_created', 'scholarship_programs', $id, "Created program \"$name\" ($year)", null, $row);
         }
         return ['ok' => true, 'id' => $id];
+    }
+
+    /**
+     * The academic year of a program, from its application start date: a start from ACADEMIC_YEAR_START_MONTH (June) to
+     * December is that year's A.Y. (2026-10-14 → 2026-2027); January–May belongs to the A.Y. that began the year before
+     * (2027-02-01 → 2026-2027). Also shown live in the program form (pages/programs.js — same rule).
+     */
+    public static function academicYearFor(string $startDate): string
+    {
+        $y = (int)substr($startDate, 0, 4);
+        if ((int)substr($startDate, 5, 2) < ACADEMIC_YEAR_START_MONTH) $y--;
+        return $y . '-' . ($y + 1);
+    }
+
+    /** Has this program made any scholar yet? (Its academic year is then fixed.) */
+    public static function hasScholars(int $id): bool
+    {
+        $stmt = Database::conn()->prepare("SELECT 1 FROM scholars WHERE program_id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        return (bool)$stmt->fetchColumn();
     }
 
     /** Open <-> close. Returns the new state, or null if not found. */
@@ -178,42 +198,22 @@ final class Program
     }
 
     /**
-     * Delete a program nobody SUBMITTED an application to — so it has no screened applications or scholars, whose
-     * records are never deleted (docs/PROCESS.md "Data retention"). Unfinished Drafts on it are deleted with it (their
-     * documents and files too) and each applicant is told; its own setup also goes: budgets, claim/renewal windows and
-     * interview schedules. Audit-logged. Returns ['ok'=>true,'drafts'=>n] or ['ok'=>false,'error'].
+     * Delete a program nobody applied to (not even a Draft) — so it has no applications or scholars, whose records are
+     * never deleted (docs/PROCESS.md "Data retention"). Its own setup goes with it: budgets, claim/renewal windows and
+     * interview schedules (empty, since there are no applications). Audit-logged. Returns ['ok'=>true] or ['ok'=>false,'error'].
      */
     public static function delete(int $id, int $actorId): array
     {
         $program = self::find($id);
         if (!$program) return ['ok' => false, 'error' => 'Program not found.'];
-        $pdo = Database::conn();
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM applications WHERE program_id = ? AND status <> 'Draft'");
+        $stmt = Database::conn()->prepare("SELECT COUNT(*) FROM applications WHERE program_id = ?");
         $stmt->execute([$id]);
         if ((int)$stmt->fetchColumn() > 0) {
-            return ['ok' => false, 'error' => "People have submitted applications to \"{$program['program_name']}\", so it is kept with their records. Close it instead."];
+            return ['ok' => false, 'error' => "People have applied to \"{$program['program_name']}\", so it is kept with their records. Close it instead."];
         }
-        $stmt = $pdo->prepare("SELECT id, application_code FROM applications WHERE program_id = ? AND status = 'Draft'");
-        $stmt->execute([$id]);
-        $drafts = $stmt->fetchAll();
-        $files = [];
-        $users = [];
-        foreach ($drafts as $d) {
-            $f = $pdo->prepare("SELECT file_path FROM documents WHERE application_id = ? AND file_path <> ''");
-            $f->execute([(int)$d['id']]);
-            $files = array_merge($files, $f->fetchAll(PDO::FETCH_COLUMN));
-            $users[] = Application::userId((int)$d['id']);
-        }
-
-        Database::transaction(static function () use ($pdo, $id, $program, $actorId, $drafts): void {
+        Database::transaction(static function () use ($id, $program, $actorId): void {
+            $pdo = Database::conn();
             $removed = [];
-            foreach ($drafts as $d) {
-                // documents, interview attempts and slot requests of the application go with it (ON DELETE CASCADE)
-                $pdo->prepare("DELETE FROM applications WHERE id = ? AND status = 'Draft'")->execute([(int)$d['id']]);
-                AuditLog::write('application_deleted', 'applications', (int)$d['id'],
-                    "Draft {$d['application_code']} deleted with its program \"{$program['program_name']}\"", null, ['by' => $actorId]);
-            }
-            if ($drafts) $removed['draft_applications'] = count($drafts);
             foreach (['budgets', 'term_schedules', 'interview_schedules'] as $table) {
                 $stmt = $pdo->prepare("DELETE FROM `$table` WHERE program_id = ?");
                 $stmt->execute([$id]);
@@ -221,15 +221,9 @@ final class Program
             }
             $pdo->prepare("DELETE FROM scholarship_programs WHERE id = ?")->execute([$id]);
             AuditLog::write('program_deleted', 'scholarship_programs', $id,
-                "Deleted program \"{$program['program_name']}\" (no submitted applications)",
-                ['program_name' => $program['program_name']] + $removed, ['by' => $actorId]);
+                "Deleted program \"{$program['program_name']}\" (A.Y. {$program['academic_year']}; nobody had applied)",
+                ['program_name' => $program['program_name'], 'academic_year' => $program['academic_year']] + $removed, ['by' => $actorId]);
         });
-        foreach ($files as $rel) DocumentStorage::deleteFile($rel);   // only after the rows are gone
-        foreach (array_filter($users) as $uid) {
-            Notification::send((int)$uid, 'Application removed',
-                "The scholarship program \"{$program['program_name']}\" was removed by the SK office, so your unfinished application for it was removed too. "
-                . 'You can apply again when a program is open.', 'warning', url('applicant/dashboard'), sendEmail: true);
-        }
-        return ['ok' => true, 'drafts' => count($drafts)];
+        return ['ok' => true];
     }
 }

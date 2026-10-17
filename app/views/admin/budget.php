@@ -49,14 +49,7 @@
   </ul>
 </div></div>
 
-<?php
-// Add defaults to the current academic year. ?new=1&program_id=&academic_year= (from Academic years) opens Add pre-filled.
-$openNew = get_str('new') === '1'
-    ? ['program_id' => get_int('program_id'), 'academic_year' => in_array(get_str('academic_year'), $years, true) ? get_str('academic_year') : '']
-    : null;
-?>
-<div class="modal fade" id="budgetModal" tabindex="-1" data-current-year="<?= e(AcademicYear::currentLabel() ?? '') ?>"
-     data-open-new="<?= $openNew ? e(js_json($openNew)) : '' ?>">
+<div class="modal fade" id="budgetModal" tabindex="-1">
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/budget-save') ?>" class="modal-content">
       <?= csrf_field() ?><input type="hidden" name="id" id="budgetId">
@@ -67,9 +60,9 @@ $openNew = get_str('new') === '1'
           <select name="program_id" id="budgetProgram" class="form-select" required>
             <option value="">Choose…</option>
             <?php foreach ($programs as $p): $s = $suggestions[(int)$p['id']] ?? null; ?>
-              <option value="<?= (int)$p['id'] ?>"
+              <option value="<?= (int)$p['id'] ?>" data-year="<?= e($p['academic_year']) ?>"
                 <?php if ($s): ?>data-suggested="<?= e(number_format($s['total'], 2, '.', '')) ?>"
-                data-suggested-text="<?= e('Suggested total budget: ' . peso($s['total']) . ' (' . $s['scholars'] . ' active scholar' . ($s['scholars'] === 1 ? '' : 's') . ' × (' . peso($s['amount']) . '/semester × ' . SEMESTERS_PER_YEAR . ' semesters))') ?>"<?php endif; ?>><?= e($p['label']) ?></option>
+                data-suggested-text="<?= e('Suggested total budget: ' . peso($s['total']) . ' (' . $s['scholars'] . ' active scholar' . ($s['scholars'] === 1 ? '' : 's') . ' × (' . peso($s['amount']) . '/semester × ' . SEMESTERS_PER_YEAR . ' semesters))') ?>"<?php endif; ?>><?= e($p['program_name']) ?></option>
             <?php endforeach; ?>
           </select>
         </div>
@@ -79,7 +72,7 @@ $openNew = get_str('new') === '1'
             <option value="">Choose…</option>
             <?php foreach ($years as $y): ?><option value="<?= e($y) ?>"><?= e($y) ?></option><?php endforeach; ?>
           </select>
-          <div class="form-text">From Releasing of budget → Academic years. <?php require VIEW_PATH . '/admin/_new_year_link.php'; ?></div>
+          <div class="form-text">Years of programs and of scholars’ semesters (scholars renew into later years).</div>
         </div>
         <div class="mb-1">
           <label class="form-label">Total budget (₱)</label>

@@ -16,7 +16,6 @@ require_once BASE_PATH . '/app/models/Scholar.php';
 require_once BASE_PATH . '/app/models/Term.php';
 require_once BASE_PATH . '/app/models/TermDocument.php';
 require_once BASE_PATH . '/app/models/Renewal.php';
-require_once BASE_PATH . '/app/models/AcademicYear.php';
 require_once BASE_PATH . '/app/models/Budget.php';
 require_once BASE_PATH . '/app/models/TermSchedule.php';
 require_once BASE_PATH . '/app/models/WorkQueues.php';
@@ -87,11 +86,6 @@ final class AdminController
         // B5 decisions
         'decisions'                 => ['InterviewController', 'decisions', self::REVIEW],
         'decisions/decide'          => ['InterviewController', 'decide', self::REVIEW],
-        // Academic years (before B6: budgets, windows and new scholars use them)
-        'academic-years'            => ['AcademicYearController', 'index', self::FUNDS],
-        'academic-years-save'       => ['AcademicYearController', 'save', self::FUNDS],
-        'academic-years-set-current' => ['AcademicYearController', 'setCurrent', self::FUNDS],
-        'academic-years-delete'     => ['AcademicYearController', 'delete', self::FUNDS],
         // B6 budget
         'budget'                    => ['FundsController', 'budget', self::FUNDS],
         'budget-save'               => ['FundsController', 'budgetSave', self::FUNDS],
@@ -179,8 +173,7 @@ final class AdminController
         $program = Program::fromRequest();
         $programs = Program::options();
         $slotsUsed = $program ? Program::slotsUsed((int)$program['id']) : 0;
-        $budgetYear = AcademicYear::currentLabel();   // the dashboard's budget figures are for the current academic year
-        $budget = $program && $budgetYear ? Budget::forProgramYear((int)$program['id'], $budgetYear) : null;
+        $budget = $program ? Budget::forProgramYear((int)$program['id'], $program['academic_year']) : null;
         $todayInterviews = self::canAccess('interviews') ? Interview::day($today) : null;
         $showBudget = self::canAccess('budget');
         if (!$showBudget) $budget = null;
@@ -192,7 +185,7 @@ final class AdminController
             'gwa'     => AnalyticsProfiles::scholarsByGwaBand((int)$program['id']),
         ] : null;
 
-        render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'budgetYear', 'todayInterviews', 'charts', 'showBudget')
+        render('admin/dashboard', compact('counters', 'program', 'programs', 'slotsUsed', 'budget', 'todayInterviews', 'charts', 'showBudget')
             + ['pageScripts' => [asset('js/sk-charts.js'), asset('js/pages/dashboard.js')]], 'Dashboard');
     }
 
@@ -259,9 +252,7 @@ final class AdminController
     {
         require_post('admin/programs');
         $r = Program::delete(post_int('id'), admin_id());
-        flash($r['ok'] ? 'success' : 'danger', $r['ok']
-            ? 'Program deleted.' . ($r['drafts'] ? " {$r['drafts']} unfinished application(s) on it were removed and the applicants told." : '')
-            : $r['error']);
+        flash($r['ok'] ? 'success' : 'danger', $r['ok'] ? 'Program deleted.' : $r['error']);
         redirect('admin/programs');
     }
 }

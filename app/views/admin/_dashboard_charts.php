@@ -22,7 +22,7 @@ $gwaRows = array_filter($charts['gwa']);
 
   <?php if (AdminController::canAccess('budget')): ?>
   <div class="col-lg-6"><div class="card border-0 shadow-sm h-100"><div class="card-body">
-    <h6 class="fw-semibold mb-1">Budget — <?= e($budgetYear ?? 'no current academic year') ?></h6>
+    <h6 class="fw-semibold mb-1">Budget — <?= e($program['academic_year']) ?></h6>
     <p class="small text-muted mb-2">Total budget, released so far, and remaining (= total − released).</p>
     <?php if (!$budgetRows): ?><p class="text-muted small mb-0">No budget for this academic year yet. <a href="<?= url('admin/budget') ?>">Create it</a>.</p><?php else: ?>
       <div style="height:180px"><canvas id="dashBudget" role="img" aria-label="Budget total, released and remaining"></canvas></div>

@@ -47,13 +47,11 @@ final class ReportController
     {
         $program = Program::fromRequest();
         $programs = Program::options();
-        $years = AcademicYear::options();
+        $years = Budget::academicYears();
         $data = null;
         if ($program) {
             $pid = (int)$program['id'];
-            // A year from the list, else the current academic year (else today's, when no year exists yet).
-            $ay = in_array($_GET['academic_year'] ?? '', $years, true) ? $_GET['academic_year']
-                : (AcademicYear::currentLabel() ?? AcademicYear::labelFor(date('Y-m-d')));
+            $ay = in_array($_GET['academic_year'] ?? '', $years, true) ? $_GET['academic_year'] : $program['academic_year'];
             $counts = AnalyticsFunnel::stageCounts($pid);
             $conversion = AnalyticsFunnel::conversionRates($pid);
             $projected = AnalyticsFunnel::projectedScholars($pid);

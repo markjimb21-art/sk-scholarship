@@ -124,8 +124,6 @@ final class Renewal
         $req = self::find($id);
         if (!$req) return ['ok' => false, 'error' => 'Renewal not found.'];
         if ($req['scholar_status'] !== 'Active') return ['ok' => false, 'error' => 'This scholarship has ended, so it can’t be renewed.'];
-        // The semester it opens must be in an academic year that exists (Releasing of budget → Academic years).
-        if ($err = AcademicYear::missingError($req['academic_year'])) return ['ok' => false, 'error' => $err];
         $pdo = Database::conn();
         try {
             $pdo->beginTransaction();

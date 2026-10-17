@@ -61,8 +61,8 @@ const TWO_SIDED_DOCUMENT_TYPES = ['School ID', 'Form 138 / Grades'];
 // Semesters: 1st -> 2nd (same A.Y.) -> 1st of the next A.Y.
 const SEMESTERS = ['1st Semester', '2nd Semester'];
 define('SEMESTERS_PER_YEAR', count(SEMESTERS));   // budgets and projections count a scholar's year as this many releases
-// An academic year starts in this month (June): a date from June on belongs to that year's A.Y., before it to the A.Y.
-// that began the year before (AcademicYear::labelFor — used to suggest the next year and by the 2026_10_16 migration).
+// A program's academic year follows its application start date: from this month (June) on it is that year's A.Y.,
+// before it the A.Y. that began the year before (Program::academicYearFor, pages/programs.js).
 const ACADEMIC_YEAR_START_MONTH = 6;
 
 // Semester claim (scholar_terms.claim_status) => label shown to the scholar.

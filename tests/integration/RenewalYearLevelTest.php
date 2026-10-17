@@ -50,18 +50,4 @@ final class RenewalYearLevelTest extends DatabaseTestCase
         $this->assertSame(['3rd Year', '4th Year'], array_values(self::row(
             "SELECT old_value, new_value FROM record_history WHERE applicant_id = 8 AND field = 'year_level' ORDER BY id DESC LIMIT 1")));
     }
-
-    public function testApprovalNeedsTheNextSemestersAcademicYear(): void
-    {
-        // The renewal is into 2027-2028 1st Semester; the seed only has 2026-2027.
-        $this->assertTrue(Renewal::submit($this->term, $this->userId, '4th Year', '')['ok']);
-        $id = (int)self::value('SELECT id FROM renewal_requests WHERE from_term_id = 2');
-        $r = Renewal::approve($id, 1);
-        $this->assertSame(['ok' => false, 'error' => "Academic year 2027-2028 doesn't exist yet — create it under Releasing of budget → Academic years."], $r);
-        $this->assertSame(0, (int)self::value("SELECT COUNT(*) FROM scholar_terms WHERE academic_year = '2027-2028'"), 'no semester opened');
-
-        AcademicYear::create('2027-2028', false, false, 1);
-        $this->assertTrue(Renewal::approve($id, 1)['ok']);
-        $this->assertSame(1, (int)self::value("SELECT COUNT(*) FROM scholar_terms WHERE academic_year = '2027-2028' AND semester = '1st Semester'"));
-    }
 }

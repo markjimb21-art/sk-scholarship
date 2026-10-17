@@ -28,7 +28,7 @@
         <?php foreach ($programs as $p):
           $acceptingNow = $openProgram && (int)$openProgram['id'] === (int)$p['id']; ?>
           <tr>
-            <td><div class="fw-semibold"><?= e($p['program_name']) ?></div></td>
+            <td><div class="fw-semibold"><?= e($p['program_name']) ?></div><small class="text-muted">A.Y. <?= e($p['academic_year']) ?></small></td>
             <td><small><?= e(fmt_date($p['application_start'])) ?> – <?= e(fmt_date($p['application_end'])) ?></small></td>
             <td><?= e(peso($p['amount_per_semester'])) ?></td>
             <td><small class="text-muted">
@@ -52,12 +52,9 @@
                 <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
                 <button class="btn btn-sm btn-outline-<?= $p['is_active'] ? 'warning' : 'success' ?>"><?= $p['is_active'] ? 'Close' : 'Open' ?></button>
               </form>
-              <?php if ((int)$p['application_count'] === 0): // nobody submitted: no records to keep (Program::delete) ?>
-                <?php $drafts = (int)$p['draft_count']; ?>
+              <?php if ((int)$p['any_application_count'] === 0): // nobody applied, not even a Draft: no records to keep (Program::delete) ?>
                 <form method="POST" action="<?= url('admin/program-delete') ?>" class="d-inline"
-                      data-confirm="<?= e('Delete "' . $p['program_name'] . '"? Its budgets, claim/renewal windows and interview schedules are deleted too'
-                          . ($drafts ? ", and the $drafts unfinished (Draft) application(s) on it, with their uploaded files — each applicant is told" : '')
-                          . '. This cannot be undone.') ?>">
+                      data-confirm="<?= e('Delete "' . $p['program_name'] . '"? Its budgets, claim/renewal windows and interview schedules are deleted too. This cannot be undone.') ?>">
                   <?= csrf_field() ?>
                   <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
                   <button class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete program"><i class="bi bi-trash" aria-hidden="true"></i></button>
@@ -96,8 +93,13 @@
             <label class="form-label">Applications close *</label>
             <input type="date" name="application_end" id="pEnd" class="form-control" required>
           </div>
-          <div class="col-12 form-text mt-1">A program has no academic year: approved scholars start in the 1st Semester of the
-            current academic year (Releasing of budget → Academic years).</div>
+          <div class="col-md-3">
+            <label class="form-label" for="pYear">Academic year *</label>
+            <input name="academic_year" id="pYear" class="form-control" placeholder="2026-2027" pattern="\d{4}-\d{4}" maxlength="9"
+                   required data-month="<?= ACADEMIC_YEAR_START_MONTH ?>" aria-describedby="pYearRule">
+          </div>
+          <div class="col-12 form-text mt-1" id="pYearRule">Filled in from the opening date (June–December → that year's A.Y.,
+            January–May → the A.Y. that began the year before); change it if needed. Semester 1 of approved scholars is its 1st Semester.</div>
           <div class="col-md-3">
             <label class="form-label">Slots *</label>
             <input type="number" name="slots_available" id="pSlots" class="form-control" min="1" step="1" required>

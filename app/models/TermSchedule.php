@@ -25,11 +25,6 @@ final class TermSchedule
         'closed'          => 'Closed',
         'cancelled'       => 'Cancelled',
     ];
-    /** Bootstrap colour per window state (window pages and the Academic years page). */
-    public const STATE_COLORS = [
-        'open' => 'success', 'not_open_yet' => 'info', 'deadline_passed' => 'warning', 'closed' => 'secondary',
-        'cancelled' => 'danger', 'not_created' => 'secondary',
-    ];
 
     public static function find(int $id): ?array
     {
@@ -195,7 +190,7 @@ final class TermSchedule
     }
 
     /**
-     * Semesters that need a window and don't have one yet: [['program_id','program_name','academic_year','semester','n','year_exists']].
+     * Semesters that need a window and don't have one yet: [['program_id','program_name','academic_year','semester','count']].
      *   release: Active scholars' semesters still Waiting for Requirements / Resubmit;
      *   renewal: the semester after an Active scholar's current, Released semester with no renewal request yet.
      */
@@ -231,12 +226,8 @@ final class TermSchedule
             }
             $need = array_values($grouped);
         }
-        $need = array_values(array_filter($need, static fn($n) =>
+        return array_values(array_filter($need, static fn($n) =>
             !self::forSemester((int)$n['program_id'], $n['academic_year'], $n['semester'], $purpose)));
-        // A renewal can be into a year that hasn't been created yet: the page then links to Academic years first.
-        foreach ($need as &$n) $n['year_exists'] = AcademicYear::exists($n['academic_year']);
-        unset($n);
-        return $need;
     }
 
     /** Accepts the datetime-local format (Y-m-d\TH:i) and Y-m-d H:i[:s]. Returns 'Y-m-d H:i:s' or null. */
@@ -277,8 +268,6 @@ final class TermSchedule
             if (!in_array($semester, SEMESTERS, true)) return ['ok' => false, 'error' => 'Choose a semester.'];
         }
         $targetChanged = $old && [(int)$old['program_id'], $old['academic_year'], $old['semester']] !== [$programId, $year, $semester];
-        // A new window, or one moved to another semester, must be in an academic year that exists.
-        if ((!$old || $targetChanged) && ($err = AcademicYear::missingError($year))) return ['ok' => false, 'error' => $err];
 
         $opens = self::parseDateTime((string)($data['opens_at'] ?? ''));
         $deadline = self::parseDateTime((string)($data['submission_deadline'] ?? ''));
@@ -451,5 +440,16 @@ final class TermSchedule
     public static function releaseDeadlineReminder(int $id): void
     {
         Database::conn()->prepare("UPDATE term_schedules SET deadline_reminder_sent_at = NULL WHERE id = ?")->execute([$id]);
+    }
+
+    /** Academic years offered in the form: every known year plus the one after the latest (renewals go into it). */
+    public static function academicYearOptions(): array
+    {
+        $years = Budget::academicYears();
+        if ($years) {
+            [$a, $b] = array_map('intval', explode('-', $years[0]) + [0, 0]);
+            if ($a > 0) array_unshift($years, ($a + 1) . '-' . ($b + 1));
+        }
+        return array_values(array_unique($years));
     }
 }

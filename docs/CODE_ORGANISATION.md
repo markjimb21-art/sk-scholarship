@@ -70,7 +70,6 @@ Every form that changes data is sent as a **POST** and its CSRF token is checked
 | `AdminController` | Route table + access map; dashboard, programs (B1), applications list |
 | `ScreeningController` | B2: screening queue, one page per application, return / qualify / reject |
 | `InterviewController` | B3–B5: schedules, assignment, attendance, scores, ranking, final decision |
-| `AcademicYearController` | Releasing of budget → Academic years: create (with budgets), make current, delete |
 | `FundsController` | B6–B10: budget, claims, releases, renewals, scholars |
 | `CalendarController` | Calendar of interviews and claim/renewal windows |
 | `ReportController` | Reports (PDF/CSV) and Data Analytics |
@@ -86,7 +85,7 @@ Controllers contain **no SQL**. They read input, call models, and either render 
 |---|---|
 | Applicants and applications | `Applicant` (profile sections), `Application` (status changes go through one transition map), `ApplicationEligibility` (pass/fail per program rule), `ApplicationSearch` (lists), `ApplicantJourney` (dashboard tracker), `RecordHistory` (old/new value of every changed field), `Document` + `DocumentStorage` (versioned uploads, private files), `Lookup` (puroks, schools, courses) |
 | Interviews | `Interview` (schedules), `InterviewSlots` (slot suggestions), `InterviewAssignment` (assign, no-show, reschedule, reminders), `InterviewScore` (rubric, ranking), `SlotRequest`, `Holiday` |
-| Scholars and money | `Program`, `AcademicYear` (the only source of year lists; the current year), `Budget`, `Scholar`, `Term` (semesters, claims, releases), `TermDocument`, `TermSchedule` (claim/renewal windows), `Renewal` |
+| Scholars and money | `Program`, `Budget`, `Scholar`, `Term` (semesters, claims, releases), `TermDocument`, `TermSchedule` (claim/renewal windows), `Renewal` |
 | Reporting | `Report` (every PDF/CSV report), `WorkQueues` (dashboard counters), and one class per analytics section: `AnalyticsFunnel`, `AnalyticsBudget`, `AnalyticsInterviews`, `AnalyticsClaims`, `AnalyticsProfiles` |
 | Accounts and settings | `User`, `Setting` |
 
@@ -107,8 +106,7 @@ All 29 tables are created by `database/schema.sql`. Many classes read a table; t
 | `users` | Every account: name, e-mail, password hash, role, active flag, failed sign-ins / lockout, last sign-in | `User`; `Auth` (registration, sign-in) |
 | `email_otp_codes` | E-mail codes for sign-up and password reset: hashed code, expiry, attempts, resend cooldown | `Otp` |
 | `puroks`, `schools`, `courses` | Reference lists for the application form (address, autocomplete) | reference data (read by `Lookup`) |
-| `scholarship_programs` | Each program (a standing scholarship, no academic year): application dates, slots, amount per semester, eligibility limits, open/closed | `Program` |
-| `academic_years` | The academic years (label, which one is current); new scholars start in the current one | `AcademicYear` |
+| `scholarship_programs` | Each program: academic year, application dates, slots, amount per semester, eligibility limits, open/closed | `Program` |
 | `applicants` | One row per applicant account, linking the user to the profile | `Applicant` (created by `Auth` at sign-up) |
 | `applicants_personal_information` | Form section I: name, birth date, address, contact, measurements, sex … | `Applicant` |
 | `education_records` | Form section II: school, year level, course, major, GWA, other scholarships | `Applicant` |

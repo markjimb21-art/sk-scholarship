@@ -1,7 +1,7 @@
 <?php
 // Claim (release) or renewal submission windows. Expects $purpose, $schedules, $needed, $missed, $programs, $years.
 $isRelease = $purpose === 'release';
-$stateColor = TermSchedule::STATE_COLORS;
+$stateColor = ['open' => 'success', 'not_open_yet' => 'info', 'deadline_passed' => 'warning', 'closed' => 'secondary', 'cancelled' => 'danger', 'not_created' => 'secondary'];
 $dt = static fn(?string $v): string => $v ? fmt_datetime($v) : '—';
 $local = static fn(?string $v): string => $v ? date('Y-m-d\TH:i', strtotime($v)) : '';
 $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
@@ -25,14 +25,8 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
     <ul class="mb-0 mt-1">
       <?php foreach ($needed as $n): ?>
         <li><?= e($n['program_name'] . ' — ' . $n['academic_year'] . ' ' . $n['semester']) ?> (<?= (int)$n['n'] ?> scholar(s))
-          <?php if ($n['year_exists']): ?>
-            <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-bs-toggle="modal" data-bs-target="#scheduleModal"
-                    data-schedule-prefill="<?= e(js_json(['program_id' => (int)$n['program_id'], 'academic_year' => $n['academic_year'], 'semester' => $n['semester']])) ?>">Create window</button>
-          <?php elseif (AdminController::canAccess('academic-years')): ?>
-            <a class="small" href="<?= url('admin/academic-years') ?>">Create academic year <?= e($n['academic_year']) ?> first</a>
-          <?php else: ?>
-            <span class="small text-muted">Academic year <?= e($n['academic_year']) ?> must be created first.</span>
-          <?php endif; ?></li>
+          <button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-bs-toggle="modal" data-bs-target="#scheduleModal"
+                  data-schedule-prefill="<?= e(js_json(['program_id' => (int)$n['program_id'], 'academic_year' => $n['academic_year'], 'semester' => $n['semester']])) ?>">Create window</button></li>
       <?php endforeach; ?>
     </ul>
   </div>
@@ -79,17 +73,7 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
 
 <?php require VIEW_PATH . '/admin/_missed_deadlines.php'; ?>
 
-<?php
-// New window defaults to the current academic year. ?prefill_program=&prefill_year=&prefill_semester= (from Academic years)
-// opens New window pre-filled.
-$prefill = get_str('prefill_program') !== '' ? [
-    'program_id' => get_int('prefill_program'),
-    'academic_year' => in_array(get_str('prefill_year'), $years, true) ? get_str('prefill_year') : '',
-    'semester' => in_array(get_str('prefill_semester'), SEMESTERS, true) ? get_str('prefill_semester') : '',
-] : null;
-?>
-<div class="modal fade" id="scheduleModal" data-open-edit="<?= $editId ?>" tabindex="-1" data-current-year="<?= e(AcademicYear::currentLabel() ?? '') ?>"
-     data-open-prefill="<?= $prefill ? e(js_json($prefill)) : '' ?>">
+<div class="modal fade" id="scheduleModal" data-open-edit="<?= $editId ?>" tabindex="-1">
   <div class="modal-dialog">
     <form method="POST" action="<?= url('admin/term-schedule-save') ?>" class="modal-content">
       <?= csrf_field() ?>
@@ -102,7 +86,7 @@ $prefill = get_str('prefill_program') !== '' ? [
             <label class="form-label">Program</label>
             <select name="program_id" id="schProgram" class="form-select" required>
               <option value="">Choose…</option>
-              <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>"><?= e($p['label']) ?></option><?php endforeach; ?>
+              <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>"><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option><?php endforeach; ?>
             </select>
           </div>
           <div class="row g-2 mb-2">
@@ -111,7 +95,6 @@ $prefill = get_str('prefill_program') !== '' ? [
               <select name="academic_year" id="schYear" class="form-select" required>
                 <?php foreach ($years as $y): ?><option value="<?= e($y) ?>"><?= e($y) ?></option><?php endforeach; ?>
               </select>
-              <?php require VIEW_PATH . '/admin/_new_year_link.php'; ?>
             </div>
             <div class="col-5">
               <label class="form-label">Semester</label>

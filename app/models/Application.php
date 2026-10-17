@@ -61,7 +61,7 @@ final class Application
     public static function find(int $id): ?array
     {
         $stmt = Database::conn()->prepare(
-            "SELECT a.*, sp.program_name, sp.application_start, sp.application_end,
+            "SELECT a.*, sp.program_name, sp.academic_year, sp.application_start, sp.application_end,
                     sp.min_gpa, sp.max_family_income, sp.max_age, sp.slots_available, sp.is_active AS program_open
              FROM applications a
              JOIN scholarship_programs sp ON sp.id = a.program_id
@@ -117,7 +117,7 @@ final class Application
     public static function currentForApplicant(int $applicantId): ?array
     {
         $pdo = Database::conn();
-        $base = "SELECT a.*, sp.program_name, sp.application_start, sp.application_end,
+        $base = "SELECT a.*, sp.program_name, sp.academic_year, sp.application_start, sp.application_end,
                         sp.is_active AS program_open
                  FROM applications a JOIN scholarship_programs sp ON sp.id = a.program_id";
 
@@ -181,7 +181,7 @@ final class Application
     {
         $stmt = Database::conn()->prepare(
             "SELECT a.id, a.application_code, a.status, a.submitted_at, a.decided_at, a.decision_remarks,
-                    sp.program_name, s.scholar_code, s.status AS scholar_status, s.end_reason
+                    sp.program_name, sp.academic_year, s.scholar_code, s.status AS scholar_status, s.end_reason
              FROM applications a
              JOIN scholarship_programs sp ON sp.id = a.program_id
              LEFT JOIN scholars s ON s.application_id = a.id
@@ -427,12 +427,7 @@ final class Application
     {
         $app = self::find($id);
         if (!$app) return ['ok' => false, 'error' => 'Application not found.'];
-        $year = null;   // the current academic year: Semester 1 opens as its 1st Semester (docs/PROCESS.md B5)
-        $r = self::decide(function (PDO $pdo) use ($app, $adminId, &$year) {
-            $year = AcademicYear::currentLabel();
-            if ($year === null) {
-                throw new DomainException('No current academic year — an admin or treasurer must create one under Releasing of budget → Academic years.');
-            }
+        $r = self::decide(function (PDO $pdo) use ($app, $adminId) {
             $lock = $pdo->prepare("SELECT slots_available FROM scholarship_programs WHERE id = ? FOR UPDATE");
             $lock->execute([(int)$app['program_id']]);
             $slots = (int)$lock->fetchColumn();
@@ -442,13 +437,13 @@ final class Application
             }
             $now = date('Y-m-d H:i:s');
             self::changeStatus($app, 'approve', $adminId, ['decided_at' => $now, 'decided_by' => $adminId]);
-            Scholar::createFromApplication($app, $year, $adminId);
+            Scholar::createFromApplication($app, $adminId);
         });
         if ($r['ok']) {
-            $window = TermSchedule::forSemester((int)$app['program_id'], $year, '1st Semester', 'release');
+            $window = TermSchedule::forSemester((int)$app['program_id'], $app['academic_year'], '1st Semester', 'release');
             self::notify($id, 'Approved — welcome, scholar!',
                 "Congratulations! Your application to {$app['program_name']} was approved. Your first semester "
-                . "($year 1st Semester) is open. To claim your cash on My Scholarship: "
+                . "({$app['academic_year']} 1st Semester) is open. To claim your cash on My Scholarship: "
                 . TermSchedule::describeForScholar($window, 'release'), 'success', 'applicant/scholarship');
         }
         return $r;

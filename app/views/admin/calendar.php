@@ -46,7 +46,7 @@
     <div><label class="form-label" for="calProgram">Program</label><select name="program_id" id="calProgram" class="form-select form-select-sm">
       <option value="">All programs</option>
       <?php foreach ($programs as $p): ?>
-        <option value="<?= (int)$p['id'] ?>" <?= $programId === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['label']) ?></option>
+        <option value="<?= (int)$p['id'] ?>" <?= $programId === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option>
       <?php endforeach; ?>
     </select></div>
   </form>

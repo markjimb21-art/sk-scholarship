@@ -62,15 +62,12 @@ INSERT INTO family_background (applicant_id, father_income, mother_income, total
 -- ---------- Programs ----------
 -- 1 = the open test program (3 slots, ₱5,000 per semester). 2 = another active program, only used to block a day for
 -- the interview suggestions (it started earlier, so program 1 stays "the open program" and the default on admin pages).
-INSERT INTO scholarship_programs (id, program_name, amount_per_semester, min_gpa, max_family_income, max_age,
+INSERT INTO scholarship_programs (id, program_name, academic_year, amount_per_semester, min_gpa, max_family_income, max_age,
                                   slots_available, application_start, application_end, is_active, created_by) VALUES
- (1, 'EduKabataan Test Program', 5000.00, 2.50, 30000.00, 30, 3,
+ (1, 'EduKabataan Test Program', '2026-2027', 5000.00, 2.50, 30000.00, 30, 3,
      CURDATE() - INTERVAL 120 DAY, CURDATE() + INTERVAL 10 DAY, 1, 1),
- (2, 'Other Test Program',       4000.00, NULL, NULL, NULL, 5,
+ (2, 'Other Test Program',       '2026-2027', 4000.00, NULL, NULL, NULL, 5,
      CURDATE() - INTERVAL 150 DAY, CURDATE() + INTERVAL 40 DAY, 1, 1);
-
--- One academic year, the current one (new scholars start in its 1st Semester). Tests that need another create it.
-INSERT INTO academic_years (label, is_current, created_by) VALUES ('2026-2027', 1, 1);
 
 -- ---------- Applications of program 1, one per status ----------
 INSERT INTO applications (id, application_code, applicant_id, program_id, status, submitted_at, reviewed_at, reviewed_by,

@@ -46,7 +46,7 @@ $dateLabels = ['applicant_list' => 'submission date', 'interviews' => 'interview
           <label class="form-label">Program <span id="programRequired" class="text-danger d-none">*</span></label>
           <select name="program_id" id="genProgram" class="form-select">
             <option value="">All programs</option>
-            <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>"><?= e($p['label']) ?></option><?php endforeach; ?>
+            <?php foreach ($programs as $p): ?><option value="<?= (int)$p['id'] ?>"><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option><?php endforeach; ?>
           </select>
         </div>
         <div class="mb-3 d-none" id="statusRow">

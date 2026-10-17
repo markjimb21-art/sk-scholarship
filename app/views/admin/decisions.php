@@ -7,7 +7,7 @@
   <form method="GET" action="<?= url('admin/decisions') ?>">
     <div><label class="form-label" for="f_program_id">Program</label><select id="f_program_id" name="program_id" class="form-select form-select-sm" data-autosubmit>
       <?php foreach ($programs as $p): ?>
-        <option value="<?= (int)$p['id'] ?>" <?= $program && (int)$program['id'] === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['label']) ?></option>
+        <option value="<?= (int)$p['id'] ?>" <?= $program && (int)$program['id'] === (int)$p['id'] ? 'selected' : '' ?>><?= e($p['program_name']) ?> (<?= e($p['academic_year']) ?>)</option>
       <?php endforeach; ?>
     </select></div>
   </form>
@@ -21,7 +21,7 @@
   <div class="card-body d-flex align-items-center gap-4 flex-wrap">
     <div>
       <div class="fs-3 fw-bold <?= $full ? 'text-danger' : 'text-success' ?>">Slots: <?= $slotsUsed ?> approved / <?= $slots ?> total</div>
-      <div class="small text-muted">Approved = scholars from this program, not counting graduated scholars or scholars ended before a second semester opened.</div>
+      <div class="small text-muted">Approved = scholars from this program, not counting scholars ended before a second semester opened.</div>
     </div>
     <?php if ($full): ?><span class="badge bg-danger">Full — the server blocks further approvals</span><?php endif; ?>
   </div>
