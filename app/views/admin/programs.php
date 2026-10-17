@@ -71,7 +71,7 @@
   </div>
 </div>
 
-<div class="modal fade" id="programModal" tabindex="-1">
+<div class="modal fade" id="programModal" tabindex="-1"<?= $reopen ? ' data-reopen="' . e(js_json($reopen)) . '"' : '' ?>>
   <div class="modal-dialog modal-lg">
     <form method="POST" action="<?= url('admin/program-save') ?>" class="modal-content">
       <?= csrf_field() ?>
@@ -81,6 +81,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
+        <div id="programFormError" class="alert alert-danger py-2 small d-none" role="alert"></div>
         <!-- align-items-end keeps the inputs in a row level when a label wraps (e.g. at A++ text size);
              help text sits in its own full-width row so it never pushes an input up -->
         <div class="row g-3 align-items-end">
@@ -131,6 +132,39 @@
               <input type="checkbox" name="is_active" value="1" class="form-check-input" id="pActive">
               <label class="form-check-label" for="pActive">Open — applicants can apply while today is inside the dates</label>
             </div>
+          </div>
+        </div>
+
+        <!-- New program only (decision D9): its renewal window and budget, saved together with it (ProgramSetup::create). -->
+        <div id="pSetup" class="mt-3" data-renewal-counts="<?= e(js_json((object)$renewalCounts)) ?>" data-semesters="<?= SEMESTERS_PER_YEAR ?>">
+          <hr class="my-2">
+          <p class="small text-muted mb-2">Opening a new academic year: these are saved together with the program — all of it, or nothing.</p>
+          <div class="form-check">
+            <input type="checkbox" name="with_renewal" value="1" class="form-check-input" id="pWithRenewal" checked data-setup-toggle="pRenewalFields">
+            <label class="form-check-label fw-semibold" for="pWithRenewal">Renewal for current scholars</label>
+          </div>
+          <div id="pRenewalFields" class="row g-2 ms-md-3 mb-3 align-items-end">
+            <div class="col-md-6">
+              <label class="form-label" for="pRenewOpens">Renewal opens</label>
+              <input type="datetime-local" name="renewal_opens_at" id="pRenewOpens" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="pRenewDeadline">Renewal deadline</label>
+              <input type="datetime-local" name="renewal_deadline" id="pRenewDeadline" class="form-control" required>
+            </div>
+            <div class="col-12 form-text mt-1" id="pRenewInfo">A renewal window on this program, into the 1st Semester of its academic year.
+              Filled in from the application dates; change them if needed.</div>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" name="with_budget" value="1" class="form-check-input" id="pWithBudget" checked data-setup-toggle="pBudgetFields">
+            <label class="form-check-label fw-semibold" for="pWithBudget">Budget</label>
+          </div>
+          <div id="pBudgetFields" class="row g-2 ms-md-3 align-items-end">
+            <div class="col-md-6">
+              <label class="form-label" for="pBudgetTotal">Total budget for the academic year (₱)</label>
+              <input type="number" name="budget_total" id="pBudgetTotal" class="form-control" min="0.01" step="0.01" required>
+            </div>
+            <div class="col-12 form-text mt-1" id="pBudgetFormula">Suggested: slots × ₱ per semester × <?= SEMESTERS_PER_YEAR ?> semesters.</div>
           </div>
         </div>
         <div id="programDateError" class="alert alert-danger py-2 small d-none mt-3">The closing date can’t be before the opening date.</div>

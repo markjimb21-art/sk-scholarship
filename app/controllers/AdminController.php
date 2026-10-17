@@ -18,6 +18,7 @@ require_once BASE_PATH . '/app/models/TermDocument.php';
 require_once BASE_PATH . '/app/models/Renewal.php';
 require_once BASE_PATH . '/app/models/Budget.php';
 require_once BASE_PATH . '/app/models/TermSchedule.php';
+require_once BASE_PATH . '/app/models/ProgramSetup.php';
 require_once BASE_PATH . '/app/models/WorkQueues.php';
 require_once BASE_PATH . '/app/models/AnalyticsFunnel.php';
 require_once BASE_PATH . '/app/models/AnalyticsBudget.php';
@@ -227,15 +228,43 @@ final class AdminController
         foreach ($programs as &$p) $p['seats'] = Program::seats((int)$p['id']);
         unset($p);
         $openProgram = Program::open();
-        render('admin/programs', compact('programs', 'openProgram') + ['pageScripts' => [asset('js/pages/programs.js')]], 'Scholarship Programs');
+        $renewalCounts = Scholar::activeByLatestYear();   // "goes to N Active scholars whose latest semester is in …"
+        $reopen = $_SESSION['_program_form'] ?? null;     // a New program form that was refused: shown again with its values
+        unset($_SESSION['_program_form']);
+        render('admin/programs', compact('programs', 'openProgram', 'renewalCounts', 'reopen') + ['pageScripts' => [asset('js/pages/programs.js')]],
+            'Scholarship Programs');
     }
 
+    /** Fields of Programs → New program that are kept when it is refused, so the form reopens with them. */
+    private const PROGRAM_FORM_FIELDS = ['program_name', 'application_start', 'application_end', 'academic_year', 'slots_available',
+        'amount_per_semester', 'min_gpa', 'max_family_income', 'max_age', 'is_active',
+        'with_budget', 'budget_total', 'with_renewal', 'renewal_opens_at', 'renewal_deadline'];
+
+    /**
+     * Edit: the program only (decision D9). New: the program with its budget and renewal window in one transaction
+     * (ProgramSetup::create) — all or nothing; when refused, the form reopens with the error naming the part.
+     */
     public function programSave(): void
     {
         require_post('admin/programs');
         $id = post_id('id');
-        $result = Program::save($_POST, $id, admin_id());
-        flash($result['ok'] ? 'success' : 'danger', $result['ok'] ? ($id ? 'Program updated.' : 'Program created.') : $result['error']);
+        if ($id) {
+            $result = Program::save($_POST, $id, admin_id());
+            flash($result['ok'] ? 'success' : 'danger', $result['ok'] ? 'Program updated.' : $result['error']);
+            redirect('admin/programs');
+        }
+        $r = ProgramSetup::create($_POST, admin_id());
+        if (!$r['ok']) {
+            flash('danger', $r['error'] . ' Nothing was saved.');
+            $_SESSION['_program_form'] = ['data' => array_intersect_key($_POST, array_flip(self::PROGRAM_FORM_FIELDS)),
+                                          'error' => $r['error'], 'part' => $r['part']];
+            redirect('admin/programs');
+        }
+        $program = Program::find($r['id']);
+        $msg = "Program created for A.Y. {$program['academic_year']}.";
+        if ($r['budget_id']) $msg .= ' Budget of ' . peso(Budget::find($r['budget_id'])['total_budget']) . ' set.';
+        if ($r['renewal_id']) $msg .= " Renewal window into {$program['academic_year']} 1st Semester created; {$r['notified']} scholar(s) were notified.";
+        flash('success', $msg);
         redirect('admin/programs');
     }
 

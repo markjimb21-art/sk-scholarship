@@ -281,9 +281,10 @@ final class TermSchedule
     /**
      * Create (program, A.Y., semester and purpose fixed from then on) or edit a window.
      * Creating notifies every affected scholar who hasn't submitted; a changed deadline resets the TERM_SCHEDULE_REMINDER_HOURS reminder and
-     * notifies them again; cancelling notifies them too. Returns ['ok'=>true,'id','notified'] or ['ok'=>false,'error'].
+     * notifies them again; cancelling notifies them too. $notify = false: nobody is notified — for a caller inside a
+     * transaction (ProgramSetup), which notifies after its commit. Returns ['ok'=>true,'id','notified'] or ['ok'=>false,'error'].
      */
-    public static function save(array $data, ?int $id, int $adminId): array
+    public static function save(array $data, ?int $id, int $adminId, bool $notify = true): array
     {
         $old = $id ? self::find($id) : null;
         if ($id && !$old) return ['ok' => false, 'error' => 'Schedule not found.'];
@@ -378,6 +379,7 @@ final class TermSchedule
         }
 
         $row = self::find($id);
+        if (!$notify) return ['ok' => true, 'id' => $id, 'notified' => 0];   // the caller notifies after its commit
         if ($targetChanged) {
             // A different semester (or program): like cancelling the old window and creating the new one.
             $notified = $old['status'] !== 'Cancelled' ? self::notifyAffected($old, 'cancelled') : 0;

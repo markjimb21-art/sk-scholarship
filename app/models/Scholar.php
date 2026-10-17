@@ -82,6 +82,21 @@ final class Scholar
      * Scholars list (filters: q, status, program_id = has a semester in that program) with their current program and
      * semester, origin program and total released.
      */
+    /**
+     * Active scholars per academic year of their latest semester: [A.Y. => n]. A renewal window into Y's 1st Semester
+     * goes to those of the year before Y (TermSchedule::affectedScholars); the new-program form shows that number.
+     */
+    public static function activeByLatestYear(): array
+    {
+        $rows = Database::conn()->query(
+            "SELECT lt.academic_year, COUNT(*) FROM scholars s
+             JOIN scholar_terms lt ON lt.id = (SELECT x.id FROM scholar_terms x WHERE x.scholar_id = s.id
+                                               ORDER BY x.academic_year DESC, x.semester DESC LIMIT 1)
+             WHERE s.status = 'Active' GROUP BY lt.academic_year"
+        )->fetchAll(PDO::FETCH_KEY_PAIR);
+        return array_map('intval', $rows);
+    }
+
     public static function search(array $filters): array
     {
         $sql = "SELECT s.id, s.scholar_code, s.status, s.end_reason, s.approval_date, sp.program_name, op.program_name AS origin_program_name,
