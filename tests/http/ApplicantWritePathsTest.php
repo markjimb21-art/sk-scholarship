@@ -45,9 +45,9 @@ final class ApplicantWritePathsTest extends HttpTestCase
         $r = self::autosave($d, ['step' => 'education', 'school_name' => ' Riverside College ', 'year_level' => 'Bogus', 'course_name' => 'BSN',
             'general_average' => '1.234', 'previous_scholarship' => '1', 'previous_scholarship_details' => 'DOST']);
         $this->assertTrue($r['success']);
-        $this->assertSame(['school_name' => 'Riverside College', 'year_level' => '1st Year', 'general_average' => '1.23', 'previous_scholarship' => 1],
+        $this->assertSame(['school_name' => 'RIVERSIDE COLLEGE', 'year_level' => '1st Year', 'general_average' => '1.23', 'previous_scholarship' => 1],
             self::row('SELECT school_name, year_level, general_average, previous_scholarship FROM education_records WHERE applicant_id = 1'));
-        $this->assertSame('Riverside College', self::value("SELECT new_value FROM record_history WHERE applicant_id = 1 AND field = 'school_name'"));
+        $this->assertSame('RIVERSIDE COLLEGE', self::value("SELECT new_value FROM record_history WHERE applicant_id = 1 AND field = 'school_name'"));
 
         $r = self::autosave($d, ['step' => 'family', 'father_income' => '9000', 'mother_income' => '-50', 'father_status' => 'Bogus', 'family_size' => '5']);
         $this->assertTrue($r['success']);

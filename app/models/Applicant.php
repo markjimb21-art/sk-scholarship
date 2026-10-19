@@ -146,16 +146,16 @@ final class Applicant
         $pdo = Database::conn();
         $old = self::education($applicantId);
         $values = [
-            'school_name'                  => trim($post['school_name'] ?? ''),
+            'school_name'                  => up($post['school_name'] ?? ''),
             'year_level'                   => $yearLevel,
-            'year_level_other'             => trim($post['year_level_other'] ?? ''),
-            'course_name'                  => trim($post['course_name'] ?? ''),
-            'major'                        => trim($post['major'] ?? '') ?: null,
+            'year_level_other'             => up($post['year_level_other'] ?? ''),
+            'course_name'                  => up($post['course_name'] ?? ''),
+            'major'                        => up($post['major'] ?? '') ?: null,
             'general_average'              => $ga,
             'previous_scholarship'         => !empty($post['previous_scholarship']) ? 1 : 0,
-            'previous_scholarship_details' => trim($post['previous_scholarship_details'] ?? ''),
+            'previous_scholarship_details' => up($post['previous_scholarship_details'] ?? ''),
             'current_scholarship'          => !empty($post['current_scholarship']) ? 1 : 0,
-            'current_scholarship_details'  => trim($post['current_scholarship_details'] ?? ''),
+            'current_scholarship_details'  => up($post['current_scholarship_details'] ?? ''),
         ];
         if ($old) {
             $assign = implode(', ', array_map(static fn($k) => "`$k` = :$k", array_keys($values)));
@@ -215,17 +215,17 @@ final class Applicant
                 total_family_income = VALUES(total_family_income), family_size = VALUES(family_size)"
         )->execute([
             'applicant_id'        => $applicantId,
-            'father_name'         => trim($post['father_name'] ?? ''),
+            'father_name'         => up($post['father_name'] ?? ''),
             'father_age'          => ($post['father_age'] ?? '') !== '' ? (int)$post['father_age'] : null,
-            'father_occupation'   => trim($post['father_occupation'] ?? ''),
-            'father_address'      => trim($post['father_address'] ?? ''),
+            'father_occupation'   => up($post['father_occupation'] ?? ''),
+            'father_address'      => up($post['father_address'] ?? ''),
             'father_contact'      => digits_only($post['father_contact'] ?? ''),
             'father_income'       => $fi,
             'father_status'       => $status($post['father_status'] ?? ''),
-            'mother_name'         => trim($post['mother_name'] ?? ''),
+            'mother_name'         => up($post['mother_name'] ?? ''),
             'mother_age'          => ($post['mother_age'] ?? '') !== '' ? (int)$post['mother_age'] : null,
-            'mother_occupation'   => trim($post['mother_occupation'] ?? ''),
-            'mother_address'      => trim($post['mother_address'] ?? ''),
+            'mother_occupation'   => up($post['mother_occupation'] ?? ''),
+            'mother_address'      => up($post['mother_address'] ?? ''),
             'mother_contact'      => digits_only($post['mother_contact'] ?? ''),
             'mother_income'       => $mi,
             'mother_status'       => $status($post['mother_status'] ?? ''),

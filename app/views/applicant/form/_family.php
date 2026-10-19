@@ -10,7 +10,7 @@
         <div class="row g-3 mb-4">
           <div class="col-md-4">
             <label class="form-label">Father's Name</label>
-            <input name="father_name" class="form-control" value="<?= e($family['father_name'] ?? '') ?>">
+            <input name="father_name" class="form-control" data-uppercase value="<?= e($family['father_name'] ?? '') ?>">
           </div>
           <div class="col-md-2">
             <label class="form-label">Age</label>
@@ -18,7 +18,7 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">Occupation</label>
-            <input name="father_occupation" class="form-control" value="<?= e($family['father_occupation'] ?? '') ?>">
+            <input name="father_occupation" class="form-control" data-uppercase value="<?= e($family['father_occupation'] ?? '') ?>">
           </div>
           <div class="col-md-3">
             <label class="form-label">Status</label>
@@ -30,7 +30,7 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">Address</label>
-            <input name="father_address" class="form-control" value="<?= e($family['father_address'] ?? '') ?>">
+            <input name="father_address" class="form-control" data-uppercase value="<?= e($family['father_address'] ?? '') ?>">
           </div>
           <div class="col-md-3">
             <label class="form-label">Contact Number</label>
@@ -49,7 +49,7 @@
         <div class="row g-3 mb-4">
           <div class="col-md-4">
             <label class="form-label">Mother's Name</label>
-            <input name="mother_name" class="form-control" value="<?= e($family['mother_name'] ?? '') ?>">
+            <input name="mother_name" class="form-control" data-uppercase value="<?= e($family['mother_name'] ?? '') ?>">
           </div>
           <div class="col-md-2">
             <label class="form-label">Age</label>
@@ -57,7 +57,7 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">Occupation</label>
-            <input name="mother_occupation" class="form-control" value="<?= e($family['mother_occupation'] ?? '') ?>">
+            <input name="mother_occupation" class="form-control" data-uppercase value="<?= e($family['mother_occupation'] ?? '') ?>">
           </div>
           <div class="col-md-3">
             <label class="form-label">Status</label>
@@ -69,7 +69,7 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">Address</label>
-            <input name="mother_address" class="form-control" value="<?= e($family['mother_address'] ?? '') ?>">
+            <input name="mother_address" class="form-control" data-uppercase value="<?= e($family['mother_address'] ?? '') ?>">
           </div>
           <div class="col-md-3">
             <label class="form-label">Contact Number</label>

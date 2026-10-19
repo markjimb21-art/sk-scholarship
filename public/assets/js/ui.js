@@ -4,7 +4,7 @@
  *  - show/hide password ("eye") button on every password field — one function, skPasswordToggle();
  *  - live new-password checklist + "Passwords match" (the rule itself is checked again on the server);
  *  - sign-in pop-up when the email and/or password is empty;
- *  - data-confirm / data-no-submit forms and data-autosubmit selects;
+ *  - data-confirm forms ask in a styled dialog; data-no-submit forms and data-autosubmit selects;
  *  - wide tables scroll sideways inside their card instead of widening the page.
  */
 (function () {
@@ -155,14 +155,114 @@
   /* ---------- Icons are decorative: the words next to them (or the control's aria-label) carry the meaning ---------- */
   document.querySelectorAll('i.bi:not([aria-hidden])').forEach(function (i) { i.setAttribute('aria-hidden', 'true'); });
 
+  /* ---------- Confirmation dialog (replaces the browser's "localhost says" box) ----------
+     data-confirm="What happens" on a <form> asks first; Cancel / Esc / clicking outside stops the submit. Optional:
+       data-confirm-title   short question, e.g. "Approve this applicant?"   (default "Are you sure?")
+       data-confirm-subject who or what it acts on, shown in bold, e.g. the applicant's name
+       data-confirm-ok      label of the action button                       (default: the form's submit button text)
+       data-confirm-tone    success | danger | warning | primary              (default: from the submit button's colour)
+     Required fields are checked by the browser before this opens. For danger the focus starts on Cancel. */
+  var TONES = {
+    success: { icon: 'bi-check-circle-fill', btn: 'btn-success' },
+    danger:  { icon: 'bi-exclamation-octagon-fill', btn: 'btn-danger' },
+    warning: { icon: 'bi-exclamation-triangle-fill', btn: 'btn-warning' },
+    primary: { icon: 'bi-question-circle-fill', btn: 'btn-primary' }
+  };
+  var confirmEl = null, confirmModal = null, pending = null;
+
+  function buildConfirm() {
+    confirmEl = document.createElement('div');
+    confirmEl.className = 'modal fade sk-confirm';
+    confirmEl.id = 'skConfirm';
+    confirmEl.tabIndex = -1;
+    confirmEl.setAttribute('role', 'alertdialog');
+    confirmEl.setAttribute('aria-modal', 'true');
+    confirmEl.setAttribute('aria-labelledby', 'skConfirmTitle');
+    confirmEl.setAttribute('aria-describedby', 'skConfirmText');
+    confirmEl.innerHTML =
+      '<div class="modal-dialog modal-dialog-centered"><div class="modal-content">' +
+        '<div class="modal-body text-center px-4 pt-4 pb-3">' +
+          '<div class="sk-confirm-icon" aria-hidden="true"><i class="bi"></i></div>' +
+          '<h2 class="h4 fw-bold mb-2" id="skConfirmTitle"></h2>' +
+          '<div class="sk-confirm-subject mb-2" id="skConfirmSubject"></div>' +
+          '<p class="mb-0" id="skConfirmText"></p>' +
+        '</div>' +
+        '<div class="modal-footer justify-content-center gap-2 border-0 pt-0 pb-4">' +
+          '<button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal" data-sk-cancel>Cancel</button>' +
+          '<button type="button" class="btn px-4" data-sk-ok></button>' +
+        '</div>' +
+      '</div></div>';
+    document.body.appendChild(confirmEl);
+    confirmModal = window.bootstrap.Modal.getOrCreateInstance(confirmEl);
+    confirmEl.querySelector('[data-sk-ok]').addEventListener('click', function () {
+      if (!pending) return;
+      var p = pending; pending = null;
+      var ok = this; ok.disabled = true; ok.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Working…';
+      p.form.dataset.skConfirmed = '1';
+      if (typeof p.form.requestSubmit === 'function') p.form.requestSubmit(p.submitter && p.submitter.form === p.form ? p.submitter : undefined);
+      else p.form.submit();
+    });
+    confirmEl.addEventListener('shown.bs.modal', function () {
+      confirmEl.setAttribute('role', 'alertdialog'); // Bootstrap resets it to "dialog" while opening
+      var tone = confirmEl.dataset.tone;
+      confirmEl.querySelector(tone === 'danger' ? '[data-sk-cancel]' : '[data-sk-ok]').focus();
+    });
+    // Back button after OK: the browser may restore this page with the dialog still showing "Working…".
+    window.addEventListener('pageshow', function (ev) { if (ev.persisted) { pending = null; confirmModal.hide(); } });
+    confirmEl.addEventListener('hidden.bs.modal', function () {
+      // Cancelled (pending still set): give focus back to the button that asked.
+      if (pending && pending.submitter && document.contains(pending.submitter)) pending.submitter.focus();
+      pending = null;
+    });
+  }
+
+  function toneOf(form, submitter) {
+    var t = form.getAttribute('data-confirm-tone');
+    if (TONES[t]) return t;
+    var cls = submitter ? submitter.className : '';
+    if (/btn-(outline-)?danger/.test(cls)) return 'danger';
+    if (/btn-(outline-)?warning/.test(cls)) return 'warning';
+    if (/btn-(outline-)?success/.test(cls)) return 'success';
+    return 'primary';
+  }
+
+  function askConfirm(form, submitter) {
+    if (!confirmEl) buildConfirm();
+    var tone = toneOf(form, submitter);
+    var label = form.getAttribute('data-confirm-ok') ||
+      (submitter && (submitter.textContent.trim() || submitter.getAttribute('aria-label'))) || 'Continue';
+    var subject = form.getAttribute('data-confirm-subject') || '';
+    confirmEl.dataset.tone = tone;
+    confirmEl.querySelector('.sk-confirm-icon').className = 'sk-confirm-icon sk-confirm-' + tone;
+    confirmEl.querySelector('.sk-confirm-icon i').className = 'bi ' + TONES[tone].icon;
+    confirmEl.querySelector('#skConfirmTitle').textContent = form.getAttribute('data-confirm-title') || 'Are you sure?';
+    var subj = confirmEl.querySelector('#skConfirmSubject');
+    subj.textContent = subject; subj.hidden = subject === '';
+    confirmEl.querySelector('#skConfirmText').textContent = form.getAttribute('data-confirm');
+    var ok = confirmEl.querySelector('[data-sk-ok]');
+    ok.disabled = false;
+    ok.className = 'btn px-4 ' + TONES[tone].btn;
+    ok.textContent = label;
+    pending = { form: form, submitter: submitter };
+    confirmModal.show();
+  }
+
   /* ---------- Forms: confirm first, never submit, submit on change ----------
-     data-confirm="Question?" on a <form>: OK/Cancel dialog first; Cancel stops the submit.
+     data-confirm on a <form>: the dialog above first.
      data-no-submit on a <form>: Enter never submits it (the application wizard saves its fields by itself).
      data-autosubmit on a <select>: picking an option submits its form (list filters). */
   document.addEventListener('submit', function (e) {
     var form = e.target;
     if (form.hasAttribute('data-no-submit')) { e.preventDefault(); return; }
-    if (form.hasAttribute('data-confirm') && !window.confirm(form.getAttribute('data-confirm'))) e.preventDefault();
+    if (!form.hasAttribute('data-confirm')) return;
+    if (form.dataset.skConfirmed === '1') { delete form.dataset.skConfirmed; return; }   // the dialog's OK sent it
+    e.preventDefault();
+    var submitter = e.submitter || form.querySelector('button:not([type="button"]), input[type="submit"]');
+    if (!window.bootstrap || !window.bootstrap.Modal) {   // Bootstrap didn't load: the browser's own box still asks
+      if (window.confirm(form.getAttribute('data-confirm'))) { form.dataset.skConfirmed = '1'; form.requestSubmit ? form.requestSubmit() : form.submit(); }
+      return;
+    }
+    askConfirm(form, submitter);
   });
   document.addEventListener('change', function (e) {
     if (e.target.matches('select[data-autosubmit]')) e.target.form.submit();

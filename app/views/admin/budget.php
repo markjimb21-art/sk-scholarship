@@ -26,7 +26,9 @@
             <td class="text-end text-nowrap">
               <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#budgetModal" data-budget-modal="<?= e(js_json($b)) ?>" aria-label="Edit budget"><i class="bi bi-pencil" aria-hidden="true"></i></button>
               <?php if ((float)$b['released'] == 0.0): ?>
-                <form method="POST" action="<?= url('admin/budget-delete') ?>" class="d-inline" data-confirm="Delete this budget?">
+                <form method="POST" action="<?= url('admin/budget-delete') ?>" class="d-inline"
+                      data-confirm-title="Delete this budget?" data-confirm-subject="<?= e($b['program_name'] . ' · A.Y. ' . $b['academic_year'] . ' · ' . peso($b['total_budget'])) ?>"
+                      data-confirm="Nothing has been released from it yet. This cannot be undone." data-confirm-ok="Delete budget">
                   <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
                   <button class="btn btn-sm btn-outline-danger" aria-label="Delete budget"><i class="bi bi-trash" aria-hidden="true"></i></button>
                 </form>

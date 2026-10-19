@@ -19,7 +19,9 @@
         <div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle"></i> <?= e($seatWarning) ?></div>
       <?php endif; ?>
       <?php if ($canDecide && $req['scholar_status'] === 'Active'): ?>
-        <form method="POST" action="<?= url('admin/renewals/decide') ?>" class="d-inline" data-confirm="Approve? This opens <?= e($req['academic_year'] . ' ' . $req['semester']) ?> for the scholar.">
+        <form method="POST" action="<?= url('admin/renewals/decide') ?>" class="d-inline"
+              data-confirm-title="Approve this renewal?" data-confirm-subject="<?= e($req['full_name'] . ' · ' . $req['academic_year'] . ' ' . $req['semester']) ?>"
+              data-confirm="This opens <?= e($req['academic_year'] . ' ' . $req['semester']) ?> for the scholar." data-confirm-ok="Approve">
           <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="decision" value="approve">
           <button class="btn btn-success"><i class="bi bi-check-circle"></i> Approved — open <?= e($req['academic_year'] . ' ' . $req['semester']) ?></button>
         </form>

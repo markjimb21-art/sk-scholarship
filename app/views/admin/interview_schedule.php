@@ -17,12 +17,14 @@ $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] 
   <div class="d-flex gap-2">
     <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editModal"><i class="bi bi-pencil"></i> Edit</button>
     <?php if ((int)$schedule['assigned_count'] === 0): ?>
-      <form method="POST" action="<?= url('admin/interview-schedule-delete') ?>" data-confirm="Delete this empty schedule?">
+      <form method="POST" action="<?= url('admin/interview-schedule-delete') ?>" data-confirm-title="Delete this schedule?" data-confirm-subject="<?= e($schedule['program_name'] . ' · ' . date('D, M j, Y', strtotime($schedule['interview_date']))) ?>"
+            data-confirm="Nobody is assigned to it. It is removed from the calendar." data-confirm-ok="Delete schedule">
         <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$schedule['id'] ?>">
         <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Delete</button>
       </form>
     <?php elseif (!$anyMarked): ?>
-      <form method="POST" action="<?= url('admin/interview-schedule-cancel') ?>" data-confirm="Cancel this schedule? Everyone assigned goes back to the waiting list and is notified.">
+      <form method="POST" action="<?= url('admin/interview-schedule-cancel') ?>" data-confirm-title="Cancel this schedule?" data-confirm-subject="<?= e($schedule['program_name'] . ' · ' . date('D, M j, Y', strtotime($schedule['interview_date']))) ?>"
+            data-confirm="Everyone assigned goes back to the waiting list and is notified." data-confirm-ok="Cancel schedule">
         <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$schedule['id'] ?>">
         <button class="btn btn-outline-danger btn-sm"><i class="bi bi-x-circle"></i> Cancel schedule</button>
       </form>
@@ -52,13 +54,19 @@ $anyMarked = (bool)array_filter($assignments, static fn($a) => $a['attendance'] 
                 <?php if ($started): ?>
                   <a class="btn btn-sm btn-success" href="<?= url('admin/interview-score&id=' . (int)$a['id']) ?>"><i class="bi bi-check2"></i> Attended — score</a>
                   <form method="POST" action="<?= url('admin/interview-no-show') ?>" class="d-inline"
-                        data-confirm="<?= e((int)$a['reschedule_count'] ? 'This was their rescheduled interview. Marking a no-show REJECTS the application. Continue?' : 'Mark as no-show? They go back to the waiting list for one reschedule.') ?>">
+                        data-confirm-title="<?= (int)$a['reschedule_count'] ? 'No-show — reject the application?' : 'Mark as no-show?' ?>"
+                        data-confirm-subject="<?= e($a['full_name']) ?>"
+                        data-confirm="<?= e((int)$a['reschedule_count'] ? 'This was their rescheduled interview. Marking a no-show REJECTS the application.' : 'They go back to the waiting list for one reschedule.') ?>"
+                        data-confirm-tone="<?= (int)$a['reschedule_count'] ? 'danger' : 'warning' ?>"
+                        data-confirm-ok="<?= (int)$a['reschedule_count'] ? 'No-show and reject' : 'Mark no-show' ?>">
                     <?= csrf_field() ?><input type="hidden" name="assignment_id" value="<?= (int)$a['id'] ?>"><input type="hidden" name="schedule_id" value="<?= (int)$schedule['id'] ?>">
                     <button class="btn btn-sm btn-outline-danger">No-show</button>
                   </form>
                 <?php else: ?>
                   <a class="btn btn-sm btn-outline-primary" href="<?= url('admin/interview-reschedule&id=' . (int)$a['id']) ?>">Reschedule</a>
-                  <form method="POST" action="<?= url('admin/interview-unassign') ?>" class="d-inline" data-confirm="Remove this applicant from the schedule? They are notified.">
+                  <form method="POST" action="<?= url('admin/interview-unassign') ?>" class="d-inline"
+                        data-confirm-title="Remove from this schedule?" data-confirm-subject="<?= e($a['full_name']) ?>"
+                        data-confirm="They are taken off this interview and notified." data-confirm-tone="warning" data-confirm-ok="Remove">
                     <?= csrf_field() ?><input type="hidden" name="assignment_id" value="<?= (int)$a['id'] ?>"><input type="hidden" name="schedule_id" value="<?= (int)$schedule['id'] ?>">
                     <button class="btn btn-sm btn-outline-secondary">Remove</button>
                   </form>

@@ -17,7 +17,9 @@
             <td><?= $t['budget_remaining'] !== null ? e(peso($t['budget_remaining'])) : '<span class="text-danger">No budget for ' . e($t['academic_year']) . '</span>' ?></td>
             <td>
               <form method="POST" action="<?= url('admin/release-save') ?>" class="row g-1 align-items-end"
-                    data-confirm="Record this release? The scholar will be notified.">
+                    data-confirm-title="Record this release?" data-confirm-subject="<?= e($t['full_name'] . ' · ' . $t['academic_year'] . ' ' . $t['semester']) ?>"
+                    data-confirm="The amount is taken from this year's budget and the scholar is notified." data-confirm-tone="success"
+                    data-confirm-ok="Record release">
                 <?= csrf_field() ?><input type="hidden" name="term_id" value="<?= (int)$t['id'] ?>">
                 <div class="col-3"><label class="form-label small mb-0" for="relAmount<?= (int)$t['id'] ?>">Amount (₱)</label><input type="number" id="relAmount<?= (int)$t['id'] ?>" name="amount" class="form-control form-control-sm" min="0.01" step="0.01" value="<?= e((string)$t['amount_per_semester']) ?>" required title="Amount (₱) — pre-filled with the program's amount per semester"></div>
                 <div class="col-3"><label class="form-label small mb-0" for="relDate<?= (int)$t['id'] ?>">Release date</label><input type="date" id="relDate<?= (int)$t['id'] ?>" name="release_date" class="form-control form-control-sm" max="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>" required></div>

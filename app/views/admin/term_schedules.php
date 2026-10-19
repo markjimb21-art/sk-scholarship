@@ -61,8 +61,11 @@ $editId = get_int('edit');   // opened straight away by pages/term-schedules.js
                       aria-label="Edit window"><i class="bi bi-pencil" aria-hidden="true"></i></button>
               <?php if ((int)$s['submitted_count'] === 0): // nobody submitted under it yet (TermSchedule::delete) ?>
                 <form method="POST" action="<?= url('admin/term-schedule-delete') ?>" class="d-inline"
-                      data-confirm="<?= e('Delete the ' . strtolower(TermSchedule::TITLES[$purpose]) . ' window ' . $s['academic_year'] . ' ' . $s['semester'] . ' (' . $s['program_name'] . ')?'
-                          . ($s['status'] !== 'Cancelled' && (int)$s['pending_count'] > 0 ? ' The ' . (int)$s['pending_count'] . ' scholar(s) it applies to will be told it was cancelled.' : '')) ?>">
+                      data-confirm-title="<?= e('Delete this ' . strtolower(TermSchedule::TITLES[$purpose]) . ' window?') ?>"
+                      data-confirm-subject="<?= e($s['program_name'] . ' · ' . $s['academic_year'] . ' ' . $s['semester']) ?>"
+                      data-confirm="<?= e($s['status'] !== 'Cancelled' && (int)$s['pending_count'] > 0
+                          ? 'The ' . (int)$s['pending_count'] . ' scholar(s) it applies to will be told it was cancelled.' : 'Nobody has submitted under it yet.') ?>"
+                      data-confirm-ok="Delete window">
                   <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="purpose" value="<?= e($purpose) ?>">
                   <button class="btn btn-sm btn-outline-danger" aria-label="Delete window"><i class="bi bi-trash" aria-hidden="true"></i></button>
                 </form>

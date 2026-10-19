@@ -137,7 +137,7 @@ All 29 tables are created by `database/schema.sql`. Many classes read a table; t
 
 - **Views are templates only.** They print every value through `e()` (HTML escaping) and never run SQL.
 - **No inline JavaScript.** There are no `<script>` blocks with code in the views and no `onclick=`/`onsubmit=` attributes. The one exception is the two-line text-size setting in the page head, which must run before the page is drawn.
-  - `ui.js` (every page): text size (A / A+ / A++), show/hide password, live password checklist, sign-in pop-up, "Are you sure?" dialogs (`data-confirm`), filters that submit on change (`data-autosubmit`), wide tables.
+  - `ui.js` (every page): text size (A / A+ / A++), show/hide password, live password checklist, sign-in pop-up, "Are you sure?" dialogs (`data-confirm` on a form, styled Bootstrap dialog; optional `data-confirm-title` / `-subject` / `-ok` / `-tone`), filters that submit on change (`data-autosubmit`), wide tables.
   - `app.js`: sidebar, age and income calculations, wizard steps.
   - `sk-charts.js`: one chart style for every chart.
   - `pages/*.js`: one file per page that needs behaviour, named after the page (`budget.js`, `calendar.js`, …).

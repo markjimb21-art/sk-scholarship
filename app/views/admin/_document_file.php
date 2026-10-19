@@ -19,7 +19,9 @@
   <?php if ($invalidBack !== null): $invKey = $invalidTable . (int)$f['id']; ?>
     <details class="small mt-1">
       <summary class="text-danger">Mark this file invalid…</summary>
-      <form method="POST" action="<?= url('admin/documents/invalidate') ?>" class="mt-1" data-confirm="Remove this file? The record is kept, marked Invalid with your reason.">
+      <form method="POST" action="<?= url('admin/documents/invalidate') ?>" class="mt-1"
+            data-confirm-title="Mark this file invalid?" data-confirm-subject="<?= e($f['original_filename']) ?>"
+            data-confirm="The file is removed. The record is kept, marked Invalid with your reason." data-confirm-ok="Mark invalid">
         <?= csrf_field() ?><input type="hidden" name="table" value="<?= e($invalidTable) ?>"><input type="hidden" name="id" value="<?= (int)$f['id'] ?>">
         <input type="hidden" name="back" value="<?= e($invalidBack) ?>">
         <label class="form-label" for="invReason<?= e($invKey) ?>">Why is this file invalid?</label>

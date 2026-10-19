@@ -33,7 +33,8 @@ $canEnd = AdminController::canAccess('renewals/end-did-not-renew');
     <h6 class="mb-0">Did not renew <span class="badge bg-<?= $didNotRenew['end'] ? 'danger' : 'secondary' ?> ms-1"><?= count($didNotRenew['end']) ?></span></h6>
     <?php if ($didNotRenew['end'] && $canEnd): ?>
       <form method="POST" action="<?= url('admin/renewals/end-did-not-renew') ?>" class="m-0"
-            data-confirm="End the scholarship of all <?= count($didNotRenew['end']) ?> scholar(s) listed here as &quot;Did not renew&quot;? Each one is notified. Anyone who submitted a renewal since this page loaded is skipped.">
+            data-confirm-title="End these scholarships?" data-confirm-subject="<?= count($didNotRenew['end']) ?> scholar(s) · Did not renew"
+            data-confirm="Each one is notified. Anyone who submitted a renewal since this page loaded is skipped." data-confirm-ok="End all">
         <?= csrf_field() ?>
         <?php foreach ($didNotRenew['end'] as $m): ?><input type="hidden" name="scholar_ids[]" value="<?= (int)$m['scholar_id'] ?>"><?php endforeach; ?>
         <button class="btn btn-sm btn-outline-danger"><i class="bi bi-person-x"></i> End all as Did not renew</button>

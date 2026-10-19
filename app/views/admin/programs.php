@@ -50,14 +50,19 @@
               <button class="btn btn-sm btn-outline-primary" title="Edit" data-bs-toggle="modal" data-bs-target="#programModal"
                       data-program-modal="<?= e(js_json($p)) ?>" aria-label="Edit program"><i class="bi bi-pencil" aria-hidden="true"></i></button>
               <form method="POST" action="<?= url('admin/program-toggle') ?>" class="d-inline"
-                    data-confirm="<?= e(($p['is_active'] ? 'Close' : 'Open') . ' "' . $p['program_name'] . '"?') ?>">
+                    data-confirm-title="<?= $p['is_active'] ? 'Close this program?' : 'Open this program?' ?>"
+                    data-confirm-subject="<?= e($p['program_name'] . ' · A.Y. ' . $p['academic_year']) ?>"
+                    data-confirm="<?= $p['is_active'] ? 'Applicants can no longer apply to it.' : 'Applicants can apply while today is inside its application dates.' ?>"
+                    data-confirm-ok="<?= $p['is_active'] ? 'Close program' : 'Open program' ?>">
                 <?= csrf_field() ?>
                 <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
                 <button class="btn btn-sm btn-outline-<?= $p['is_active'] ? 'warning' : 'success' ?>"><?= $p['is_active'] ? 'Close' : 'Open' ?></button>
               </form>
               <?php if ((int)$p['any_application_count'] === 0): // nobody applied, not even a Draft: no records to keep (Program::delete) ?>
                 <form method="POST" action="<?= url('admin/program-delete') ?>" class="d-inline"
-                      data-confirm="<?= e('Delete "' . $p['program_name'] . '"? Its budgets, claim/renewal windows and interview schedules are deleted too. This cannot be undone.') ?>">
+                      data-confirm-title="Delete this program?" data-confirm-subject="<?= e($p['program_name'] . ' · A.Y. ' . $p['academic_year']) ?>"
+                      data-confirm="Its budgets, claim/renewal windows and interview schedules are deleted too. This cannot be undone."
+                      data-confirm-ok="Delete program">
                   <?= csrf_field() ?>
                   <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
                   <button class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete program"><i class="bi bi-trash" aria-hidden="true"></i></button>

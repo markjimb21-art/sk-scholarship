@@ -209,6 +209,21 @@ hr { border-color: var(--border-soft); opacity: 1; }
 .page-link { display: flex; align-items: center; justify-content: center; min-width: var(--target-min); }
 .modal-content { border-radius: var(--radius); }
 
+/* ---------- Confirmation dialog (ui.js, every data-confirm form) ---------- */
+.sk-confirm .modal-dialog { max-width: 30rem; }
+.sk-confirm .modal-content { border: 0; box-shadow: 0 1rem 3rem rgba(15, 23, 42, .25); }
+.sk-confirm-icon { width: 4rem; height: 4rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 2rem; margin-bottom: .75rem; }
+.sk-confirm-success { background: var(--success-bg); color: var(--success-text); }
+.sk-confirm-danger  { background: var(--danger-bg);  color: var(--danger-text); }
+.sk-confirm-warning { background: var(--warning-bg); color: var(--warning-text); }
+.sk-confirm-primary { background: var(--info-bg);    color: var(--info-text); }
+.sk-confirm-subject { display: inline-block; max-width: 100%; padding: .3rem .8rem; border-radius: var(--radius);
+  background: var(--neutral-bg); color: var(--text); font-weight: 700; overflow-wrap: anywhere; }
+.sk-confirm-subject[hidden] { display: none; }
+#skConfirmText { color: var(--text-muted); overflow-wrap: anywhere; }
+.sk-confirm .modal-footer .btn { min-width: 8rem; min-height: var(--target-min); font-weight: 700; }
+
 /* ---------- Text-size control (A / A+ / A++) ---------- */
 .text-size-control { display: inline-flex; border: 2px solid var(--border-field); border-radius: var(--radius); overflow: hidden; }
 .text-size-control button { min-width: var(--target-min); min-height: var(--target-min); border: 0; background: var(--surface-card);
@@ -299,7 +314,7 @@ hr { border-color: var(--border-soft); opacity: 1; }
 .review-table td { word-break: break-word; }
 .doc-Submitted { background: var(--info-bg); color: var(--info-text); }
 .doc-Verified { background: var(--success-bg); color: var(--success-text); }
-.doc-Not-Submitted { background: var(--neutral-bg); color: var(--neutral-text); }
+.doc-Not-Submitted { background: var(--danger-bg); color: var(--danger-text); }   /* Missing: light red, needs action */
 .doc-Invalid { background: var(--danger-bg); color: var(--danger-text); }
 
 /* ---------- Document drag-and-drop ---------- */

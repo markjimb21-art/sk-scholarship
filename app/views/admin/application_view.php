@@ -68,7 +68,9 @@ $screening = Application::can('qualify', $app['status']);
       <div class="card-body">
         <h6 class="fw-semibold mb-3">Screening decision</h6>
         <?php if ($screening): ?>
-          <form method="POST" action="<?= url('admin/screening/decide') ?>" class="mb-2" data-confirm="Qualify this applicant for an interview?">
+          <form method="POST" action="<?= url('admin/screening/decide') ?>" class="mb-2"
+                data-confirm-title="Qualify for interview?" data-confirm-subject="<?= e($app['applicant']['full_name'] ?? $app['application_code']) ?>"
+                data-confirm="This applicant moves on to the interview stage." data-confirm-ok="Qualify">
             <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$app['id'] ?>"><input type="hidden" name="decision" value="qualify">
             <button class="btn btn-success w-100"><i class="bi bi-check-circle"></i> Qualify for interview</button>
           </form>

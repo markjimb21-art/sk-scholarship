@@ -8,9 +8,9 @@
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Name of School *</label>
-            <input name="school_name" class="form-control" required list="schoolList" value="<?= e($education['school_name'] ?? '') ?>">
+            <input name="school_name" class="form-control" data-uppercase required list="schoolList" value="<?= e($education['school_name'] ?? '') ?>">
             <datalist id="schoolList">
-              <?php foreach ($schools as $s): ?><option value="<?= e($s['school_name']) ?>"><?php endforeach; ?>
+              <?php foreach ($schools as $s): ?><option value="<?= e(up($s['school_name'])) ?>"><?php endforeach; ?>
             </datalist>
           </div>
           <div class="col-md-3">
@@ -23,19 +23,19 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">If Other, specify</label>
-            <input name="year_level_other" class="form-control" value="<?= e($education['year_level_other'] ?? '') ?>">
+            <input name="year_level_other" class="form-control" data-uppercase value="<?= e($education['year_level_other'] ?? '') ?>">
           </div>
           <div class="col-md-6">
             <label class="form-label">Course *</label>
-            <input name="course_name" class="form-control" required list="courseList" autocomplete="off" value="<?= e($education['course_name'] ?? '') ?>">
+            <input name="course_name" class="form-control" data-uppercase required list="courseList" autocomplete="off" value="<?= e($education['course_name'] ?? '') ?>">
             <div class="form-text">Start typing your course to see available recommendations.</div>
             <datalist id="courseList">
-              <?php foreach ($courses as $c): ?><option value="<?= e($c['course_name']) ?>"><?php endforeach; ?>
+              <?php foreach ($courses as $c): ?><option value="<?= e(up($c['course_name'])) ?>"><?php endforeach; ?>
             </datalist>
           </div>
           <div class="col-md-6">
             <label class="form-label">Major</label>
-            <input name="major" class="form-control" placeholder="e.g. English, Mathematics" value="<?= e($education['major'] ?? '') ?>">
+            <input name="major" class="form-control" data-uppercase placeholder="e.g. English, Mathematics" value="<?= e($education['major'] ?? '') ?>">
           </div>
           <div class="col-md-6">
             <label class="form-label">General Weighted Average (GWA)</label>
@@ -53,7 +53,7 @@
                      <?= !empty($education['previous_scholarship']) ? 'checked' : '' ?>>
               <label class="form-check-label" for="prevYes">Yes</label>
             </div>
-            <input name="previous_scholarship_details" class="form-control mt-2"
+            <input name="previous_scholarship_details" class="form-control mt-2" data-uppercase
                    placeholder="Scholarship name / details" value="<?= e($education['previous_scholarship_details'] ?? '') ?>">
           </div>
           <div class="col-md-6">
@@ -63,7 +63,7 @@
                      <?= !empty($education['current_scholarship']) ? 'checked' : '' ?>>
               <label class="form-check-label" for="currYes">Yes</label>
             </div>
-            <input name="current_scholarship_details" class="form-control mt-2"
+            <input name="current_scholarship_details" class="form-control mt-2" data-uppercase
                    placeholder="Scholarship name / details" value="<?= e($education['current_scholarship_details'] ?? '') ?>">
           </div>
         </div>

@@ -32,7 +32,8 @@
 <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
   <div><strong>A slot is free.</strong> Promote the next waitlisted applicant, <strong><?= e($nextWaitlisted['full_name']) ?></strong>
     (rank <?= (int)$nextWaitlisted['rank'] ?>, score <?= e(number_format((float)$nextWaitlisted['total_score'], 2)) ?>)?</div>
-  <form method="POST" action="<?= url('admin/decisions/decide') ?>" data-confirm="Approve <?= e($nextWaitlisted['full_name']) ?>? This creates the scholar and opens Semester 1.">
+  <form method="POST" action="<?= url('admin/decisions/decide') ?>" data-confirm-title="Promote and approve?" data-confirm-subject="<?= e($nextWaitlisted['full_name']) ?>"
+        data-confirm="This creates the scholar and opens Semester 1. They take the free slot." data-confirm-ok="Approve">
     <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$nextWaitlisted['id'] ?>"><input type="hidden" name="decision" value="approve">
     <button class="btn btn-success btn-sm">Promote and approve</button>
   </form>
@@ -58,7 +59,9 @@
             <td><span class="badge bg-<?= e(APP_STATUS_COLORS[$r['status']]) ?>"><?= e($r['status']) ?></span></td>
             <td class="text-end text-nowrap">
               <?php if (Application::can('approve', $r['status'])): ?>
-                <form method="POST" action="<?= url('admin/decisions/decide') ?>" class="d-inline" data-confirm="Approve this applicant? This creates the scholar and opens Semester 1.">
+                <form method="POST" action="<?= url('admin/decisions/decide') ?>" class="d-inline"
+                      data-confirm-title="Approve this applicant?" data-confirm-subject="<?= e($r['full_name'] . ' · ' . $r['application_code']) ?>"
+                      data-confirm="This creates the scholar and opens Semester 1." data-confirm-ok="Approve">
                   <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="decision" value="approve">
                   <button class="btn btn-sm btn-success" <?= $full ? 'disabled title="All slots are filled."' : '' ?>>Approve</button>
                 </form>
